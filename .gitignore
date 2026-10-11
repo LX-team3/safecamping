@@ -1,0 +1,54 @@
+# ===========================
+# 비밀 정보 (DB 비밀번호 등)
+# ===========================
+application-local.properties
+.env
+.env.local
+
+# ===========================
+# Eclipse 워크스페이스
+# ===========================
+.metadata/
+RemoteSystemsTempFiles/
+.recommenders/
+
+# ===========================
+# Frontend (client - Vue)
+# ===========================
+node_modules/
+dist/
+*.local
+npm-debug.log*
+
+# ===========================
+# Backend (server - Spring Boot / Maven)
+# ===========================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+HELP.md
+*.log
+
+# ===========================
+# IDE 설정
+# ===========================
+# Eclipse
+.project
+.classpath
+.settings/
+.factorypath
+bin/
+.springBeans
+.sts4-cache/
+
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# ===========================
+# OS
+# ===========================
+.DS_Store
+Thumbs.db
