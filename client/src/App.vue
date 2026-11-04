@@ -1,99 +1,31 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
-
-const message = ref('연결 중...')
-
-onMounted(async () => {
-  try {
-    const res = await axios.get('/api/test')
-    message.value = res.data.message
-  } catch (e) {
-    message.value = '연결 실패: ' + e.message
-  }
-})
-
+import { RouterView } from 'vue-router'
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-      <h1>{{ message }}</h1>
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
+  <!-- 모바일 390px 폭 틀 -->
+  <div class="frame">
+    <RouterView />
+  </div>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.frame {
+  max-width: var(--frame-width);
+  height: 100vh;
+  height: 100dvh; /* 모바일 주소창을 뺀 실제 보이는 높이 */
+  margin: 0 auto;
+  overflow-y: auto; /* 화면이 틀보다 길면 틀 안에서 스크롤 */
+  background: var(--color-bg);
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
+/* PC 처럼 화면이 틀보다 넓을 때: 설계의 폰 크기(390×844)로 줄이고 가운데에 둔다 */
+@media (min-width: 391px) {
+  .frame {
+    height: min(var(--frame-height), calc(100dvh - 48px));
+    margin: 24px auto;
+    border-radius: 20px;
+    box-shadow: 0 0 0 1px var(--color-border), 0 4px 24px rgba(0, 0, 0, 0.08);
   }
 }
 </style>

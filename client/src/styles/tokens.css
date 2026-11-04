@@ -1,0 +1,19 @@
+/* 디자인 토큰 — 색은 여기 변수만 쓴다 (루트 CLAUDE.md "디자인 규칙")
+   색 값은 화면설계 파일(docs/design/Login·Signup.dc.html)에서 가져왔다 */
+:root {
+  --color-bg: #ffffff;        /* 배경 */
+  --color-outside: #e9eae6;   /* 모바일 틀 바깥(PC 브라우저) 배경 */
+  --color-bg-soft: #f7f7f5;   /* 안내 박스 배경 (비상연락처 등) */
+  --color-card: #ffffff;      /* 카드·입력칸 */
+  --color-border: #d6d7d1;    /* 테두리 */
+  --color-text: #1c1d1b;      /* 본문 */
+  --color-text-sub: #6e706b;  /* 보조 */
+  --color-primary: #4f5d33;   /* 메인(올리브) */
+  --color-green: #1f6136;     /* 사용 가능 문구 초록 */
+
+  --font-base: 'Noto Sans KR', system-ui, sans-serif;
+  --frame-width: 390px;       /* 모바일 화면 폭 */
+  --frame-height: 844px;      /* PC 에서 보여 줄 모바일 화면 높이 (설계 파일 크기) */
+  --radius-input: 12px;
+  --radius-pill: 27px;
+}

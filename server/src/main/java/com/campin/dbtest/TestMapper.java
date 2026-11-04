@@ -1,4 +1,4 @@
-package com.campingsafe.server.mapper;
+package com.campin.dbtest;
 
 import java.util.List;
 import java.util.Map;

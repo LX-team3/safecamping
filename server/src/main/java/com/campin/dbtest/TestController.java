@@ -1,11 +1,10 @@
-package com.campingsafe.server.controller;
+package com.campin.dbtest;
 
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.web.bind.annotation.*;
 
-import com.campingsafe.server.mapper.TestMapper;
 
 import lombok.RequiredArgsConstructor;
 

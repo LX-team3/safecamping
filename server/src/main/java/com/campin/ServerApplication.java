@@ -1,4 +1,4 @@
-package com.campingsafe.server;
+package com.campin;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
