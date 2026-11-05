@@ -23,6 +23,8 @@ member/   # ①-3 로그인 · ①-4 회원가입 (member 테이블). 내 정보
 survey/   # ② 캠핑 유형 진단 (만들 때 같은 모양으로)
 region/   # ③ 지역 찾기
 map/      # ④ 캠핑지도
+saved/    # 저장(목록 탭)·관심 캠핑장 비교 (saved_list·saved_camp 테이블). CampDummyData 는 캠핑장 데이터가 생기면 지운다
+family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치도 여기에
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
 ```
 
@@ -53,6 +55,16 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 | `POST /api/auth/login` | 로그인 `{ loginId, password, keep }` → 세션 쿠키, `keep` 이면 remember-me 쿠키(14일) |
 | `POST /api/auth/logout` | 로그아웃 (SecurityConfig 의 logout 설정이 처리) |
 | `GET /api/auth/me` | 지금 로그인한 회원. 로그인 안 했으면 401 |
+| `GET /api/saved/lists` | 내 저장 목록 (`관심 캠핑장` 기본 목록이 없으면 만들어 줌). 이하 `/api/saved/**` 전부 로그인 필요 |
+| `POST /api/saved/lists` · `PATCH`·`DELETE /api/saved/lists/{id}` | 목록 만들기 `{ name }`·이름 바꾸기·삭제 (기본 목록은 바꾸기·삭제 불가 400) |
+| `POST`·`DELETE /api/saved/lists/{id}/camps/{campId}` | 캠핑장 담기·빼기 (지금 campId 는 더미 `c1`~`c3`) |
+| `GET /api/saved/lists/{id}/compare` | 목록 앞의 3곳 비교 표 (더미, `dummy: true`). 남의 목록 id 는 404 |
+| `GET /api/family/room` | 내 가족방 (없으면 `data: null`). 이하 `/api/family/**` 전부 로그인 필요. 한 사람당 방 하나라 주소에 방 번호를 넣지 않는다 |
+| `POST /api/family/room` · `POST /api/family/room/join` | 가족방 만들기 `{ name }` → 201 / 초대코드로 들어가기 `{ inviteCode }` (이미 방이 있으면 400) |
+| `DELETE /api/family/room/me` | 나가기 (마지막 사람이면 방·모일 장소도 지움) |
+| `GET`·`POST /api/family/places` · `DELETE /api/family/places/{id}` | 모일 장소 목록·추가 `{ name, description?, lon?, lat? }`·삭제 (다른 방 장소 id 는 404) |
+| `GET`·`POST /api/family/children` · `PUT`·`DELETE /api/family/children/{id}` | 아이 건강 응급 카드 목록·추가·수정·삭제 `{ name, birthDate?, bloodType?, allergy?, disease?, medicine?, memo? }` |
+| `GET`·`POST /api/family/schedules` · `DELETE /api/family/schedules/{id}` | 가족 일정 목록(시간 순)·추가 `{ title, startAt: "2026-11-14T06:00:00+09:00", memo? }`·삭제 |
 
 - 로그인은 Spring Security **세션 방식**. remember-me 서명 키는 환경변수 `REMEMBER_ME_KEY` (없으면 실행마다 임시 키)
 - CSRF 켜 둠 (`csrf.spa()`): POST·PUT·PATCH·DELETE 는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 보내야 한다 (axios 는 자동, 없으면 403). curl·Postman 으로 시험할 때는 먼저 GET 으로 쿠키를 받는다
@@ -75,4 +87,4 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 - 프론트에서 하는 검사(최대 개수, 단독 선택, 날짜)는 서버에서도 같은 규칙으로 한 번 더 한다
 - 요청 JSON 의 참/거짓 값은 `Boolean` 으로 받는다 (Jackson 3 은 `boolean` 값이 빠지면 요청 전체를 오류로 처리)
 - `dbtest/` 의 `TestController`/`TestMapper`(연결 확인용 임시 코드)를 새 기능의 본보기로 삼지 않는다
-- 보안 설정(SecurityConfig)을 임의로 수정하지 않는다 (지금은 `/api/auth/me` 만 로그인 필요, 나머지는 둘러보기용으로 전체 허용. 변경은 사용자 승인 후)
+- 보안 설정(SecurityConfig)을 임의로 수정하지 않는다 (지금은 `/api/auth/me`·`/api/saved/**`·`/api/family/**` 만 로그인 필요, 나머지는 둘러보기용으로 전체 허용. 변경은 사용자 승인 후)

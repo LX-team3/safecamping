@@ -10,6 +10,12 @@
   --color-text-sub: #6e706b;  /* 보조 */
   --color-primary: #4f5d33;   /* 메인(올리브) */
   --color-green: #1f6136;     /* 사용 가능 문구 초록 */
+  /* 아래는 저장·비교 화면 설계(Saved·Compare.dc.html)에서 가져온 색 */
+  --color-photo: #dcddd6;     /* 캠핑장 사진 자리(회색 칸) */
+  --color-fill-soft: #f1f1ee; /* 빈 썸네일 칸 */
+  --color-line: #eeeeea;      /* 표의 줄 구분선 */
+  --color-divider: #e6e6e1;   /* 탭·아래 메뉴 경계선 */
+  --color-text-mid: #3f413c;  /* 표의 보통 값 글씨 (본문보다 약간 연함) */
 
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */
