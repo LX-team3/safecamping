@@ -23,8 +23,11 @@ onMounted(async () => {
     <template v-if="auth.isLoggedIn">
       <p>{{ auth.member.name }}님, 로그인되었습니다.</p>
       <button type="button" @click="auth.logout()">로그아웃</button>
+      <RouterLink to="/saved">저장</RouterLink>
+      <RouterLink to="/my-camping">내 캠핑</RouterLink>
     </template>
     <RouterLink v-else to="/login">로그인</RouterLink>
+    <RouterLink to="/my-info">내 정보</RouterLink>
   </main>
 </template>
 

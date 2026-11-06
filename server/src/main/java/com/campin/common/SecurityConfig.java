@@ -94,7 +94,8 @@ public class SecurityConfig {
 
             // 요청별 권한 설정
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/me").authenticated()
+                // 저장(관심 캠핑장 목록)·가족 모임방(내 캠핑)·내 정보(비상연락처 등)는 회원 전용
+                .requestMatchers("/api/auth/me", "/api/saved/**", "/api/family/**", "/api/member/**").authenticated()
                 .requestMatchers("/api/test/**", "/api/auth/**").permitAll()
                 // "로그인 없이 둘러보기"가 있으므로 나머지는 아직 전부 허용
                 // 회원 전용 기능(결과 저장 등)을 만들면 그 주소를 위 authenticated() 에 추가한다

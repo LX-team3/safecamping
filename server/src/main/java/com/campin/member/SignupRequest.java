@@ -27,7 +27,7 @@ public record SignupRequest(
         @NotBlank(message = "연락처를 입력해 주세요.")
         String phone,
 
-        @NotBlank(message = "비상연락처를 입력해 주세요.")
+        // 비상연락처는 선택 (비우면 저장하지 않고, 나중에 내 정보에서 넣는다)
         String emergencyPhone,
 
         @NotBlank(message = "주소를 입력해 주세요.")

@@ -13,8 +13,7 @@ public interface MemberMapper {
 
     // 컬럼은 snake_case, 자바 필드는 camelCase 라서 AS 로 이름을 맞춘다
     @Select("""
-            SELECT id, login_id AS loginId, password_hash AS passwordHash, name,
-                   phone, emergency_phone AS emergencyPhone,
+            SELECT id, login_id AS loginId, password_hash AS passwordHash, name, phone,
                    address, address_detail AS addressDetail, created_at AS createdAt
               FROM member
              WHERE login_id = #{loginId}
@@ -24,10 +23,10 @@ public interface MemberMapper {
     @Select("SELECT EXISTS (SELECT 1 FROM member WHERE login_id = #{loginId})")
     boolean existsByLoginId(@Param("loginId") String loginId);
 
-    // @Options: INSERT 후 DB 가 만든 id 를 member.id 에 다시 채워 준다
+    // @Options: INSERT 후 DB 가 만든 id 를 member.id 에 다시 채워 준다 (비상연락처 저장에 쓴다)
     @Insert("""
-            INSERT INTO member (login_id, password_hash, name, phone, emergency_phone, address, address_detail)
-            VALUES (#{loginId}, #{passwordHash}, #{name}, #{phone}, #{emergencyPhone}, #{address}, #{addressDetail})
+            INSERT INTO member (login_id, password_hash, name, phone, address, address_detail)
+            VALUES (#{loginId}, #{passwordHash}, #{name}, #{phone}, #{address}, #{addressDetail})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     void insert(Member member);
