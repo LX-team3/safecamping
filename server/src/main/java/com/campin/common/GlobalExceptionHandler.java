@@ -60,6 +60,13 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail("아이디 또는 비밀번호가 맞지 않습니다.");
     }
 
+    // 서비스에서 찾는 데이터가 없다고 던진 예외 → 404
+    @ExceptionHandler(NotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> dataNotFound(NotFoundException e) {
+        return ApiResponse.fail(e.getMessage());
+    }
+
     // 없는 주소 → 404
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)

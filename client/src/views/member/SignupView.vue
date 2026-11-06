@@ -117,8 +117,8 @@ async function submit() {
       </div>
 
       <div class="group sos">
-        <label for="su-sos">비상연락처</label>
-        <span class="hint">위급할 때 내 위치와 일정을 받을 가족 번호입니다</span>
+        <label for="su-sos">비상연락처 (선택)</label>
+        <span class="hint">위급할 때 내 위치와 일정을 받을 가족 번호입니다. 나중에 내 정보에서 넣어도 됩니다</span>
         <input id="su-sos" v-model.trim="form.emergencyPhone" type="tel" placeholder="010 0000 0000" />
       </div>
 

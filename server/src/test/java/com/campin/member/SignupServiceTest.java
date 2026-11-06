@@ -2,10 +2,12 @@ package com.campin.member;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,7 @@ import com.campin.common.InvalidRequestException;
 class SignupServiceTest {
 
     private final Map<String, Member> table = new HashMap<>();
+    private final FakeEmergencyContactMapper contacts = new FakeEmergencyContactMapper();
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
     private SignupService service;
 
@@ -31,7 +34,7 @@ class SignupServiceTest {
                 table.put(member.getLoginId(), member);
             }
         };
-        service = new SignupService(fakeMapper, encoder);
+        service = new SignupService(fakeMapper, contacts, encoder);
     }
 
     private SignupRequest request(String loginId, String pw, String pw2, String phone) {
@@ -46,7 +49,11 @@ class SignupServiceTest {
         assertNotEquals("password1", saved.getPasswordHash());
         assertTrue(encoder.matches("password1", saved.getPasswordHash()));
         assertEquals("01012345678", saved.getPhone());
-        assertEquals("01098765432", saved.getEmergencyPhone());
+        // 비상연락처는 첫 번째 사람으로, 이름 없이 저장된다
+        List<EmergencyContact> emergency = contacts.findByMemberId(saved.getId());
+        assertEquals(1, emergency.size());
+        assertNull(emergency.get(0).getName());
+        assertEquals("01098765432", emergency.get(0).getPhone());
     }
 
     @Test
@@ -61,6 +68,13 @@ class SignupServiceTest {
         assertThrows(InvalidRequestException.class,
                 () -> service.signup(request("camper01", "password1", "password1", "01012345678")));
         assertEquals(false, service.isLoginIdAvailable("camper01"));
+    }
+
+    @Test
+    void 비상연락처를_비워도_가입된다() {
+        service.signup(new SignupRequest("camper02", "password1", "password1", "홍길동",
+                "01012345678", "", "서울시 어딘가", null));
+        assertTrue(contacts.findByMemberId(table.get("camper02").getId()).isEmpty());
     }
 
     @Test
