@@ -16,6 +16,10 @@
   --color-line: #eeeeea;      /* 표의 줄 구분선 */
   --color-divider: #e6e6e1;   /* 탭·아래 메뉴 경계선 */
   --color-text-mid: #3f413c;  /* 표의 보통 값 글씨 (본문보다 약간 연함) */
+  /* 아래는 내 정보 화면 설계(ForYouNew·Me.dc.html)에서 가져온 색 */
+  --color-text-light: #c9cac4;   /* 어두운 카드 안의 보조 글씨 */
+  --color-accent-light: #9db06a; /* 어두운 카드 안의 번호 강조 */
+  --color-arrow: #9a9c96;        /* 메뉴 줄 오른쪽 화살표 */
 
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */

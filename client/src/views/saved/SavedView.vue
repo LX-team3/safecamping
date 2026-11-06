@@ -1,5 +1,5 @@
 <script setup>
-// 저장 화면 (설계: Saved.dc.html). 이번에는 "목록" 탭만 동작하고 차박 위치·가족 공유는 준비 중
+// 저장 화면 (설계: Saved.dc.html). 이번에는 "목록" 탭만 동작하고 차박 위치는 준비 중 (가족 공유 탭은 가족방과 역할이 겹쳐 뺌)
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSavedStore } from '@/stores/saved'
@@ -7,7 +7,7 @@ import { useSavedStore } from '@/stores/saved'
 const auth = useAuthStore()
 const saved = useSavedStore()
 
-const TABS = ['목록', '차박 위치', '가족 공유']
+const TABS = ['목록', '차박 위치']
 const tab = ref(0)
 const error = ref('')
 

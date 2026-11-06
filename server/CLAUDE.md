@@ -19,7 +19,9 @@ member/   # ①-3 로그인 · ①-4 회원가입 (member 테이블). 내 정보
           Member, MemberMapper, MemberResponse,
           SignupController, SignupService, SignupRequest,
           LoginController, LoginService, LoginRequest,
-          MemberDetailsService, KeepLoginRememberMeServices
+          MemberDetailsService, KeepLoginRememberMeServices,
+          EmergencyContact*(내 정보 · 비상연락처 최대 5명, emergency_contact 테이블),
+          Activity*(내 정보 · 여행 취향 최대 3개, member_activity 테이블. 선택지는 ActivityOption)
 survey/   # ② 캠핑 유형 진단 (만들 때 같은 모양으로)
 region/   # ③ 지역 찾기
 map/      # ④ 캠핑지도
@@ -51,10 +53,12 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 | `GET /api/map/facilities?types=er,police` | 안전 시설 목록 (police·er·fire·store·toilet, 비우면 전부) |
 | `GET /api/map/tours?kw=계곡` · `/api/map/tours/{id}` | 관광지 목록·상세 |
 | `GET /api/auth/check-id?loginId=` | 아이디 중복 확인 → `{ available }` |
-| `POST /api/auth/signup` | 회원가입 (비밀번호 BCrypt 저장, 연락처는 숫자만) → 201 |
+| `POST /api/auth/signup` | 회원가입 (비밀번호 BCrypt 저장, 연락처는 숫자만, 비상연락처 `emergencyPhone` 은 선택 — 넣으면 emergency_contact 첫 번째 사람으로) → 201 |
 | `POST /api/auth/login` | 로그인 `{ loginId, password, keep }` → 세션 쿠키, `keep` 이면 remember-me 쿠키(14일) |
 | `POST /api/auth/logout` | 로그아웃 (SecurityConfig 의 logout 설정이 처리) |
 | `GET /api/auth/me` | 지금 로그인한 회원. 로그인 안 했으면 401 |
+| `GET`·`PUT /api/member/emergency-contacts` | 내 비상연락처 (최대 5명). GET → 넣은 순서대로 `[{ name, phone }, …]` (회원가입 때 넣은 번호는 name null). PUT `{ contacts: [...] }` 은 목록을 통째로 바꿈 (다 비운 칸은 건너뜀, 이름·번호 중 하나만 있거나 6명 이상이면 400). 로그인 필요 |
+| `GET`·`PUT /api/member/activities` | 내 여행 취향. GET → `{ options: [{ code, label, desc }], selected: [code], max: 3 }`. PUT `{ activities: [code] }` 통째로 바꿈 (없는 code·4개 이상 400). 로그인 필요 |
 | `GET /api/saved/lists` | 내 저장 목록 (`관심 캠핑장` 기본 목록이 없으면 만들어 줌). 이하 `/api/saved/**` 전부 로그인 필요 |
 | `POST /api/saved/lists` · `PATCH`·`DELETE /api/saved/lists/{id}` | 목록 만들기 `{ name }`·이름 바꾸기·삭제 (기본 목록은 바꾸기·삭제 불가 400) |
 | `POST`·`DELETE /api/saved/lists/{id}/camps/{campId}` | 캠핑장 담기·빼기 (지금 campId 는 더미 `c1`~`c3`) |
@@ -87,4 +91,4 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 - 프론트에서 하는 검사(최대 개수, 단독 선택, 날짜)는 서버에서도 같은 규칙으로 한 번 더 한다
 - 요청 JSON 의 참/거짓 값은 `Boolean` 으로 받는다 (Jackson 3 은 `boolean` 값이 빠지면 요청 전체를 오류로 처리)
 - `dbtest/` 의 `TestController`/`TestMapper`(연결 확인용 임시 코드)를 새 기능의 본보기로 삼지 않는다
-- 보안 설정(SecurityConfig)을 임의로 수정하지 않는다 (지금은 `/api/auth/me`·`/api/saved/**`·`/api/family/**` 만 로그인 필요, 나머지는 둘러보기용으로 전체 허용. 변경은 사용자 승인 후)
+- 보안 설정(SecurityConfig)을 임의로 수정하지 않는다 (지금은 `/api/auth/me`·`/api/saved/**`·`/api/family/**`·`/api/member/**` 만 로그인 필요, 나머지는 둘러보기용으로 전체 허용. 변경은 사용자 승인 후)

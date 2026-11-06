@@ -27,6 +27,7 @@ onMounted(async () => {
       <RouterLink to="/my-camping">내 캠핑</RouterLink>
     </template>
     <RouterLink v-else to="/login">로그인</RouterLink>
+    <RouterLink to="/my-info">내 정보</RouterLink>
   </main>
 </template>
 

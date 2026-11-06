@@ -16,7 +16,7 @@ public class Member {
     private String passwordHash;     // BCrypt 로 암호화한 값. 원래 비밀번호는 어디에도 저장하지 않는다
     private String name;
     private String phone;            // 숫자만 (예: 01012345678)
-    private String emergencyPhone;   // 위급할 때 연락받을 가족 번호, 숫자만
+    // 비상연락처는 emergency_contact 테이블 (EmergencyContactMapper)
     private String address;
     private String addressDetail;
     private OffsetDateTime createdAt;

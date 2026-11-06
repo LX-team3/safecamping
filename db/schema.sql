@@ -1,6 +1,10 @@
 -- 캠핑메이트 스키마 (PostgreSQL)
 -- 명명 규칙은 db/CLAUDE.md. 테이블 이름은 단수로 통일한다 (예: member)
 -- 실행할 스키마(search_path)는 각자 DB 에 맞춘다 (현재 임시로 campingsafe 사용 중)
+-- 서버는 application.properties 의 currentSchema 스키마 안에서만 테이블을 찾는다. 이름이 다르면 아래 두 줄의 이름을 같이 바꾼다
+-- pgAdmin 은 이 파일 전체를 한 번에 실행해야 한다 (Ctrl+A 로 전체 선택 후 F5). 일부만 선택해 실행하면 SET 이 빠져 public 에 만들어진다
+CREATE SCHEMA IF NOT EXISTS campingsafe;
+SET search_path TO campingsafe;
 
 -- 회원. 로그인·회원가입(Spring Security)에서 쓴다
 CREATE TABLE IF NOT EXISTS member (
@@ -9,10 +13,55 @@ CREATE TABLE IF NOT EXISTS member (
     password_hash   varchar(100) NOT NULL,         -- BCrypt 암호화 값 (원래 비밀번호는 저장하지 않음)
     name            varchar(20)  NOT NULL,
     phone           varchar(11)  NOT NULL,         -- 숫자만 (예: 01012345678)
-    emergency_phone varchar(11)  NOT NULL,         -- 위급할 때 위치·일정을 받을 가족 번호
     address         varchar(200) NOT NULL,
     address_detail  varchar(100),
     created_at      timestamptz  NOT NULL DEFAULT now()
+);
+
+-- 비상연락처 (위급할 때 위치·일정을 받을 가족). 한 회원당 최대 5명 (서버에서 막음). 넣은 순서(id)대로 보여 준다
+-- 회원가입 때는 번호만 받을 수 있어 name 이 비어 있을 수 있다. 내 정보 화면에서 저장할 때는 이름도 받는다
+CREATE TABLE IF NOT EXISTS emergency_contact (
+    id          bigserial    PRIMARY KEY,
+    member_id   bigint       NOT NULL REFERENCES member (id) ON DELETE CASCADE,  -- 탈퇴하면 같이 지운다
+    name        varchar(20),
+    phone       varchar(11)  NOT NULL,   -- 숫자만
+    created_at  timestamptz  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS emergency_contact_member_idx ON emergency_contact (member_id);
+
+-- 예전 모양(member 안의 emergency_phone 칸)으로 만든 DB 를 옮긴다: 번호를 emergency_contact 로 복사하고 칸을 지운다
+-- emergency_phone 칸이 없으면(새 DB 이거나 이미 옮겼으면) 아무것도 하지 않는다 → 여러 번 실행해도 괜찮다
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'member' AND column_name = 'emergency_phone') THEN
+        -- 잠깐 있었던 2명용 칸도 함께 옮기기 위해, 없으면 빈 칸으로 만들어 둔다
+        ALTER TABLE member ADD COLUMN IF NOT EXISTS emergency_name   varchar(20);
+        ALTER TABLE member ADD COLUMN IF NOT EXISTS emergency_name2  varchar(20);
+        ALTER TABLE member ADD COLUMN IF NOT EXISTS emergency_phone2 varchar(11);
+        INSERT INTO emergency_contact (member_id, name, phone)
+            SELECT id, emergency_name, emergency_phone FROM member WHERE emergency_phone IS NOT NULL ORDER BY id;
+        INSERT INTO emergency_contact (member_id, name, phone)
+            SELECT id, emergency_name2, emergency_phone2 FROM member WHERE emergency_phone2 IS NOT NULL ORDER BY id;
+        ALTER TABLE member DROP COLUMN emergency_name, DROP COLUMN emergency_phone,
+                           DROP COLUMN emergency_name2, DROP COLUMN emergency_phone2;
+    END IF;
+END $$;
+
+-- 여행 취향 (내 정보). 고른 취향에 맞는 캠핑장을 추천하는 데 쓴다 (추천은 캠핑장 데이터가 들어오면 붙임)
+-- 한 회원당 최대 3개, 순서 없음 (서버에서 막음). activity 값은 서버 ActivityOption 의 code (fishing·hiking 등)
+-- 예전 이름(member_taste · taste 칸)으로 만든 DB 는 이름만 바꾼다 (새 DB 이거나 이미 바꿨으면 아무것도 안 함)
+DO $$
+BEGIN
+    IF to_regclass('member_taste') IS NOT NULL AND to_regclass('member_activity') IS NULL THEN
+        ALTER TABLE member_taste RENAME TO member_activity;
+        ALTER TABLE member_activity RENAME COLUMN taste TO activity;
+    END IF;
+END $$;
+CREATE TABLE IF NOT EXISTS member_activity (
+    member_id   bigint       NOT NULL REFERENCES member (id) ON DELETE CASCADE,  -- 탈퇴하면 같이 지운다
+    activity    varchar(20)  NOT NULL,
+    PRIMARY KEY (member_id, activity)  -- 같은 취향은 한 번만
 );
 
 -- 저장 목록 (저장 화면 "목록" 탭). 예: 관심 캠핑장, 11월 가족 캠핑 후보
