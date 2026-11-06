@@ -20,6 +20,10 @@
   --color-text-light: #c9cac4;   /* 어두운 카드 안의 보조 글씨 */
   --color-accent-light: #9db06a; /* 어두운 카드 안의 번호 강조 */
   --color-arrow: #9a9c96;        /* 메뉴 줄 오른쪽 화살표 */
+  /* 아래는 1분 진단 설계(Survey.dc.html)에서 가져온 색 */
+  --color-track: #e3e4de;        /* 진행 막대의 아직 안 간 칸 */
+  --color-danger: #a12a21;       /* 위험 안내 글씨 (일산화탄소 등) */
+  --color-danger-soft: #fbe5e2;  /* 위험 안내 상자 배경 */
 
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */

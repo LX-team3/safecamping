@@ -12,7 +12,7 @@
 - 패키지 안에 파일을 **바로** 넣는다. 안에 controller/·service/ 같은 하위 폴더를 만들지 않는다
 - 파일 이름으로 역할을 구분한다: `XxxController`, `XxxService`, `XxxMapper`, `XxxRequest`/`XxxResponse`(요청·응답), 그 밖은 모델
 - 여러 기능이 같이 쓰는 설정·응답·예외는 `common`
-- data : DB 연결 전 임시 더미 (`SurveyDummyData`, `RegionDummyData`). DB 를 연결하면 mapper 로 바꾸고 지운다
+- data : DB 연결 전 임시 더미 (`RegionDummyData`). DB 를 연결하면 mapper 로 바꾸고 지운다 (설문은 더미 없이 `survey/SurveyQuestions` + DB)
 ```
 common/   ApiResponse, InvalidRequestException, GlobalExceptionHandler, SecurityConfig
 member/   # ①-3 로그인 · ①-4 회원가입 (member 테이블). 내 정보 수정·탈퇴도 여기에
@@ -22,10 +22,11 @@ member/   # ①-3 로그인 · ①-4 회원가입 (member 테이블). 내 정보
           MemberDetailsService, KeepLoginRememberMeServices,
           EmergencyContact*(내 정보 · 비상연락처 최대 5명, emergency_contact 테이블),
           Activity*(내 정보 · 여행 취향 최대 3개, member_activity 테이블. 선택지는 ActivityOption)
-survey/   # ② 캠핑 유형 진단 (만들 때 같은 모양으로)
+survey/   # ② 1분 진단 (3단계 5문항, survey_answer 테이블). 질문은 SurveyQuestions 한곳
 region/   # ③ 지역 찾기
 map/      # ④ 캠핑지도
 saved/    # 저장(목록 탭)·관심 캠핑장 비교 (saved_list·saved_camp 테이블). CampDummyData 는 캠핑장 데이터가 생기면 지운다
+alert/    # 내 정보 · 알림 (기상특보 + 재난문자). 지금은 AlertDummyData, 지역은 Sido(임시 가장 가까운 시·도)
 family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치도 여기에
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
 ```
@@ -43,8 +44,9 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 ## API 목록
 | 주소 | 하는 일 |
 |---|---|
-| `GET /api/survey/options` | 설문 10문항 선택지 (id·이름·최대 개수·단독 선택) |
-| `POST /api/survey/result` | 설문 답변 검사 → 결과 유형 (지금은 항상 `a`, `fixed: true`) |
+| `GET /api/survey/questions` | 1분 진단 5문항 (새 설계 Survey.dc.html, 3단계). `[{ key, title, type: single·multi·rank, max, exclusive, options: [{ code, label, sub }] }]`. 로그인 없이도 됨 |
+| `GET`·`PUT /api/member/survey` | 내 진단 답 `{ campType, transport, heating[], safetyItems[], facilities[] }` (진단 안 했으면 null). PUT 은 덮어씀, 규칙 틀리면 400. 로그인 필요 (안 한 사람의 답은 브라우저에만) |
+
 | `GET /api/regions/camp-count?sido=32` | 시·군·구별 캠핑장 수 (더미, `dummy: true`). `sido` 없으면 전국 |
 | `POST /api/trips/check` | 동행·날짜 검사 → 몇 박인지. 날짜는 `"2026-11-05"` 형식 |
 | `GET /api/map/camps?grades=safe,mid` | 캠핑장 목록 (점수 높은 순, 등급 safe 70↑ / mid 40~70 / warn 40↓) |
@@ -59,10 +61,11 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 | `GET /api/auth/me` | 지금 로그인한 회원. 로그인 안 했으면 401 |
 | `GET`·`PUT /api/member/emergency-contacts` | 내 비상연락처 (최대 5명). GET → 넣은 순서대로 `[{ name, phone }, …]` (회원가입 때 넣은 번호는 name null). PUT `{ contacts: [...] }` 은 목록을 통째로 바꿈 (다 비운 칸은 건너뜀, 이름·번호 중 하나만 있거나 6명 이상이면 400). 로그인 필요 |
 | `GET`·`PUT /api/member/activities` | 내 여행 취향. GET → `{ options: [{ code, label, desc }], selected: [code], max: 3 }`. PUT `{ activities: [code] }` 통째로 바꿈 (없는 code·4개 이상 400). 로그인 필요 |
+| `GET /api/alerts?sido=` · `?lat=&lon=` | 알림 (기상특보 + 재난문자, **더미** `dummy: true`). 지역 → 위치(가장 가까운 시·도) → 없으면 전국. `{ sido, regions, activeWarnings, todayDisasterCount, items: [{ kind: warning·disaster, area, category, message, issuedAt, active }] }`. 로그인 없이 됨 |
 | `GET /api/saved/lists` | 내 저장 목록 (`관심 캠핑장` 기본 목록이 없으면 만들어 줌). 이하 `/api/saved/**` 전부 로그인 필요 |
 | `POST /api/saved/lists` · `PATCH`·`DELETE /api/saved/lists/{id}` | 목록 만들기 `{ name }`·이름 바꾸기·삭제 (기본 목록은 바꾸기·삭제 불가 400) |
 | `POST`·`DELETE /api/saved/lists/{id}/camps/{campId}` | 캠핑장 담기·빼기 (지금 campId 는 더미 `c1`~`c3`) |
-| `GET /api/saved/lists/{id}/compare` | 목록 앞의 3곳 비교 표 (더미, `dummy: true`). 남의 목록 id 는 404 |
+| `GET /api/saved/lists/{id}/compare` | 목록 앞의 3곳 비교 (더미, `dummy: true`). `rows: [{ label, kind: score·minutes·yesno, bestLabel, cells: [{ text, value, best }] }]` — value 는 막대 길이용 숫자(막대 없으면 null). 남의 목록 id 는 404 |
 | `GET /api/family/room` | 내 가족방 (없으면 `data: null`). 이하 `/api/family/**` 전부 로그인 필요. 한 사람당 방 하나라 주소에 방 번호를 넣지 않는다 |
 | `POST /api/family/room` · `POST /api/family/room/join` | 가족방 만들기 `{ name }` → 201 / 초대코드로 들어가기 `{ inviteCode }` (이미 방이 있으면 400) |
 | `DELETE /api/family/room/me` | 나가기 (마지막 사람이면 방·모일 장소도 지움) |

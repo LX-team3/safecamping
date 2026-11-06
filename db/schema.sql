@@ -64,6 +64,19 @@ CREATE TABLE IF NOT EXISTS member_activity (
     PRIMARY KEY (member_id, activity)  -- 같은 취향은 한 번만
 );
 
+-- 1분 진단 답 (설계 Survey.dc.html, 3단계 5문항). 회원당 한 줄, 다시 진단하면 덮어쓴다
+-- 값은 서버 SurveyQuestions 의 code. 여러 개 고르는 답은 code 를 쉼표로 이어 저장 (facilities 는 고른 순서 = 중요한 순서)
+-- 유형 판정 기준은 아직 없어 답만 저장한다 (판정이 정해지면 type 칸 추가)
+CREATE TABLE IF NOT EXISTS survey_answer (
+    member_id     bigint        PRIMARY KEY REFERENCES member (id) ON DELETE CASCADE,  -- 탈퇴하면 같이 지운다
+    camp_type     varchar(20)   NOT NULL,   -- 1. 어떤 캠핑 (1개)
+    transport     varchar(20)   NOT NULL,   -- 2. 이동 수단 (1개)
+    heating       varchar(100)  NOT NULL,   -- 3. 난방 (여러 개)
+    safety_items  varchar(100)  NOT NULL,   -- 4. 챙겨 둔 안전 용품 (여러 개)
+    facilities    varchar(100)  NOT NULL,   -- 5. 안심되는 주변 시설 (최대 3개, 순서 있음)
+    updated_at    timestamptz   NOT NULL DEFAULT now()
+);
+
 -- 저장 목록 (저장 화면 "목록" 탭). 예: 관심 캠핑장, 11월 가족 캠핑 후보
 CREATE TABLE IF NOT EXISTS saved_list (
     id          bigserial    PRIMARY KEY,

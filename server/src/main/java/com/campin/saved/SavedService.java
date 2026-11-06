@@ -97,11 +97,13 @@ public class SavedService {
                 .limit(COMPARE_MAX)
                 .toList();
 
+        int maxScore = camps.stream().mapToInt(CampDummyData.Camp::safetyScore).max().orElse(0);
         List<CompareResponse.Row> rows = camps.isEmpty() ? List.of() : List.of(
-                // 안전점수 줄은 설계대로 모두 초록 글씨로만 보여 주고 "가장 좋은 값" 표시는 하지 않는다
-                row("안전점수", "score", camps, c -> "안전 " + c.safetyScore(), c -> false),
-                minutesRow("응급실", camps, CampDummyData.Camp::erMinutes),
-                minutesRow("소방서", camps, CampDummyData.Camp::fireMinutes),
+                // 막대 비교로 바꾸면서 안전점수도 가장 높은 곳에 칩을 붙인다 (표일 때는 표시하지 않았음)
+                row("안전점수", "score", "가장 높음", camps, c -> c.safetyScore() + "점",
+                        CampDummyData.Camp::safetyScore, c -> c.safetyScore() == maxScore),
+                minutesRow("응급실까지", camps, CampDummyData.Camp::erMinutes),
+                minutesRow("소방서까지", camps, CampDummyData.Camp::fireMinutes),
                 shelterRow(camps),
                 yesNoRow("전기 사용", camps, CampDummyData.Camp::hasPower),
                 yesNoRow("반려동물", camps, CampDummyData.Camp::allowsPet));
@@ -114,7 +116,8 @@ public class SavedService {
     private CompareResponse.Row minutesRow(String label, List<CampDummyData.Camp> camps,
                                            Function<CampDummyData.Camp, Integer> minutes) {
         int min = camps.stream().mapToInt(minutes::apply).min().orElse(0);
-        return row(label, "normal", camps, c -> "차로 " + minutes.apply(c) + "분", c -> minutes.apply(c) == min);
+        return row(label, "minutes", "가장 가까움", camps, c -> "차로 " + minutes.apply(c) + "분",
+                minutes, c -> minutes.apply(c) == min);
     }
 
     // 대피소: 걸어서 갈 수 있는 곳을 먼저 친다 (재난 때는 차가 막히거나 못 쓸 수 있어서 — 임시 규칙, 설계 파일 표시와 같음)
@@ -125,25 +128,29 @@ public class SavedService {
                 .filter(c -> c.shelterOnFoot() == anyOnFoot)
                 .mapToInt(CampDummyData.Camp::shelterMinutes)
                 .min().orElse(0);
-        return row("대피소", "normal", camps,
+        // 걸어서 가는 곳과 차로 가는 곳이 섞이면 분 숫자를 같은 막대로 비교할 수 없어 막대를 그리지 않는다
+        boolean sameMode = camps.stream().allMatch(c -> c.shelterOnFoot() == anyOnFoot);
+        return row("대피소까지", "minutes", "가장 가까움", camps,
                 c -> (c.shelterOnFoot() ? "걸어서 " : "차로 ") + c.shelterMinutes() + "분",
+                c -> sameMode ? c.shelterMinutes() : null,
                 c -> c.shelterOnFoot() == anyOnFoot && c.shelterMinutes() == min);
     }
 
     private CompareResponse.Row yesNoRow(String label, List<CampDummyData.Camp> camps,
                                          Predicate<CampDummyData.Camp> yes) {
-        return row(label, "normal", camps, c -> yes.test(c) ? "가능" : "불가", yes);
+        return row(label, "yesno", "가능", camps, c -> yes.test(c) ? "가능" : "불가", c -> null, yes);
     }
 
     // 캠핑장이 1곳뿐이면 비교할 대상이 없으므로 "가장 좋은 값" 표시를 하지 않는다
-    private CompareResponse.Row row(String label, String kind, List<CampDummyData.Camp> camps,
+    private CompareResponse.Row row(String label, String kind, String bestLabel, List<CampDummyData.Camp> camps,
                                     Function<CampDummyData.Camp, String> text,
+                                    Function<CampDummyData.Camp, Integer> value,
                                     Predicate<CampDummyData.Camp> best) {
         List<CompareResponse.Cell> cells = new ArrayList<>();
         for (CampDummyData.Camp c : camps) {
-            cells.add(new CompareResponse.Cell(text.apply(c), camps.size() > 1 && best.test(c)));
+            cells.add(new CompareResponse.Cell(text.apply(c), value.apply(c), camps.size() > 1 && best.test(c)));
         }
-        return new CompareResponse.Row(label, kind, cells);
+        return new CompareResponse.Row(label, kind, bestLabel, cells);
     }
 
     // 처음 저장 화면에 들어온 회원에게 '관심 캠핑장' 목록을 만들어 준다

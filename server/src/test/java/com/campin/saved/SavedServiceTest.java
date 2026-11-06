@@ -149,6 +149,13 @@ class SavedServiceTest {
         // 대피소: 걸어서 가는 곳 중 가장 짧은 설하캠핑장 (차로 4분보다 먼저 친다)
         List<CompareResponse.Cell> shelter = result.rows().get(3).cells();
         assertEquals(List.of(true, false, false), shelter.stream().map(CompareResponse.Cell::best).toList());
+        // 막대: 응급실은 분 숫자로 그리고, 대피소는 걸어서·차로가 섞여 막대를 그리지 않는다
+        assertEquals(List.of(17, 21, 9), er.stream().map(CompareResponse.Cell::value).toList());
+        assertTrue(shelter.stream().allMatch(c -> c.value() == null));
+        // 안전점수: 가장 높은 설하캠핑장(90)에 칩
+        assertEquals("가장 높음", result.rows().get(0).bestLabel());
+        assertEquals(List.of(true, false, false),
+                result.rows().get(0).cells().stream().map(CompareResponse.Cell::best).toList());
     }
 
     @Test
