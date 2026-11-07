@@ -14,14 +14,28 @@
 - 여러 기능이 같이 쓰는 설정·응답·예외는 `common`
 - data : DB 연결 전 임시 더미 (`SurveyDummyData`, `RegionDummyData`). DB 를 연결하면 mapper 로 바꾸고 지운다
 ```
-common/   ApiResponse, InvalidRequestException, GlobalExceptionHandler, SecurityConfig
+common/   ApiResponse, InvalidRequestException, GlobalExceptionHandler, SecurityConfig, DriveTone
 member/   # ①-3 로그인 · ①-4 회원가입 (member 테이블). 내 정보 수정·탈퇴도 여기에
           Member, MemberMapper, MemberResponse,
           SignupController, SignupService, SignupRequest,
           LoginController, LoginService, LoginRequest,
-          MemberDetailsService, KeepLoginRememberMeServices
-survey/   # ② 캠핑 유형 진단 (만들 때 같은 모양으로)
-region/   # ③ 지역 찾기
+          MemberDetailsService, KeepLoginRememberMeServices,
+          MemberChildController, MemberChildService, MemberChildMapper, MemberChildRequest  # 함께 가는 아이 (member_child)
+survey/   # ② 1분 진단 · 관광지 탭 여행 취향 (survey_* 테이블)
+          Survey, SurveyStep, SurveyQuestion, SurveyOption, SurveyAnswer, SurveyAnswerItem, SurveyMapper,
+          SurveyController, SurveyService, SurveyResponse, SurveyAnswerRequest
+camp/     # 탐색 탭 캠핑장 목록·추천·지도 (camp 테이블)
+          Camp, CampMapper, CampController, CampService, CampResponse, CampRecommendResponse
+facility/ # 시설 상세 (facility·camp_facility 테이블)
+          Facility, FacilityFrom, FacilityMapper, FacilityController, FacilityService, FacilityDetailResponse
+tour/     # 관광지 상세 (tour·camp_tour 테이블)
+          Tour, TourFrom, TourMapper, TourController, TourService, TourDetailResponse
+place/    # 캠핑장·시설·관광지 상세가 함께 쓰는 정보 줄·안내 상자 (place_info·place_note 테이블)
+          PlaceInfo, PlaceNote, PlaceMapper
+region/   # 탐색 탭 지역 선택 시트 (sido·sigungu 테이블)
+          RegionController, RegionService, RegionMapper, SidoResponse, SigunguResponse
+trip/     # 탐색 탭 누구와·언제 시트 (테이블 없음, 검사만)
+          TripController, TripService, TripCheckRequest, TripCheckResponse
 map/      # ④ 캠핑지도
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
 ```
@@ -39,15 +53,22 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 ## API 목록
 | 주소 | 하는 일 |
 |---|---|
-| `GET /api/survey/options` | 설문 10문항 선택지 (id·이름·최대 개수·단독 선택) |
-| `POST /api/survey/result` | 설문 답변 검사 → 결과 유형 (지금은 항상 `a`, `fixed: true`) |
-| `GET /api/regions/camp-count?sido=32` | 시·군·구별 캠핑장 수 (더미, `dummy: true`). `sido` 없으면 전국 |
-| `POST /api/trips/check` | 동행·날짜 검사 → 몇 박인지. 날짜는 `"2026-11-05"` 형식 |
-| `GET /api/map/camps?grades=safe,mid` | 캠핑장 목록 (점수 높은 순, 등급 safe 70↑ / mid 40~70 / warn 40↓) |
-| `GET /api/map/camps/{id}` | 캠핑장 상세 + 안전점수 항목 5개 |
+| `GET /api/surveys/{code}` | 설문 내용 (단계 → 질문 → 선택지). code = `diagnosis`(1분 진단) · `travel`(여행 취향) |
+| `POST /api/surveys/{code}/answers` | 답변 검사(필수·최대 개수·단독 선택) → 회원이면 DB 저장. `{ answers: { 질문code: [선택지code] } }` → `{ saved }` |
+| `GET /api/surveys/{code}/answers/me` | 로그인 회원의 가장 최근 답변 (로그인 필요) |
+| `GET /api/regions/sidos` | 시·도 17곳 + 들어 있는 시·군·구 수 (`sigunguCount` 0 이면 준비 중) |
+| `GET /api/regions/sidos/{id}/sigungus` | 한 시·도의 시·군·구 (`safetyReady`: 안심 데이터 있음). 지금은 강원 18곳만 |
+| `GET /api/regions/sigungus?q=인제` | 시·군·구 이름 검색 (최대 30곳) |
+| `POST /api/trips/check` | 누구와·언제 검사 → 몇 박인지. `{ checkIn, checkOut, adults, kids, childAges }`, 날짜는 `"2026-11-14"`. 지난 날·당일 체크아웃·어른 0명·나이대 수 불일치는 400 |
+| `GET` · `PUT /api/members/me/children` | 내 아이 나이대 (`infant`·`preschool`·`elementary`) 불러오기·통째로 저장 (로그인 필요) |
+| `GET /api/camps?sido=&sigungu=&campType=&sort=score\|er` | 캠핑장 목록 (지도 마커·전체 목록). 등급 grade: safe 70↑ / caution 40~69 / danger 40 미만 / unknown (더미, `dummy: true`) |
+| `GET /api/camps/recommend?sido=&sigungu=&campType=&sort=&limit=5` | 내 유형 추천 TOP N (임시 기준: 위험 제외·유형 일치·정렬) + 뺀 위험 등급 `excluded` |
 | `GET /api/map/camps/compare?ids=c1,c2` | 관심 캠핑장 비교 (최대 3곳) |
+| `GET /api/camps/{id}` | 캠핑장 상세: 기본 정보, 가까운 시설(`facilities`, 시간 색 `tone`), 정보 줄(`infos`) |
+| `GET /api/camps/{id}/tours?prefer=trekking,mountain` | 주변 관광지. 취향과 맞는 곳이 앞, 그다음 인기순 |
+| `GET /api/facilities/{id}?campId=` | 시설 상세. `campId` 를 주면 그 캠핑장에서 거리·시간(`from`) |
+| `GET /api/tours/{id}?campId=` | 관광지 상세. `campId` 를 주면 그 캠핑장에서 시간(`from`) |
 | `GET /api/map/facilities?types=er,police` | 안전 시설 목록 (police·er·fire·store·toilet, 비우면 전부) |
-| `GET /api/map/tours?kw=계곡` · `/api/map/tours/{id}` | 관광지 목록·상세 |
 | `GET /api/auth/check-id?loginId=` | 아이디 중복 확인 → `{ available }` |
 | `POST /api/auth/signup` | 회원가입 (비밀번호 BCrypt 저장, 연락처는 숫자만) → 201 |
 | `POST /api/auth/login` | 로그인 `{ loginId, password, keep }` → 세션 쿠키, `keep` 이면 remember-me 쿠키(14일) |

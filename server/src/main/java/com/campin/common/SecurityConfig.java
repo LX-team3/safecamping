@@ -95,6 +95,10 @@ public class SecurityConfig {
             // 요청별 권한 설정
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/me").authenticated()
+                // 내 설문 답변 불러오기는 회원만 (답변 제출은 비회원도 가능 → 아래 permitAll)
+                .requestMatchers("/api/surveys/*/answers/me").authenticated()
+                // 내 정보(함께 가는 아이 등)는 회원만
+                .requestMatchers("/api/members/me/**").authenticated()
                 .requestMatchers("/api/test/**", "/api/auth/**").permitAll()
                 // "로그인 없이 둘러보기"가 있으므로 나머지는 아직 전부 허용
                 // 회원 전용 기능(결과 저장 등)을 만들면 그 주소를 위 authenticated() 에 추가한다

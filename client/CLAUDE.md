@@ -45,6 +45,7 @@ frontend/src/
 ## 데이터·API
 - 지금은 `data/` 의 더미 데이터를 쓴다. 안전 수치(점수·거리·시간)가 더미면 화면이나 주석에 더미임을 표시한다 (임시)
 - 백엔드 호출은 `utils/api.js` 의 `api()` 를 쓴다 (성공이면 data, 실패면 서버 문구를 담은 Error). 응답 형식은 `backend/CLAUDE.md`
+- 카카오맵 키: `client/.env.local` 에 `VITE_KAKAO_MAP_KEY=...` (JavaScript 키, 각자 넣음, 커밋 안 됨. 넣은 뒤 `npm run dev` 재시작). 없으면 `components/map/CampMap.vue`·`RouteMap.vue` 가 임시 그림을 보여 준다. 공통 코드는 `utils/kakaoMap.js`. 카카오 콘솔 Web 플랫폼에 `http://localhost:5173` 등록 필요
 - 개발 중 `/api` 요청은 `vite.config.js` 의 proxy 가 백엔드(8080)로 넘긴다 → 백엔드를 먼저 켜 둔다
 - 연결된 화면: ②-6 설문 제출, ③-1 지역별 캠핑장 수, ③-2 인원·날짜 확인, ④-1~10 캠핑지도 (`data/regionDummy.js` 는 더 이상 안 씀)
 - ④ 캠핑지도는 틀만 있음: 지도는 `MapCanvas` 의 임시 그림(설계 지도 위 x·y %), 길찾기 경로는 비어 있음 → 카카오 API 연결 때 채움
