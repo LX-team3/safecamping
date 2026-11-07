@@ -1,5 +1,36 @@
 # 진행 상황
 
+## 2026-11-07 관광지 탭 여행 취향 (설문 2문항)
+- 화면: `/tour-preference?camp=캠핑장id` (`views/tour/TourPreferenceView.vue`), 스토어 `stores/tourPreference.js`. 관광지 탭 배너에서 들어오고, 저장한 뒤에는 "바꾸기"로 다시 연다
+- 서버: `tour/TourPreference*`. `GET /api/tour-preferences/questions`, `GET`·`PUT /api/member/tour-preferences`
+- DB: `member_tour_preference` 테이블 (`db/schema.sql`). 1분 진단(survey)과 내 정보 여행 취향(ActivityView·member_activity)은 건드리지 않음
+- 비회원은 sessionStorage 에만 저장, 로그인해도 서버로 옮기지 않음
+- 설계와 다른 점: 아이 안내 문구. "나이에 맞지 않는 활동은 뒤로 보내드려요"는 연령 데이터가 없어 동작하지 않으므로 "연령 제한을 꼭 확인하세요"로 바꿈
+- 남은 일: 내 정보 여행 취향과 합칠지 팀에서 결정, 관광지 더미 데이터 추가(지금 2곳)
+
+## 2026-11-07 탐색·상세 화면을 현재 1분 진단 스토어에 맞춤
+- `ExploreView`: `survey.answers` 가 null 이어도 그려지게 하고, 진단 값(`campType`, `fuel`, `facilities`)을 현재 스토어 형식으로 맞춤
+- `CampDetailView`: 없는 `survey.answers.travel`·`fetchMine` 제거. 여행 취향 화면이 없어 관광지는 인기순, 취향 배너는 숨김
+- 남은 일: 여행 취향 화면(설문 2문항), `MemberChild*` 4개 합치기, `SecurityConfig` 에 `/api/members/me/**` 추가, 관광지 탭 안내 문구 정리
+- 확인: 복사본에서 `vite build` 통과, 탐색·상세 3화면 마운트 오류 없음. 서버 API 응답 200 (시·도 17곳, 캠핑장 7곳). 실제 브라우저 화면은 확인 못 함
+
+## 2026-11-06 캠핑장 상세 · 시설 상세 · 관광지 상세
+- 화면: `/camps/:id`(`views/camp/CampDetailView.vue`, 경로 지도 위 시트, 안전점수·캠핑장 정보·관광지 탭), `/facilities/:id?camp=`, `/tours/:id?camp=`. 공통 부품 `components/detail/`(DetailTopBar·PhotoBox·InfoRows·NoteList), 경로 지도 `components/map/RouteMap.vue`, `utils/place.js`
+- 흐름: 탐색 목록 한 줄 → 캠핑장 상세. 지도 마커는 한 번 누르면 이름표, 다시 누르면 상세. 안전점수 탭 시설 → 시설 상세, 관광지 탭 관광지 → 관광지 상세. "경로 보기" → 경로 지도 (칩으로 시설을 고르면 검은 줄)
+- 백엔드: `camp/` 에 상세·관광지(`GET /api/camps/{id}`, `/{id}/tours`), `facility/`, `tour/`, 공통 `place/`, `common/DriveTone`
+- DB: `schema.sql` 에 `facility`·`camp_facility`·`tour`·`camp_tour`·`place_info`·`place_note`, `camp` 에 `reservation_url` 컬럼, 더미 `db/data_detail.sql` (설하캠핑장만) — **DB 에 직접 실행해야 함**
+- 임시로 정한 것: 경로 줄은 두 좌표를 잇는 직선(실제 도로 아님, 화면에 표시), 차로 시간 색 기준 10분(`DriveTone`), 주의·위험 등급 headline 문구. 전화·주소는 지어내지 않고 "확인 필요"
+- 더미 시설·관광지의 길찾기는 좌표 대신 카카오맵 이름 검색으로 연다 (더미 좌표로 안내하지 않기 위해)
+- 토큰 추가(임시): `--color-caution-bg`
+- 확인: `mvnw test` 통과 (42개, 상세 10개 추가), `npm run build` 통과
+- 확인 못 함: SQL 실행, API 실제 응답, 카카오 지도 선 표시, 브라우저 화면
+- 남은 일: 내 캠핑에 일정 등록(2부, 지금 버튼 비활성), 사진 여러 장, 실제 도로 경로, 다른 캠핑장 6곳의 시설·관광지 데이터, 공공데이터 연동
+
+## 2026-11-06 카카오 지도 실제 키 적용 준비
+- 적용 화면: 탐색 지도(`CampMap`), 캠핑장 경로 지도·시설 상세 지도(`RouteMap`). 키만 `client/.env.local` 의 `VITE_KAKAO_MAP_KEY` 에 넣으면 된다
+- 보완: 공통 `fitPoints`(점 하나일 때 과확대 방지)·`keepMapSized`(크기 변경 반영), 마커 `clickable`(터치), 시설 상세 210px 높이에 맞춘 여백, 지도를 불러오는 중 화면을 나갔을 때 오류 방지
+
+
 ## 2026-11-06 내 정보 · 알림 (기상특보 + 재난문자 모아 보기) — 더미
 - 설계 파일 없음 → 예시로 받은 "재난 안전문자 대시보드" 목록 모양 참고. 숫자 카드(전국 건수·사용자 제보) 대신 "지금 내 지역" 카드(발효 중 특보 + 오늘 재난문자 수)
 - 화면: `/my-info/alerts` (`views/member/AlertView.vue`), 내 정보 메뉴(로그인 전·후 모두)에서 연결. 로그인 없이 볼 수 있음
@@ -79,6 +110,29 @@
 - 남은 일: 일정 수정(지금은 삭제 후 다시 추가), 내 캠핑 예약 정보 카드
 - **3차 위치 공유는 보류** (지도 화면이 아직 없어서). 이야기한 방향: 같은 가족방 앱 사용자끼리만 공유, 각자 스위치로 켬(기본 꺼짐),
   화면이 열려 있는 동안만 갱신(웹 한계 → "n분 전" 꼭 표시), 최신 위치 1개만 저장, 끄거나 나가면 삭제. 앱 없는 가족에게 문자 보내기는 범위 밖
+
+## 2026-11-05 탐색 탭: 내 유형 추천 TOP 5 목록 + 캠핑장 지도
+- 화면: `/explore` (`views/explore/ExploreView.vue`) — 지도 위에 시트를 올린 한 화면. 손잡이·"지도" 버튼으로 접기/펼치기, 목록 한 줄을 누르면 지도에서 그 캠핑장 선택
+- 부품: `components/map/CampMap.vue`(카카오맵, 키 없으면 임시 그림), `components/explore/CampRow.vue`, `components/common/BottomNav.vue`(탐색만 동작), `stores/favorite.js`(하트, 브라우저에만 저장), `utils/kakaoMap.js`
+- 1분 진단 마지막 버튼 → `/explore` (진단 답의 캠핑 유형을 추천 조건으로, 난방·안심 시설 1순위를 안내 문구로 씀)
+- 백엔드: `com.campin.camp` — `GET /api/camps`, `/api/camps/recommend`, `/api/camps/sigungus`. 추천은 **임시 기준**(위험 제외 · 유형 일치 · 점수/응급실 순)
+- DB: `schema.sql` 에 `camp` 테이블(좌표는 lat·lng 숫자 컬럼, PostGIS 는 공간 분석 때), 더미 `db/data_camp.sql` 7곳 (`is_dummy = true`) — **DB 에 직접 실행해야 함**
+- 더미 점수: 스크린샷의 71·54 는 문서 등급 기준(70↑ 안전 / 40~69 주의 / 40 미만 위험)과 맞지 않아 65·35 로 넣음 → 등급 기준 확정 필요
+- 토큰 추가(임시): `--color-safe-bg`, `--color-caution`, `--color-danger`, `--color-map-bg`
+- 확인: `mvnw test` 통과 (23개, 캠핑장 7개 추가), `npm run build` 통과
+- 확인 못 함: SQL 실행, API 실제 응답, 카카오 지도 표시, 브라우저 화면
+- 남은 일: 날짜 칩(③ 인원·날짜), 상세 필터, 레이어 버튼(2부 재난 레이어), 저장 탭·회원 저장, 캠핑장 상세, 진단 결과 화면
+
+## 2026-11-05 탐색 탭: 지역 선택 · 누구와 언제 시트
+- 화면: 탐색 필터 줄의 지역 칩 → `components/explore/RegionSheet.vue`(전국 시·도 → 시·군·구, 검색, "안심 데이터 있음"), 날짜 칩 → `TripSheet.vue`(혼자/성인 동행/아이 동반 · 어른·아이 인원 · 아이 나이대 · 3달 달력). 공통 `components/common/BottomSheet.vue`, `stores/trip.js`, `utils/date.js`
+- 적용하면 목록을 펼쳐 그 지역으로 다시 불러옴. 지도 상태(시트 접힘)에서도 칩을 누를 수 있음
+- 백엔드: `region/`(`/api/regions/sidos`, `/sidos/{id}/sigungus`, `/sigungus?q=`), `trip/`(`POST /api/trips/check`), `member/` 에 아이 나이대(`GET·PUT /api/members/me/children`, 로그인 필요 → `SecurityConfig`)
+- `/api/camps`·`/recommend` 에 `sido` 조건 추가 (시·군·구 이름이 전국에서 겹침, 예: 고성군), 쓰지 않게 된 `/api/camps/sigungus` 삭제
+- DB: `schema.sql` 에 `sido`·`sigungu`·`member_child`, 데이터 `db/data_region.sql` (시·도 17 + 강원 18, 인제군만 안심 데이터 있음) — **DB 에 직접 실행해야 함**
+- 다른 시·도의 시·군·구는 아직 없음 → 화면에 "준비 중". 전체는 행정표준코드(법정동코드) 파일로 넣을 예정
+- 확인: `mvnw test` 통과 (32개, 지역 3·여행 조건 4·아이 나이대 2 추가), `npm run build` 통과
+- 확인 못 함: SQL 실행, API 실제 응답, 브라우저 화면
+- 남은 일: 동행·아이 나이대를 추천·안전 안내에 반영, 내 정보 › 함께 가는 가족 화면, 전국 시·군·구 데이터
 
 ## 2026-11-05 내 캠핑 · 가족 모임방 (1차: 방 만들기·초대 + 모일 장소) — 브랜치 `feature/saved` 에서 작업 (분리 필요)
 - 위치 결정: 가족방은 하단 탭 `내 캠핑` 안에 둔다 (저장 = 예약 전, 내 정보 = 계정 설정이라 성격이 다름). 저장 화면의 "가족 공유" 탭 계획은 이쪽으로 옮김
