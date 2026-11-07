@@ -24,7 +24,13 @@
   --color-track: #e3e4de;        /* 진행 막대의 아직 안 간 칸 */
   --color-danger: #a12a21;       /* 위험 안내 글씨 (일산화탄소 등) */
   --color-danger-soft: #fbe5e2;  /* 위험 안내 상자 배경 */
-
+--color-selected-bg: #f1f1ec;  /* 고른 선택지 배경 */
+  --color-warn-bg: var(--color-danger-soft);  /* 같은 색이라 기존 변수 재사용 */
+  --color-warn-text: var(--color-danger);
+  --color-safe-bg: #e3f0e5;      /* 안전 배지 배경 */
+  --color-caution: #b45a09;      /* 주의 */
+  --color-caution-bg: #fbeedd;   /* 주의 안내 상자 배경 */
+  --color-map-bg: #e9eae4;       /* 카카오 키가 없을 때 임시 지도 바탕 */
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */
   --frame-height: 844px;      /* PC 에서 보여 줄 모바일 화면 높이 (설계 파일 크기) */
