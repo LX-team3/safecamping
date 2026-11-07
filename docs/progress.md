@@ -1,5 +1,22 @@
 # 진행 상황
 
+## 2026-11-08 알림 · 기상특보 실제 데이터 (기상청)
+- 서버: `alert/KmaWarningClient`(기상청 기상특보 조회서비스 `getPwnStatus` 호출, 10분 캐시, 실패 시 1분간 재시도 안 함), `alert/KmaWarningParser`(t6 "o 종류 : 강원도(구역…), …" → 시·도별 Alert), `alert/WarningSource`(테스트에서 가짜를 넣기 위한 인터페이스)
+- 키: 환경변수 `KMA_SERVICE_KEY` (공공데이터포털 디코딩 키). 없거나 호출 실패면 기상특보는 더미 + 화면에 "예시"
+- 응답: `dummy` → `warningDummy`·`disasterDummy` 로 나눔. 재난문자는 아직 더미 (`AlertDummyData.disasters()`)
+- 화면(`AlertView`): 예시인 쪽만 안내 문구·"예시" 칩. 실제 특보는 "~부터" 대신 "~ 기준" (특보현황에 특보별 시작 시각이 없어 지어내지 않음)
+- 정한 것: 바다 구역(풍랑특보 등)은 시·도 알림에서 뺌, 예비특보(t7)는 아직 안 씀, 구역이 많으면 제목에 3곳 + "외 n곳"
+- 남은 일: 재난문자 API (행정안전부, 키 신청 필요), 예비특보 표시 여부
+- 확인: `mvnw test` 통과 (68개, 알림 9개 추가), `npm run build` 통과. 실제 기상청 호출 확인 (2026-11-08, 강원·경북 건조주의보가 화면에 나옴)
+- 주의: Eclipse 에 Lombok 이 없으면 Eclipse 가 `target/classes` 를 깨진 클래스로 덮어써 서버가 안 뜬다 → `mvnw clean spring-boot:run` 또는 Eclipse 에 Lombok 설치
+
+## 2026-11-07 첫 화면 탐색으로 · 하단바 탭 연결
+- 라우터: `/` 로 들어오면 `/explore` 로 보낸다 (redirect). 로그인 후·"로그인 없이 둘러보기"도 탐색으로 간다
+- 하단바(`components/common/BottomNav.vue`): 내 캠핑 `/my-camping` · 저장 `/saved` · 내 정보 `/my-info` 연결. 내 주변은 화면이 없어 아직 비활성
+- `MyInfoView`·`MyCampingView`·`SavedView` 에 하단바 추가. 탐색 화면처럼 `.page`(세로 flex) 안에 내용(스크롤) + 하단바
+- 남은 일: 하위 화면(비상연락처·가족방·비교 등)은 하단바 없음 (뒤로가기 화면이라 일부러 뺌). `HomeView` import 는 안 쓰지만 남아 있음
+- 확인: `npm run build` 통과. 실제 브라우저 화면은 확인 못 함
+
 ## 2026-11-07 관광지 탭 여행 취향 (설문 2문항)
 - 화면: `/tour-preference?camp=캠핑장id` (`views/tour/TourPreferenceView.vue`), 스토어 `stores/tourPreference.js`. 관광지 탭 배너에서 들어오고, 저장한 뒤에는 "바꾸기"로 다시 연다
 - 서버: `tour/TourPreference*`. `GET /api/tour-preferences/questions`, `GET`·`PUT /api/member/tour-preferences`
