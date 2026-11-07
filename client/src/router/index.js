@@ -30,6 +30,24 @@ const router = createRouter({
     { path: '/my-info/activity', name: 'activity', component: () => import('../views/member/ActivityView.vue') },
     // 내 정보 · 알림 (기상특보 + 재난문자, 지금은 더미). 로그인 없이도 볼 수 있다
     { path: '/my-info/alerts', name: 'alerts', component: () => import('../views/member/AlertView.vue') },
+    { path: '/explore', name: 'explore', component: () => import('../views/explore/ExploreView.vue') },
+    {
+      path: '/camps/:id(\\d+)', name: 'camp-detail', component: () => import('../views/camp/CampDetailView.vue'),
+      props: (route) => ({ id: Number(route.params.id) })
+    },
+    {
+      path: '/facilities/:id(\\d+)', name: 'facility-detail', component: () => import('../views/facility/FacilityDetailView.vue'),
+      props: (route) => ({ id: Number(route.params.id), campId: route.query.camp ? Number(route.query.camp) : null })
+    },
+    {
+      path: '/tours/:id(\\d+)', name: 'tour-detail', component: () => import('../views/tour/TourDetailView.vue'),
+      props: (route) => ({ id: Number(route.params.id), campId: route.query.camp ? Number(route.query.camp) : null })
+    },
+    // 여행 취향 (관광지 탭 순서용). ?camp=캠핑장id 로 끝난 뒤 돌아갈 캠핑장을 받는다
+    {
+      path: '/tour-preference', name: 'tour-preference', component: () => import('../views/tour/TourPreferenceView.vue'),
+      props: (route) => ({ campId: route.query.camp ? Number(route.query.camp) : null })
+    },
   ],
 })
 

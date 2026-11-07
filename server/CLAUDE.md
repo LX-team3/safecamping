@@ -28,6 +28,7 @@ map/      # ④ 캠핑지도
 saved/    # 저장(목록 탭)·관심 캠핑장 비교 (saved_list·saved_camp 테이블). CampDummyData 는 캠핑장 데이터가 생기면 지운다
 alert/    # 내 정보 · 알림 (기상특보 + 재난문자). 지금은 AlertDummyData, 지역은 Sido(임시 가장 가까운 시·도)
 family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치도 여기에
+tour/     # 관광지 상세 + 관광지 탭 여행 취향 TourPreference* (member_tour_preference 테이블. 선택지는 TourPreferenceOptions)
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
 ```
 
@@ -61,6 +62,8 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 | `GET /api/auth/me` | 지금 로그인한 회원. 로그인 안 했으면 401 |
 | `GET`·`PUT /api/member/emergency-contacts` | 내 비상연락처 (최대 5명). GET → 넣은 순서대로 `[{ name, phone }, …]` (회원가입 때 넣은 번호는 name null). PUT `{ contacts: [...] }` 은 목록을 통째로 바꿈 (다 비운 칸은 건너뜀, 이름·번호 중 하나만 있거나 6명 이상이면 400). 로그인 필요 |
 | `GET`·`PUT /api/member/activities` | 내 여행 취향. GET → `{ options: [{ code, label, desc }], selected: [code], max: 3 }`. PUT `{ activities: [code] }` 통째로 바꿈 (없는 code·4개 이상 400). 로그인 필요 |
+| `GET /api/tour-preferences/questions` | 관광지 탭 여행 취향 질문 2개. `[{ code, title, max, options: [{ code, label }] }]`. 로그인 없이도 됨 |
+| `GET`·`PUT /api/member/tour-preferences` | 내 관광지 여행 취향 `{ activity: [code], nature: [code] }`. PUT 은 통째로 바꿈 (없는 code·최대 개수 초과 400). 로그인 필요 |
 | `GET /api/alerts?sido=` · `?lat=&lon=` | 알림 (기상특보 + 재난문자, **더미** `dummy: true`). 지역 → 위치(가장 가까운 시·도) → 없으면 전국. `{ sido, regions, activeWarnings, todayDisasterCount, items: [{ kind: warning·disaster, area, category, message, issuedAt, active }] }`. 로그인 없이 됨 |
 | `GET /api/saved/lists` | 내 저장 목록 (`관심 캠핑장` 기본 목록이 없으면 만들어 줌). 이하 `/api/saved/**` 전부 로그인 필요 |
 | `POST /api/saved/lists` · `PATCH`·`DELETE /api/saved/lists/{id}` | 목록 만들기 `{ name }`·이름 바꾸기·삭제 (기본 목록은 바꾸기·삭제 불가 400) |
