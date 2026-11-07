@@ -1,11 +1,12 @@
 <script setup>
 // 내 정보 · 알림 — 기상특보 + 재난문자 모아 보기. 설계 파일 없음 (예시로 받은 "재난 안전문자 대시보드" 목록 모양을 참고)
 // 지역: 지금 내 위치(브라우저) → 서버가 가장 가까운 시·도로 정한다. 위치를 못 쓰면 시·도를 직접 고른다
-// 데이터는 더미 (API 키를 받으면 서버만 바꾼다). 로그인 없이도 볼 수 있다
+// 기상특보는 기상청 실제 데이터(서버가 못 받으면 예시), 재난문자는 아직 예시. 로그인 없이도 볼 수 있다
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/utils/api'
 
-const data = ref(null) // AlertResponse: { dummy, sido, regions, activeWarnings, todayDisasterCount, items }
+// AlertResponse: { warningDummy, disasterDummy, sido, regions, activeWarnings, todayDisasterCount, items }
+const data = ref(null)
 const error = ref('')
 const loading = ref(false)
 const locating = ref(false)
@@ -22,6 +23,21 @@ const KIND_LABEL = { warning: '특보', disaster: '재난문자' }
 const shown = computed(() =>
   (data.value?.items ?? []).filter((a) => filter.value === 'all' || a.kind === filter.value),
 )
+
+// 이 알림이 예시(더미)인지. 기상특보·재난문자가 따로 정해진다
+function isDummy(a) {
+  return a.kind === 'warning' ? data.value?.warningDummy : data.value?.disasterDummy
+}
+
+// 맨 위 안내 문구: 실제로 가짜인 쪽만 알려 준다
+const dummyNote = computed(() => {
+  const d = data.value
+  if (!d) return ''
+  if (d.warningDummy && d.disasterDummy) return '기상특보·재난문자 모두 예시 알림이에요. 실제 정보가 아니에요.'
+  if (d.disasterDummy) return '재난문자는 예시 알림이에요. 기상특보는 기상청 실제 정보예요.'
+  if (d.warningDummy) return '기상특보는 예시 알림이에요. 재난문자는 실제 정보예요.'
+  return ''
+})
 
 async function load(params) {
   loading.value = true
@@ -89,8 +105,8 @@ function timeText(iso) {
 
     <div class="body">
       <!-- 안전 정보를 지어내지 않는다는 규칙: 더미면 맨 위에 항상 보이게 -->
-      <p v-if="data?.dummy" class="dummy" role="note">
-        <b>더미 데이터</b> 예시 알림이에요. 실제 기상특보·재난문자가 아니에요.
+      <p v-if="dummyNote" class="dummy" role="note">
+        <b>예시 포함</b> {{ dummyNote }}
       </p>
 
       <!-- 지금 지역 상태 -->
@@ -111,7 +127,8 @@ function timeText(iso) {
           <div v-if="data.activeWarnings.length" class="warnings">
             <p v-for="w in data.activeWarnings" :key="w.id" class="warning-now">
               <b>⚠ {{ w.category }} 발효 중</b>
-              <span>{{ w.area }} · {{ timeText(w.issuedAt) }}부터</span>
+              <!-- 기상청 특보현황은 특보마다 시작 시각을 주지 않아 "현황 기준 시각"으로 보여 준다 (시작 시각을 지어내지 않기 위해) -->
+              <span>{{ w.area }} · {{ timeText(w.issuedAt) }} {{ data.warningDummy ? '부터' : '기준' }}</span>
             </p>
           </div>
           <p v-else class="calm">발효 중인 기상특보가 없어요.</p>
@@ -135,7 +152,7 @@ function timeText(iso) {
               <span class="time">{{ timeText(a.issuedAt) }}</span>
             </span>
             <span class="msg" :class="{ open: openId === a.id }">
-              <span :class="['chip', a.kind]">{{ KIND_LABEL[a.kind] }} · {{ a.category }}</span>
+              <span :class="['chip', a.kind]">{{ KIND_LABEL[a.kind] }} · {{ a.category }}{{ isDummy(a) ? ' · 예시' : '' }}</span>
               {{ a.message }}
             </span>
           </button>

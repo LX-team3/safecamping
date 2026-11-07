@@ -5,9 +5,7 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/',
-      name: 'home',
-      component: HomeView,
+      path: '/', redirect: '/explore'
     },
     // ①-3 로그인, ①-4 회원가입
     { path: '/login', name: 'login', component: () => import('../views/member/LoginView.vue') },
