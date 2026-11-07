@@ -6,6 +6,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
+import BottomNav from '@/components/common/BottomNav.vue'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
@@ -46,58 +47,70 @@ async function logout() {
 </script>
 
 <template>
-  <div class="me">
-    <h1>내 정보</h1>
-    <p v-if="auth.isLoggedIn" class="hello">{{ auth.member.name }}님, 안녕하세요</p>
+  <div class="page">
+    <div class="me">
+      <h1>내 정보</h1>
+      <p v-if="auth.isLoggedIn" class="hello">{{ auth.member.name }}님, 안녕하세요</p>
 
-    <!-- 진단 후 (Me.dc.html) -->
-    <div v-if="survey.done && survey.summary" class="diagnosis">
-      <div class="head">
-        <span class="step">{{ auth.isLoggedIn ? `${auth.member.name}님의 1분 진단` : '내 1분 진단' }}</span>
-        <span class="result">{{ survey.summary }}</span>
-        <span v-if="!auth.isLoggedIn" class="save-hint">로그인하면 진단 결과가 저장됩니다.</span>
-      </div>
-      <div class="result-actions">
-        <RouterLink to="/survey" class="redo">다시 진단하기</RouterLink>
-      </div>
-    </div>
-
-    <!-- 진단 전 (ForYouNew.dc.html) -->
-    <div v-else class="diagnosis">
-      <div class="head">
-        <span class="step">3단계 · 5문항 · 약 1분</span>
-        <span class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</span>
-      </div>
-      <ol class="points">
-        <li><b>1</b><span><b>내 캠핑 유형</b><span>나는 어떤 캠퍼인지 알아봐요</span></span></li>
-        <li><b>2</b><span><b>맞춤 안전 수칙</b><span>내 유형에 꼭 필요한 것만</span></span></li>
-        <li><b>3</b><span><b>맞춤 캠핑장 순서</b><span>탐색 TOP5가 내 유형 기준으로 바뀌어요</span></span></li>
-      </ol>
-      <RouterLink to="/survey" class="start">1분 진단 시작하기</RouterLink>
-    </div>
-
-    <ul class="menu">
-      <li v-for="m in menu" :key="m.name">
-        <RouterLink v-if="m.to" :to="m.to" class="row">
-          <span class="text"><span class="name">{{ m.name }}</span><span class="desc">{{ m.desc }}</span></span>
-          <span class="arrow" aria-hidden="true">›</span>
-        </RouterLink>
-        <div v-else class="row off">
-          <span class="text"><span class="name">{{ m.name }}</span><span class="desc">{{ m.desc }}</span></span>
+      <!-- 진단 후 (Me.dc.html) -->
+      <div v-if="survey.done && survey.summary" class="diagnosis">
+        <div class="head">
+          <span class="step">{{ auth.isLoggedIn ? `${auth.member.name}님의 1분 진단` : '내 1분 진단' }}</span>
+          <span class="result">{{ survey.summary }}</span>
+          <span v-if="!auth.isLoggedIn" class="save-hint">로그인하면 진단 결과가 저장됩니다.</span>
         </div>
-      </li>
-      <!-- 설계에 로그아웃 자리가 없어 메뉴 맨 아래에 둠 (위치는 확인 필요) -->
-      <li v-if="auth.isLoggedIn">
-        <button type="button" class="row" @click="logout">
-          <span class="text"><span class="name">로그아웃</span></span>
-        </button>
-      </li>
-    </ul>
+        <div class="result-actions">
+          <RouterLink to="/survey" class="redo">다시 진단하기</RouterLink>
+        </div>
+      </div>
+
+      <!-- 진단 전 (ForYouNew.dc.html) -->
+      <div v-else class="diagnosis">
+        <div class="head">
+          <span class="step">3단계 · 5문항 · 약 1분</span>
+          <span class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</span>
+        </div>
+        <ol class="points">
+          <li><b>1</b><span><b>내 캠핑 유형</b><span>나는 어떤 캠퍼인지 알아봐요</span></span></li>
+          <li><b>2</b><span><b>맞춤 안전 수칙</b><span>내 유형에 꼭 필요한 것만</span></span></li>
+          <li><b>3</b><span><b>맞춤 캠핑장 순서</b><span>탐색 TOP5가 내 유형 기준으로 바뀌어요</span></span></li>
+        </ol>
+        <RouterLink to="/survey" class="start">1분 진단 시작하기</RouterLink>
+      </div>
+
+      <ul class="menu">
+        <li v-for="m in menu" :key="m.name">
+          <RouterLink v-if="m.to" :to="m.to" class="row">
+            <span class="text"><span class="name">{{ m.name }}</span><span class="desc">{{ m.desc }}</span></span>
+            <span class="arrow" aria-hidden="true">›</span>
+          </RouterLink>
+          <div v-else class="row off">
+            <span class="text"><span class="name">{{ m.name }}</span><span class="desc">{{ m.desc }}</span></span>
+          </div>
+        </li>
+        <!-- 설계에 로그아웃 자리가 없어 메뉴 맨 아래에 둠 (위치는 확인 필요) -->
+        <li v-if="auth.isLoggedIn">
+          <button type="button" class="row" @click="logout">
+            <span class="text"><span class="name">로그아웃</span></span>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <BottomNav active="me" />
   </div>
 </template>
 
 <style scoped>
+/* 화면 전체 틀: 위는 내용(스크롤), 맨 아래는 하단바 (탐색 화면과 같은 방식) */
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 .me {
+  flex: 1;
+  min-height: 0; /* 이게 없으면 내용이 길 때 하단바가 아래로 밀려난다 */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 18px;

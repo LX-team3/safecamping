@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSavedStore } from '@/stores/saved'
+import BottomNav from '@/components/common/BottomNav.vue'
 
 const auth = useAuthStore()
 const saved = useSavedStore()
@@ -54,57 +55,69 @@ function countText(list) {
 </script>
 
 <template>
-  <div class="saved">
-    <div class="head">
-      <h1>저장</h1>
-      <button v-if="auth.isLoggedIn && tab === 0" type="button" class="icon" aria-label="새 목록 만들기"
-        @click="creating = !creating">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
-    </div>
-
-    <div role="tablist" class="tabs">
-      <button v-for="(label, i) in TABS" :key="label" type="button" role="tab" :aria-selected="i === tab"
-        :class="{ on: i === tab }" @click="tab = i">{{ label }}</button>
-    </div>
-
-    <div v-if="!auth.isLoggedIn" class="empty">
-      <p>저장은 로그인하면 쓸 수 있어요.</p>
-      <RouterLink to="/login" class="primary">로그인</RouterLink>
-    </div>
-
-    <p v-else-if="tab !== 0" class="empty">준비 중이에요.</p>
-
-    <template v-else>
-      <form v-if="creating" class="create" @submit.prevent="create">
-        <input v-model.trim="newName" maxlength="30" placeholder="새 목록 이름 (예: 11월 가족 캠핑 후보)" />
-        <button type="submit" class="primary">만들기</button>
-        <p v-if="createError" class="error" role="alert">{{ createError }}</p>
-      </form>
-
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-
-      <div class="grid">
-        <RouterLink v-for="list in saved.lists" :key="list.id" :to="`/saved/lists/${list.id}`" class="card">
-          <span class="thumb">
-            <span v-for="i in 3" :key="i" :class="{ filled: filled(list, i - 1) }" />
-            <span class="more">{{ more(list) }}</span>
-          </span>
-          <span class="text">
-            <b>{{ list.name }}</b>
-            <span>{{ countText(list) }}</span>
-          </span>
-        </RouterLink>
+  <div class="page">
+    <div class="saved">
+      <div class="head">
+        <h1>저장</h1>
+        <button v-if="auth.isLoggedIn && tab === 0" type="button" class="icon" aria-label="새 목록 만들기"
+          @click="creating = !creating">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
       </div>
-    </template>
+
+      <div role="tablist" class="tabs">
+        <button v-for="(label, i) in TABS" :key="label" type="button" role="tab" :aria-selected="i === tab"
+          :class="{ on: i === tab }" @click="tab = i">{{ label }}</button>
+      </div>
+
+      <div v-if="!auth.isLoggedIn" class="empty">
+        <p>저장은 로그인하면 쓸 수 있어요.</p>
+        <RouterLink to="/login" class="primary">로그인</RouterLink>
+      </div>
+
+      <p v-else-if="tab !== 0" class="empty">준비 중이에요.</p>
+
+      <template v-else>
+        <form v-if="creating" class="create" @submit.prevent="create">
+          <input v-model.trim="newName" maxlength="30" placeholder="새 목록 이름 (예: 11월 가족 캠핑 후보)" />
+          <button type="submit" class="primary">만들기</button>
+          <p v-if="createError" class="error" role="alert">{{ createError }}</p>
+        </form>
+
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
+
+        <div class="grid">
+          <RouterLink v-for="list in saved.lists" :key="list.id" :to="`/saved/lists/${list.id}`" class="card">
+            <span class="thumb">
+              <span v-for="i in 3" :key="i" :class="{ filled: filled(list, i - 1) }" />
+              <span class="more">{{ more(list) }}</span>
+            </span>
+            <span class="text">
+              <b>{{ list.name }}</b>
+              <span>{{ countText(list) }}</span>
+            </span>
+          </RouterLink>
+        </div>
+      </template>
+    </div>
+    <BottomNav active="saved" />
   </div>
 </template>
 
 <style scoped>
+/* 화면 전체 틀: 위는 내용(스크롤), 맨 아래는 하단바 (탐색 화면과 같은 방식) */
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 .saved {
+  flex: 1;
+  min-height: 0; /* 이게 없으면 내용이 길 때 하단바가 아래로 밀려난다 */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 18px;
