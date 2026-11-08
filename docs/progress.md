@@ -1,5 +1,18 @@
 # 진행 상황
 
+## 2026-11-08 내 주변 탭 (지금 위치 안전점수 · 지도 레이어)
+- 화면: `/nearby` (`views/nearby/NearbyView.vue`), 부품 `components/nearby/NearbyMap.vue`(내 위치 + 번호 마커)·`LayerSheet.vue`("지도에 보일 것"). 아래 탭 "내 주변" 연결
+- 시설 목록은 **차로 n분만** 보여 줌 (대피소 도보 시간 뺌). 길찾기는 카카오맵으로만 넘김 (더미 시설은 이름 검색, `utils/place.js` directionsUrl)
+- 레이어 시트: 응급실·소방서·경찰서·24시 편의점·약국·대피소. **공중화장실 뺌**. 약국·대피소는 줄만 있고 데이터 없음(`ready: false`, 기본 꺼짐). 탭 "지도 종류"·"날씨 · 재난"은 비활성
+- 서버: `nearby/` — `GET /api/nearby?lat=&lng=`, `GET /api/nearby/layers`. DB 변경 없음 (기존 camp·facility·camp_facility 사용)
+- 임시로 정한 것: "지금 이 위치" 점수를 계산할 방법이 없어 **시설 데이터가 있는 가장 가까운 캠핑장의 점수·시간**을 보여 주고 화면에 "○○ 기준 · 더미 데이터"로 표시. 10km 넘게 떨어지면 "가장 가까운 데이터 ○○(nkm) 기준". 위치 권한이 없으면 예시 위치(설하캠핑장 좌표)
+- 위쪽 상태 카드: 지역 + 기상특보 수(`/api/alerts`, 더미). 날씨(기온)는 데이터가 없어 "준비 중"
+- 가족에게 내 위치 보내기: 휴대폰 공유 창(`navigator.share`) → 없으면 카카오맵 링크 복사. 가족방으로 바로 보내기는 2부 가족 위치 기능에서
+- 확인: `mvnw test` 통과 (65개, 새 NearbyServiceTest 6개), `npm run build` 통과
+- 확인 못 함: 실제 DB 에서 SQL(가장 가까운 캠핑장) 실행, 브라우저 화면·위치 권한, 카카오 지도 마커, 휴대폰 공유 창
+- 남은 일: 약국·대피소 데이터(facility.type CHECK 에 pharmacy·shelter 추가 필요), 내 위치 기준 실제 거리·시간 계산(PostGIS/경로 API), 날씨
+
+
 ## 2026-11-08 알림 · 기상특보 실제 데이터 (기상청)
 - 서버: `alert/KmaWarningClient`(기상청 기상특보 조회서비스 `getPwnStatus` 호출, 10분 캐시, 실패 시 1분간 재시도 안 함), `alert/KmaWarningParser`(t6 "o 종류 : 강원도(구역…), …" → 시·도별 Alert), `alert/WarningSource`(테스트에서 가짜를 넣기 위한 인터페이스)
 - 키: 환경변수 `KMA_SERVICE_KEY` (공공데이터포털 디코딩 키). 없거나 호출 실패면 기상특보는 더미 + 화면에 "예시"

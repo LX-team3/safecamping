@@ -46,6 +46,9 @@ const router = createRouter({
       path: '/tour-preference', name: 'tour-preference', component: () => import('../views/tour/TourPreferenceView.vue'),
       props: (route) => ({ campId: route.query.camp ? Number(route.query.camp) : null })
     },
+      // 내 주변 (지금 위치 안전점수 · 가까운 시설 · 지도 레이어). 로그인 없이도 볼 수 있다
+    { path: '/nearby', name: 'nearby', component: () => import('../views/nearby/NearbyView.vue') },
+
   ],
 })
 
