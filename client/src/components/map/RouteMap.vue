@@ -1,13 +1,15 @@
 <script setup>
-// 경로 지도: 출발지(캠핑장)에서 시설까지 선을 긋는다. 고른 시설은 검은 줄, 나머지는 회색 줄
+// 경로 지도: 출발지(캠핑장)에서 시설까지 형광 파란 선을 긋는다. 고른 시설은 진하고 굵게, 나머지는 옅게
 // 카카오 키가 있으면 카카오맵, 없으면 좌표 비율로 그린 임시 그림 (CampMap 과 같은 방식)
-// 지금 선은 두 좌표를 잇는 직선이다 → 도로 경로 데이터가 생기면 line() 에 그 좌표들을 넘기면 된다
+// 시설에 path(도로 경로 좌표)가 있으면 그 길을 따라 그리고, 없으면 두 좌표를 잇는 직선을 긋는다
+// noLine: 선 없이 마커만 (실제 경로 사이에 직선이 섞이면 헷갈려서 — 예: 경로를 받지 않는 편의점)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 
 const props = defineProps({
   origin: { type: Object, default: null }, // { name, lat, lng }
-  targets: { type: Array, default: () => [] }, // [{ id, label, lat, lng, no }] no: 마커 번호 (없으면 십자)
+  // [{ id, label, lat, lng, no, path?, noLine? }] no: 마커 번호 (없으면 십자), path: [[위도, 경도], ...]
+  targets: { type: Array, default: () => [] },
   selectedId: { type: Number, default: null },
   bottomInset: { type: Number, default: 0 }, // 아래 시트가 가리는 높이(px)
   dotted: { type: Boolean, default: false }, // 시설 상세처럼 점선 한 줄
@@ -74,23 +76,45 @@ function originEl() {
   return span
 }
 
-function line(target, selected) {
-  return new kakao.maps.Polyline({
-    map,
-    path: [new kakao.maps.LatLng(props.origin.lat, props.origin.lng), new kakao.maps.LatLng(target.lat, target.lng)],
-    strokeWeight: selected ? 5 : 4,
-    strokeColor: cssColor(selected ? '--color-text' : '--color-text-sub'),
-    strokeOpacity: selected ? 1 : 0.45,
-    strokeStyle: props.dotted ? 'shortdot' : 'solid',
-    zIndex: selected ? 2 : 1,
-  })
+// 선의 점들: 도로 경로가 있으면 그 좌표 전체, 없으면 출발지·도착지 두 점
+function linePoints(target) {
+  if (target.path?.length >= 2) return target.path.map(([lat, lng]) => ({ lat, lng }))
+  return [props.origin, target]
+}
+
+// 형광 느낌: 같은 길을 세 겹으로 겹쳐 그린다
+//  ① 넓고 옅은 파란 빛(글로우) ② 선명한 파란 선 ③ (고른 길만) 안쪽 밝은 심
+// 시설 상세처럼 점선(dotted)이면 빛·심 없이 점선 한 줄만
+function lines(target, selected) {
+  const path = linePoints(target).map((p) => new kakao.maps.LatLng(p.lat, p.lng))
+  const blue = cssColor('--color-route')
+  const z = selected ? 10 : 1 // 고른 길이 다른 길 위에 보이게 (겹마다 +1, 마커는 이보다 위에 있다)
+  const layer = (weight, color, opacity, zOffset) =>
+    new kakao.maps.Polyline({
+      map,
+      path,
+      strokeWeight: weight,
+      strokeColor: color,
+      strokeOpacity: opacity,
+      strokeStyle: props.dotted ? 'shortdot' : 'solid',
+      zIndex: z + zOffset,
+    })
+  if (props.dotted) return [layer(5, blue, 1, 0)]
+  const result = [
+    layer(selected ? 16 : 10, blue, selected ? 0.22 : 0.1, 0), // ① 빛
+    layer(selected ? 6 : 4, blue, selected ? 1 : 0.5, 1), // ② 선
+  ]
+  if (selected) result.push(layer(2, cssColor('--color-route-core'), 0.95, 2)) // ③ 심
+  return result
 }
 
 function draw() {
   if (!map) return
   drawn.forEach((o) => o.setMap(null))
   drawn = []
-  if (props.origin) props.targets.forEach((t) => drawn.push(line(t, t.id === props.selectedId)))
+  if (props.origin) {
+    props.targets.filter((t) => !t.noLine).forEach((t) => drawn.push(...lines(t, t.id === props.selectedId)))
+  }
   props.targets.forEach((t) =>
     drawn.push(
       new kakao.maps.CustomOverlay({
@@ -98,7 +122,7 @@ function draw() {
         position: new kakao.maps.LatLng(t.lat, t.lng),
         content: markerEl(t),
         clickable: true, // 마커를 누른 것이 지도 조작으로 넘어가지 않게 (휴대폰 터치에 필요)
-        zIndex: t.id === props.selectedId ? 10 : 3,
+        zIndex: t.id === props.selectedId ? 30 : 20, // 선(1~12)보다 위
       }),
     ),
   )
@@ -108,15 +132,21 @@ function draw() {
         map,
         position: new kakao.maps.LatLng(props.origin.lat, props.origin.lng),
         content: originEl(),
-        zIndex: 5,
+        zIndex: 25,
       }),
     )
   }
 }
 
+// 지도 범위·임시 그림에 쓸 점: 출발지 + 시설 + 도로 경로 좌표 (산길이 크게 돌아가도 화면 밖으로 나가지 않게)
+function allPoints() {
+  const paths = props.targets.flatMap((t) => (t.path || []).map(([lat, lng]) => ({ lat, lng })))
+  return [...props.targets, ...(props.origin ? [props.origin] : []), ...paths]
+}
+
 function fit() {
   if (!map) return
-  const points = [...props.targets, ...(props.origin ? [props.origin] : [])]
+  const points = allPoints()
   // 시설 상세 지도는 높이가 210px 뿐이라 여백을 고정하면 그릴 자리가 없다 → 높이에 맞춰 줄인다
   const gap = Math.min(70, el.value.clientHeight / 5)
   fitPoints(kakao, map, points, [gap, 70, props.bottomInset + gap, 70])
@@ -133,7 +163,7 @@ watch(() => props.selectedId, draw)
 
 // ---- 임시 그림 (카카오 키 없음): 좌표의 최소·최대를 0~100 으로 바꿔 그린다 (실제 축척 아님) ----
 const fake = computed(() => {
-  const points = [...props.targets, ...(props.origin ? [props.origin] : [])]
+  const points = allPoints()
   if (!points.length) return { origin: null, targets: [] }
   const lats = points.map((p) => p.lat)
   const lngs = points.map((p) => p.lng)
@@ -144,9 +174,14 @@ const fake = computed(() => {
   })
   return {
     origin: props.origin ? { ...props.origin, ...pos(props.origin) } : null,
-    // 고른 시설을 맨 뒤로 → 나중에 그려져서 회색 줄 위에 보인다
+    // 고른 시설을 맨 뒤로 → 나중에 그려져서 옅은 줄 위에 보인다
+    // points: SVG polyline 의 "x,y x,y ..." (직선이면 출발지·도착지 두 점)
     targets: props.targets
-      .map((t) => ({ ...t, ...pos(t) }))
+      .map((t) => ({
+        ...t,
+        ...pos(t),
+        points: props.origin ? linePoints(t).map((p) => { const q = pos(p); return `${q.x},${q.y}` }).join(' ') : '',
+      }))
       .sort((a, b) => (a.id === props.selectedId) - (b.id === props.selectedId)),
   }
 })
@@ -157,8 +192,10 @@ const fake = computed(() => {
     <div ref="el" class="canvas" :class="{ fake: mode === 'fake' }">
       <div v-if="mode === 'fake'" class="area" :style="{ bottom: bottomInset + 48 + 'px' }">
         <svg v-if="fake.origin" class="lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <line v-for="t in fake.targets" :key="t.id" :x1="fake.origin.x" :y1="fake.origin.y" :x2="t.x" :y2="t.y"
-            :class="{ selected: t.id === selectedId, dotted }" vector-effect="non-scaling-stroke" />
+          <template v-for="t in fake.targets" :key="t.id">
+            <polyline v-if="!t.noLine" :points="t.points" :class="{ selected: t.id === selectedId, dotted }"
+              vector-effect="non-scaling-stroke" />
+          </template>
         </svg>
         <button v-for="t in fake.targets" :key="t.id" type="button" class="route-marker fake-pos"
           :class="{ selected: t.id === selectedId }" :style="{ left: t.x + '%', top: t.y + '%' }"
@@ -200,17 +237,21 @@ const fake = computed(() => {
   height: 100%;
   overflow: visible;
 }
-.lines line {
-  stroke: var(--color-text-sub);
+/* 임시 그림도 형광 파랑: drop-shadow 로 선 둘레에 같은 색 빛을 낸다 */
+.lines polyline {
+  fill: none;
+  stroke: var(--color-route);
   stroke-width: 3;
-  stroke-opacity: 0.45;
+  stroke-opacity: 0.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.lines line.selected {
-  stroke: var(--color-text);
+.lines polyline.selected {
   stroke-width: 5;
   stroke-opacity: 1;
+  filter: drop-shadow(0 0 4px var(--color-route));
 }
-.lines line.dotted {
+.lines polyline.dotted {
   stroke-dasharray: 2 7;
   stroke-linecap: round;
 }

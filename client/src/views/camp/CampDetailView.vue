@@ -1,9 +1,9 @@
 <script setup>
 // 캠핑장 상세: 경로 지도 위에 시트를 올린 한 화면
 //  - 시트를 올리면 상세 (안전점수 · 캠핑장 정보 · 관광지 탭)
-//  - "경로 보기"·손잡이로 내리면 경로 지도 (고른 시설까지 검은 줄)
+//  - "경로 보기"·손잡이로 내리면 경로 지도 (응급실·소방서·경찰서까지 카카오 자동차 경로, 형광 파란 선)
 //  - 안전점수 탭의 시설을 누르면 시설 상세, 관광지 탭의 관광지를 누르면 관광지 상세
-// 데이터: GET /api/camps/{id}, GET /api/camps/{id}/tours?prefer=
+// 데이터: GET /api/camps/{id}, GET /api/camps/{id}/tours?prefer=, GET /api/camps/{id}/routes
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import RouteMap from '@/components/map/RouteMap.vue'
@@ -45,13 +45,30 @@ const sheetOpen = ref(true)
 // "다른 관광지"로 돌아올 때 ?tab=tour 로 관광지 탭을 연다
 const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'safety')
 const selectedId = ref(null) // 경로 지도에서 고른 시설
+const routes = ref([]) // 카카오 자동차 경로 [{ facilityId, type, ok, dummy, distanceKm, durationMin, path }]
+const routeState = ref('loading') // loading | kakao | straight | error
 
 // 여행 취향 답 (관광지 순서에 씀)
 const prefer = computed(() => preference.codes)
 
+// 경로는 상세와 따로 부른다: 카카오가 느리거나 실패해도 상세 화면은 먼저 보여야 하므로
+async function loadRoutes(campId) {
+  routes.value = []
+  routeState.value = 'loading'
+  try {
+    const res = await api(`/api/camps/${campId}/routes`)
+    if (campId !== props.id) return // 기다리는 사이 다른 캠핑장으로 바뀌었으면 버린다
+    routes.value = res.routes
+    routeState.value = res.source
+  } catch {
+    if (campId === props.id) routeState.value = 'error' // 직선으로 보여 준다
+  }
+}
+
 async function load() {
   error.value = ''
   camp.value = null
+  loadRoutes(props.id)
   try {
     await preference.load() // 회원이면 저장한 취향을 쓴다
   } catch {
@@ -92,12 +109,36 @@ const summary = computed(() =>
 )
 
 const rowName = (f) => (f.type === 'er' ? `응급실 (${f.name})` : f.name)
-const shortLabel = (f) => `${FACILITY_LABEL[f.type]} ${f.driveMin}분`
+// 경로 지도의 시간·거리: 카카오 경로를 받았으면 그 값, 아니면 DB 값
+const routeOf = (f) => routes.value.find((r) => r.facilityId === f.id && r.ok)
+const driveMinOf = (f) => routeOf(f)?.durationMin ?? f.driveMin
+const distanceOf = (f) => routeOf(f)?.distanceKm ?? f.distanceKm
+const shortLabel = (f) => `${FACILITY_LABEL[f.type]} ${driveMinOf(f)}분`
 
+const hasRoutes = computed(() => routes.value.some((r) => r.ok))
 const origin = computed(() => (camp.value ? { name: camp.value.name, lat: camp.value.lat, lng: camp.value.lng } : null))
 const targets = computed(() =>
-  facilities.value.map((f, i) => ({ id: f.id, label: shortLabel(f), lat: f.lat, lng: f.lng, no: i + 1 })),
+  facilities.value.map((f, i) => ({
+    id: f.id,
+    label: shortLabel(f),
+    lat: f.lat,
+    lng: f.lng,
+    no: i + 1,
+    path: routeOf(f)?.path,
+    // 실제 경로를 그릴 때 경로를 받지 않는 시설(편의점)은 직선을 빼고 마커만 → 직선과 도로가 섞여 헷갈리지 않게
+    noLine: hasRoutes.value && !routes.value.some((r) => r.facilityId === f.id),
+  })),
 )
+
+// 경로 지도 위 안내 한 줄
+const routeNote = computed(() => {
+  if (routeState.value === 'loading') return '경로를 불러오는 중...'
+  if (!hasRoutes.value) return '실제 경로를 불러오지 못해 직선으로 보여 드려요'
+  const parts = ['카카오 길찾기 예상 시간 · 교통 상황에 따라 달라질 수 있어요']
+  if (routes.value.some((r) => r.dummy)) parts.unshift('예시 위치 기준 경로')
+  if (routes.value.some((r) => !r.ok)) parts.push('일부는 직선')
+  return parts.join(' · ')
+})
 
 const isFavorite = computed(() => favorite.has(props.id))
 
@@ -172,7 +213,7 @@ async function savePlan() {
     <template v-else>
       <RouteMap :origin="origin" :targets="targets" :selected-id="selectedId" :bottom-inset="COLLAPSED"
         @select="(fid) => (selectedId = fid)" />
-      <p v-if="!sheetOpen" class="route-note">직선 예시 · 실제 도로 경로가 아니에요</p>
+      <p v-if="!sheetOpen" class="route-note">{{ routeNote }}</p>
 
       <section class="sheet" :style="{ top: sheetOpen ? '56px' : `calc(100% - ${COLLAPSED}px)` }">
         <button type="button" class="handle" :aria-expanded="sheetOpen" @click="sheetOpen = !sheetOpen">
@@ -272,7 +313,7 @@ async function savePlan() {
             </button>
           </div>
           <p v-if="selected" class="picked">
-            <span>{{ selected.name }} · {{ selected.distanceKm.toFixed(1) }}km · 차로 {{ selected.driveMin }}분</span>
+            <span>{{ selected.name }} · {{ distanceOf(selected).toFixed(1) }}km · 차로 {{ driveMinOf(selected) }}분</span>
             <RouterLink :to="`/facilities/${selected.id}?camp=${id}`">시설 상세 ›</RouterLink>
           </p>
           <p v-else class="picked">이 캠핑장의 시설 정보를 준비하고 있어요.</p>
