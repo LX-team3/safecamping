@@ -4,7 +4,7 @@
 // to 는 꼭 '/' 로 시작한다 (없으면 지금 주소 기준 상대경로가 돼서 엉뚱한 곳으로 간다)
 const TABS = [
   { key: 'explore', label: '탐색', to: '/explore', icon: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-4.5-4.5' },
-  { key: 'nearby', label: '내 주변', to: null, icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3' },
+{ key: 'nearby', label: '내 주변', to: '/nearby', icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3' },
   { key: 'mycamp', label: '내 캠핑', to: '/my-camping', icon: 'M12 3L2 21h20zM12 10v5M12 18v.01' },
   { key: 'saved', label: '저장', to: '/saved', icon: 'M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z' },
   { key: 'me', label: '내 정보', to: '/my-info', icon: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0' },
