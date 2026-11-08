@@ -3,13 +3,16 @@
 // 여기에는 화면 묶음(단계별 제목·안내 문구)만 둔다. 지역·날짜·동행은 탐색 화면, 관광지·체험은 여행 취향에서 고른다
 // 끝나면 내 정보로 간다 (설계는 탐색 화면인데 아직 없음). 다시 진단할 때는 이전 답을 채워서 연다
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
 const router = useRouter()
+const route = useRoute()
+// 탐색 화면 팝업에서 왔으면(?from=explore) 끝난 뒤·나갈 때 탐색으로, 아니면 내 정보로 돌아간다
+const backTo = computed(() => (route.query.from === 'explore' ? '/explore' : '/my-info'))
 
 // 단계 묶음과 문구는 설계 그대로. card: 세로 카드 모양(체크 원 있음), 아니면 알약 모양
 const STEPS = [
@@ -105,7 +108,7 @@ async function next() {
       safetyItems: picked.safetyItems,
       facilities: picked.facilities,
     }, auth.isLoggedIn)
-    router.push('/my-info')
+    router.push(backTo.value)
   } catch (e) {
     error.value = e.message
   } finally {
@@ -115,7 +118,7 @@ async function next() {
 
 function prev() {
   error.value = ''
-  if (step.value === 0) router.push('/my-info')
+  if (step.value === 0) router.push(backTo.value)
   else step.value--
 }
 </script>
@@ -125,7 +128,7 @@ function prev() {
     <div class="top">
       <div class="top-row">
         <span class="step-text">1분 진단 · {{ step + 1 }} / {{ STEPS.length }}</span>
-        <RouterLink to="/my-info" class="later">나중에 할게요</RouterLink>
+        <RouterLink :to="backTo" class="later">나중에 할게요</RouterLink>
       </div>
       <div class="bars">
         <span v-for="(s, i) in STEPS" :key="i" :class="{ on: i <= step }" />

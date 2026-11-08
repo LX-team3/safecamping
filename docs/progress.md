@@ -1,5 +1,19 @@
 # 진행 상황
 
+## 2026-11-08 내 캠핑 일정 등록 (서버 저장) · 탐색 진단 팝업 · 지도 레이어 · 내 정보 정리
+- **내 캠핑 일정 등록**: 캠핑장 상세 "내 캠핑에 일정 등록"(비활성이던 버튼) → 시트(체크인·체크아웃·메모) → 내 캠핑 탭(`MyCampingView`)의 "준비 중" 자리에 카드로 보임 (D-day·n박·삭제)
+  - DB: `camp_plan` 테이블 추가 (`db/schema.sql`) — **DB 에 직접 실행해야 함**. 캠핑장 이름·지역은 등록 때 값을 복사해 저장, `camp_id` 는 외래키 없이 값만
+  - 서버: 새 패키지 `mycamping/` (CampPlan*). `GET`·`POST /api/member/camp-plans`, `DELETE /api/member/camp-plans/{id}`. `/api/member/**` 아래라 **SecurityConfig 수정 없음**
+  - 검사(서버·프론트 같음): 지난 체크인, 체크아웃 ≤ 체크인, 같은 캠핑장·같은 체크인 중복 → 400
+  - 프론트: `stores/myCamping.js`. 로그아웃하면 목록 비움. 가족방 일정(family_schedule)과는 별개
+- **탐색 진단 팝업**: 진단 안 한 사람에게 탐색 화면 가운데 팝업 "내 유형 진단하기"(그림 `assets/illust/camping.svg`, unDraw — 출처 표기 불필요). "지금하기" → `/survey?from=explore` → 끝나면 탐색으로 돌아옴. "나중에하기" → 그 탭(sessionStorage)에서 다시 안 뜸
+- **탐색 지도 레이어 버튼**: 비활성 → "지도에 보일 것" 시트(`components/explore/MapLayerSheet.vue`). 안전·주의·위험 등급 마커 켜고 끄기 (기본 모두 켜짐, 목록은 그대로)
+- **내 주변 패널**: 손잡이를 누르면 패널이 120px 로 내려가 지도가 넓게 보임 (다시 누르면 올라옴). 지도 마커도 다시 맞춤
+- **내 정보**: 메뉴 아래 회색 설명 줄과 "○○님, 안녕하세요" 삭제
+- 확인: `mvnw test` 통과 (73개, 새 CampPlanServiceTest 5개), `npm run build` 통과
+- 확인 못 함: `camp_plan` 실제 SQL 실행·API 응답, 브라우저 화면 전부 (팝업·시트·패널·일정 등록)
+- 남은 일: 탐색 지도에 응급실·소방서 등 시설 레이어, 내 캠핑 카드에 날씨·위험 알림, 캠핑장 상세 하단 "안전 알림을 보내드려요" 문구(알림 기능 없음)
+
 ## 2026-11-08 내 주변 탭 (지금 위치 안전점수 · 지도 레이어)
 - 화면: `/nearby` (`views/nearby/NearbyView.vue`), 부품 `components/nearby/NearbyMap.vue`(내 위치 + 번호 마커)·`LayerSheet.vue`("지도에 보일 것"). 아래 탭 "내 주변" 연결
 - 시설 목록은 **차로 n분만** 보여 줌 (대피소 도보 시간 뺌). 길찾기는 카카오맵으로만 넘김 (더미 시설은 이름 검색, `utils/place.js` directionsUrl)
