@@ -12,6 +12,7 @@ import { api } from '@/utils/api'
 import { FACILITY_LABEL, directionsUrl, shortSido } from '@/utils/place'
 
 const PANEL = 430 // 아래 패널 높이(px) — 지도가 마커를 이 위쪽에 모아 그린다
+const COLLAPSED = 120 // 손잡이를 눌러 내렸을 때 높이: 손잡이 + 안전점수 줄만 남겨 지도가 넓게 보인다
 
 // 위치를 못 받았을 때 보여 줄 예시 위치 (더미 캠핑장 설하캠핑장 좌표, db/data_camp.sql)
 const SAMPLE = { lat: 38.14, lng: 128.205 }
@@ -29,6 +30,8 @@ const loading = ref(true)
 const error = ref('')
 const sheetOpen = ref(false)
 const shareMsg = ref('')
+const collapsed = ref(false) // true: 패널을 내려서 지도를 보는 중
+const panelHeight = computed(() => (collapsed.value ? COLLAPSED : PANEL))
 
 // 브라우저 위치 → 실패하면 예시 위치
 function locate() {
@@ -152,7 +155,7 @@ async function shareLocation() {
 <template>
   <div class="nearby">
     <div class="stage">
-      <NearbyMap :me="me" :facilities="shown" :bottom-inset="PANEL" />
+      <NearbyMap :me="me" :facilities="shown" :bottom-inset="panelHeight" />
 
       <!-- 왼쪽 위: 지역 · 기상특보 -->
       <div class="status">
@@ -174,8 +177,12 @@ async function shareLocation() {
       </button>
 
       <!-- 아래 패널 -->
-      <section class="panel" :style="{ height: PANEL + 'px' }">
-        <span class="grip" aria-hidden="true" />
+      <section class="panel" :class="{ collapsed }" :style="{ height: panelHeight + 'px' }">
+        <!-- 손잡이를 누르면 패널이 내려가 지도가 보이고, 다시 누르면 올라온다 -->
+        <button type="button" class="grip" :aria-label="collapsed ? '패널 펼치기' : '지도 보기'"
+          :aria-expanded="!collapsed" @click="collapsed = !collapsed">
+          <span />
+        </button>
 
         <p v-if="loading" class="state">내 위치를 찾는 중...</p>
         <p v-else-if="error" class="state">
@@ -305,13 +312,25 @@ async function shareLocation() {
   border-radius: 20px 20px 0 0;
   background: var(--color-card);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+  transition: height 0.25s ease;
 }
+.panel.collapsed {
+  overflow-y: hidden; /* 내려간 상태에서는 안쪽이 스크롤되지 않게 */
+}
+/* 손잡이: 줄 모양은 안쪽 span, 누르는 영역은 가로 전체 */
 .grip {
   flex: none;
-  align-self: center;
+  align-self: stretch;
+  padding: 10px 0 14px;
+  border: none;
+  background: none;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+}
+.grip span {
   width: 44px;
   height: 5px;
-  margin: 10px 0 14px;
   border-radius: 3px;
   background: var(--color-border);
 }

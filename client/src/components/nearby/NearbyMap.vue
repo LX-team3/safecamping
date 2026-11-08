@@ -72,7 +72,8 @@ function draw() {
   fitPoints(kakao, map, points, [80, 50, props.bottomInset + 40, 50])
 }
 
-watch(() => [props.me, props.facilities], draw)
+// 패널 높이(bottomInset)가 바뀌어도 다시 그려서, 패널을 내리면 지도가 넓어진 만큼 마커가 다시 맞춰진다
+watch(() => [props.me, props.facilities, props.bottomInset], draw)
 
 // ---- 임시 그림 (카카오 키 없음): 좌표의 최소·최대를 0~100 으로 바꿔 그린다 (실제 축척 아님) ----
 const fake = computed(() => {
