@@ -9,7 +9,7 @@ const props = defineProps({
   selectedId: { type: Number, default: null },
   bottomInset: { type: Number, default: 0 }, // 아래 시트가 가리는 높이(px) → 버튼·마커를 그 위로 올린다
 })
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'layers']) // layers: 오른쪽 위 레이어 버튼을 눌렀다 (시트는 부모가 연다)
 
 const GRADE_LABEL = { safe: '안전', caution: '주의', danger: '위험', unknown: '점수 없음' }
 const DEFAULT_CENTER = { lat: 38.0697, lng: 128.1707 } // 캠핑장이 하나도 없을 때 (인제군청 근처)
@@ -161,9 +161,9 @@ const fakeMarkers = computed(() => {
       </template>
     </div>
 
-    <!-- 오른쪽 위: 레이어(재난 위험 레이어는 2부 예정) + 범례 -->
+    <!-- 오른쪽 위: 레이어 + 범례 (재난 위험 레이어는 2부 예정) -->
     <div class="top-right">
-      <button type="button" class="round" disabled title="재난 위험 레이어 (준비 중)" aria-label="지도 레이어 (준비 중)">
+      <button type="button" class="round" aria-label="지도에 보일 것" aria-haspopup="dialog" @click="emit('layers')">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3l9 5-9 5-9-5z" />

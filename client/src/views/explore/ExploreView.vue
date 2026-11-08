@@ -11,9 +11,12 @@ import CampMap from '@/components/map/CampMap.vue'
 import CampRow from '@/components/explore/CampRow.vue'
 import RegionSheet from '@/components/explore/RegionSheet.vue'
 import TripSheet from '@/components/explore/TripSheet.vue'
+import MapLayerSheet from '@/components/explore/MapLayerSheet.vue'
 import BottomNav from '@/components/common/BottomNav.vue'
+import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
 import { api } from '@/utils/api'
 import { shortLabel } from '@/utils/date'
+import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTripStore } from '@/stores/trip'
@@ -21,6 +24,7 @@ import { useTripStore } from '@/stores/trip'
 const COLLAPSED = 168 // 접었을 때 시트 높이(px): 손잡이 + 검색창 + 필터 줄
 
 const router = useRouter()
+const auth = useAuthStore()
 const survey = useSurveyStore()
 const favorite = useFavoriteStore()
 const trip = useTripStore()
@@ -29,7 +33,8 @@ const trip = useTripStore()
 const sheetOpen = ref(true) // true: 목록 / false: 지도
 const query = ref('') // 검색어 (이름·지역)
 const matchMine = ref(true) // "내 유형 맞춤" 켜짐
-const openSheet = ref(null) // null | 'region' | 'trip' — 열려 있는 아래 시트
+const openSheet = ref(null) // null | 'region' | 'trip' | 'layers' — 열려 있는 아래 시트
+const gradeOn = ref({ safe: true, caution: true, danger: true }) // 지도에 보일 등급 (레이어 시트)
 const sort = ref('score') // score | er
 const showExcluded = ref(false) // "따로 보기": 추천에서 뺀 위험 등급 보기
 const selectedId = ref(null)
@@ -66,6 +71,42 @@ async function load() {
   }
 }
 
+// ---- 1분 진단 안내 팝업 ----
+// 진단을 안 한 사람에게만 한 번 보여 준다. "나중에하기"를 누르면 이 브라우저 탭에서는 다시 안 뜬다
+const PROMPT_KEY = 'survey-prompt-dismissed'
+const surveyChecked = ref(false) // 서버의 내 진단 답까지 확인했는지 (확인 전에 띄우면 한 번 깜빡인다)
+const promptDismissed = ref(readDismissed())
+const showSurveyPrompt = computed(() => surveyChecked.value && !survey.done && !promptDismissed.value)
+
+function readDismissed() {
+  try {
+    return sessionStorage.getItem(PROMPT_KEY) === '1'
+  } catch {
+    return false // 저장소를 못 쓰면 매번 보여 준다
+  }
+}
+function later() {
+  promptDismissed.value = true
+  try {
+    sessionStorage.setItem(PROMPT_KEY, '1')
+  } catch {
+    // 저장 못 해도 이번 화면에서는 닫힌다
+  }
+}
+// 끝나면 탐색으로 돌아오게 from 을 붙여 보낸다
+function startSurvey() {
+  router.push({ path: '/survey', query: { from: 'explore' } })
+}
+
+onMounted(async () => {
+  try {
+    await survey.load(auth.isLoggedIn) // 로그인했으면 저장된 답을 가져온다 (이미 한 사람에게 팝업이 뜨면 안 된다)
+  } catch {
+    // 못 불러와도 탐색은 쓸 수 있게 둔다
+  }
+  surveyChecked.value = true
+})
+
 onMounted(load)
 watch([() => trip.state.sido, () => trip.state.sigungu, sort], load)
 watch(matchMine, () => (showExcluded.value = false))
@@ -84,8 +125,13 @@ const listCamps = computed(() => {
   else list = allCamps.value
   return list.filter(matches)
 })
-// 지도에는 위험 등급까지 전부 (안전 정보라 숨기지 않는다)
-const mapCamps = computed(() => allCamps.value.filter(matches))
+// 지도에는 위험 등급까지 전부 보여 준다 (안전 정보라 기본은 숨기지 않음). 레이어 시트에서 사용자가 끈 등급만 뺀다
+// 점수 없음(unknown)은 시트에 없으니 항상 보인다
+const mapCamps = computed(() => allCamps.value.filter(matches).filter((c) => gradeOn.value[c.grade] !== false))
+
+function toggleGrade(code) {
+  gradeOn.value = { ...gradeOn.value, [code]: !gradeOn.value[code] }
+}
 
 const isRanked = computed(() => matchMine.value && !showExcluded.value)
 const title = computed(() => {
@@ -139,7 +185,7 @@ function onMarker(id) {
   <div class="explore">
     <div class="stage">
       <CampMap :camps="mapCamps" :selected-id="selectedId" :bottom-inset="COLLAPSED"
-        @select="onMarker" />
+        @select="onMarker" @layers="openSheet = 'layers'" />
 
       <!-- 지도 위 시트 -->
       <section class="sheet" :class="{ open: sheetOpen }" :style="{ top: sheetOpen ? '0px' : `calc(100% - ${COLLAPSED}px)` }">
@@ -230,9 +276,24 @@ function onMarker(id) {
 
     <BottomNav active="explore" />
 
+    <!-- 1분 진단 안내 팝업 (진단 전에만) -->
+    <div v-if="showSurveyPrompt" class="prompt-back">
+      <div class="prompt" role="dialog" aria-modal="true" aria-labelledby="prompt-title">
+        <!-- 장식 그림이라 alt 는 비워 둔다 (스크린리더가 읽지 않게) -->
+        <img :src="campingImg" alt="" class="prompt-img" />
+        <h2 id="prompt-title">내 유형 진단하기</h2>
+        <p>결과에 따라 안전수칙과 캠핑장 추천이 달라집니다.</p>
+        <div class="prompt-buttons">
+          <button type="button" class="later" @click="later">나중에하기</button>
+          <button type="button" class="now" @click="startSurvey">지금하기</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 아래 시트 (화면 전체를 어둡게 덮음) -->
     <RegionSheet v-if="openSheet === 'region'" @close="openSheet = null" @apply="applied" />
     <TripSheet v-if="openSheet === 'trip'" @close="openSheet = null" @apply="applied" />
+    <MapLayerSheet v-if="openSheet === 'layers'" :on="gradeOn" @close="openSheet = null" @toggle="toggleGrade" />
   </div>
 </template>
 
@@ -420,6 +481,73 @@ h1 {
   color: var(--color-text);
   text-decoration: underline;
   cursor: pointer;
+}
+/* 진단 안내 팝업: 화면 전체를 어둡게 덮고 가운데에 카드 */
+.prompt-back {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.prompt {
+  width: 100%;
+  max-width: 344px;
+  padding: 24px 16px 20px;
+  text-align: center;
+  border-radius: 20px;
+  background: var(--color-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* 높이를 제한해서 버튼이 화면 아래로 밀리지 않게 한다 */
+.prompt-img {
+  align-self: center;
+  height: 110px;
+  width: auto;
+  margin-bottom: 4px;
+}
+.prompt h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+}
+.prompt p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: -0.03em;
+  word-break: keep-all; /* 단어 중간에서 줄이 바뀌지 않게 */
+  text-wrap: balance; /* 좁은 화면에서 두 줄이 되더라도 "다." 만 홀로 남지 않게 */
+  color: var(--color-text);
+}
+.prompt-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.prompt-buttons button {
+  height: 48px;
+  border-radius: 24px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.prompt-buttons .later {
+  flex: 1;
+  border: 1.5px solid var(--color-text);
+  background: var(--color-card);
+  color: var(--color-text);
+}
+.prompt-buttons .now {
+  flex: 1.4;
+  border: 0;
+  background: var(--color-text);
+  color: var(--color-card);
 }
 .to-map {
   position: absolute;

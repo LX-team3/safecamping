@@ -152,3 +152,17 @@ CREATE TABLE IF NOT EXISTS family_schedule (
     created_by      bigint        REFERENCES member (id) ON DELETE SET NULL,
     created_at      timestamptz   NOT NULL DEFAULT now()
 );
+
+-- 내 캠핑: 캠핑장 상세에서 "내 캠핑에 일정 등록"한 캠핑 (내 캠핑 탭에 카드로 보인다). 가족방과 상관없이 회원 개인 것
+CREATE TABLE IF NOT EXISTS camp_plan (
+    id          bigserial     PRIMARY KEY,
+    member_id   bigint        NOT NULL REFERENCES member (id) ON DELETE CASCADE,  -- 탈퇴하면 같이 지운다
+    camp_id     bigint        NOT NULL,   -- 탐색 화면의 캠핑장 id. camp 테이블과 외래키로 잇기 전이라 값만 저장한다
+    camp_name   varchar(100)  NOT NULL,   -- 등록할 때의 이름을 복사해 둔다 (나중에 캠핑장 이름이 바뀌어도 카드는 그대로)
+    place       varchar(100),             -- 예: 강원 인제군 북면
+    check_in    date          NOT NULL,   -- 날짜만 (시간대 문제 없음)
+    check_out   date          NOT NULL,
+    memo        varchar(100),
+    created_at  timestamptz   NOT NULL DEFAULT now(),
+    UNIQUE (member_id, camp_id, check_in)  -- 같은 캠핑장·같은 체크인을 두 번 등록할 수 없다
+);

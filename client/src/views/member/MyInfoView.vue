@@ -6,10 +6,12 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
+import { useMyCampingStore } from '@/stores/myCamping'
 import BottomNav from '@/components/common/BottomNav.vue'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
+const myCamping = useMyCampingStore()
 const router = useRouter()
 
 onMounted(async () => {
@@ -26,22 +28,23 @@ onMounted(async () => {
 const menu = computed(() =>
   auth.isLoggedIn
     ? [
-        { name: '함께 가는 가족', desc: '아이 나이에 맞는 안전 안내', to: '/my-info/family' },
-        { name: '여행 취향', desc: '낚시 · 등산 · 물놀이 등 3개까지 · 캠핑장 추천에 반영', to: '/my-info/activity' },
-        { name: '비상연락처', desc: '가족 5명까지 · 위치와 안전 정보 공유', to: '/my-info/emergency-contacts' },
-        { name: '알림', desc: '기상특보 · 재난문자 모아 보기', to: '/my-info/alerts' },
-        { name: '공지사항 · 문의', desc: '준비 중이에요' },
+        { name: '함께 가는 가족', to: '/my-info/family' },
+        { name: '여행 취향', to: '/my-info/activity' },
+        { name: '비상연락처', to: '/my-info/emergency-contacts' },
+        { name: '알림', to: '/my-info/alerts' },
+        { name: '공지사항 · 문의' }, // 화면이 아직 없어 누를 수 없음
       ]
     : [
-        { name: '로그인 · 회원가입', desc: '기록과 비상연락처를 저장하려면 필요해요', to: '/login' },
-        { name: '알림', desc: '기상특보 · 재난문자 모아 보기', to: '/my-info/alerts' },
-        { name: '공지사항 · 문의', desc: '준비 중이에요' },
+        { name: '로그인 · 회원가입', to: '/login' },
+        { name: '알림', to: '/my-info/alerts' },
+        { name: '공지사항 · 문의' },
       ],
 )
 
 async function logout() {
   await auth.logout()
   survey.reset() // 다음 사람에게 이전 사람의 진단 결과가 보이지 않게
+  myCamping.reset() // 내 캠핑 목록도 같은 이유로 비운다
   router.push('/login')
 }
 </script>
@@ -50,7 +53,6 @@ async function logout() {
   <div class="page">
     <div class="me">
       <h1>내 정보</h1>
-      <p v-if="auth.isLoggedIn" class="hello">{{ auth.member.name }}님, 안녕하세요</p>
 
       <!-- 진단 후 (Me.dc.html) -->
       <div v-if="survey.done && survey.summary" class="diagnosis">
@@ -81,11 +83,11 @@ async function logout() {
       <ul class="menu">
         <li v-for="m in menu" :key="m.name">
           <RouterLink v-if="m.to" :to="m.to" class="row">
-            <span class="text"><span class="name">{{ m.name }}</span><span class="desc">{{ m.desc }}</span></span>
+            <span class="text"><span class="name">{{ m.name }}</span></span>
             <span class="arrow" aria-hidden="true">›</span>
           </RouterLink>
           <div v-else class="row off">
-            <span class="text"><span class="name">{{ m.name }}</span><span class="desc">{{ m.desc }}</span></span>
+            <span class="text"><span class="name">{{ m.name }}</span></span>
           </div>
         </li>
         <!-- 설계에 로그아웃 자리가 없어 메뉴 맨 아래에 둠 (위치는 확인 필요) -->
@@ -121,11 +123,6 @@ h1 {
   font-size: 32px;
   font-weight: 900;
   letter-spacing: -0.03em;
-}
-.hello {
-  margin: -10px 0 0;
-  font-size: 14px;
-  color: var(--color-text-sub);
 }
 .diagnosis {
   display: flex;
@@ -250,10 +247,6 @@ h1 {
 .name {
   font-size: 16px;
   font-weight: 500;
-}
-.desc {
-  font-size: 12px;
-  color: var(--color-text-sub);
 }
 .arrow {
   color: var(--color-arrow);

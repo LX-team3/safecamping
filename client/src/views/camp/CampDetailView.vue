@@ -10,8 +10,13 @@ import RouteMap from '@/components/map/RouteMap.vue'
 import DetailTopBar from '@/components/detail/DetailTopBar.vue'
 import PhotoBox from '@/components/detail/PhotoBox.vue'
 import InfoRows from '@/components/detail/InfoRows.vue'
+import BottomSheet from '@/components/common/BottomSheet.vue'
 import { api } from '@/utils/api'
 import { FACILITY_LABEL, shortSido } from '@/utils/place'
+import { useAuthStore } from '@/stores/auth'
+import { useMyCampingStore } from '@/stores/myCamping'
+import { useTripStore } from '@/stores/trip'
+import { todayIso, nightsBetween } from '@/utils/date'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
 
@@ -27,6 +32,9 @@ const GRADE_LABEL = { safe: '안전', caution: '주의', danger: '위험', unkno
 const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
 
 const route = useRoute()
+const auth = useAuthStore()
+const myCamping = useMyCampingStore()
+const trip = useTripStore()
 const favorite = useFavoriteStore()
 const preference = useTourPreferenceStore()
 
@@ -92,6 +100,63 @@ const targets = computed(() =>
 )
 
 const isFavorite = computed(() => favorite.has(props.id))
+
+// ---- 내 캠핑에 일정 등록 ----
+// 등록하면 내 캠핑 탭에 카드로 뜬다 (서버 저장, stores/myCamping.js). 회원 전용이라 로그인이 필요하다
+// 시트 단계: login(로그인 필요) → form(날짜 입력) → done(저장 끝)
+const planOpen = ref(false)
+const planStep = ref('form')
+const planCheckIn = ref('') // "2026-11-14"
+const planCheckOut = ref('')
+const planMemo = ref('')
+const planError = ref('')
+const planSaving = ref(false)
+
+function openPlan() {
+  planError.value = ''
+  planOpen.value = true
+  if (!auth.isLoggedIn) {
+    planStep.value = 'login'
+    return
+  }
+  // 탐색에서 고른 날짜가 있으면 미리 채운다
+  planCheckIn.value = trip.state.checkIn || ''
+  planCheckOut.value = trip.state.checkOut || ''
+  planMemo.value = ''
+  planStep.value = 'form'
+}
+
+async function savePlan() {
+  if (!planCheckIn.value || !planCheckOut.value) {
+    planError.value = '체크인·체크아웃 날짜를 골라 주세요.'
+    return
+  }
+  if (planCheckIn.value < todayIso()) {
+    planError.value = '지난 날짜는 고를 수 없습니다.'
+    return
+  }
+  if (nightsBetween(planCheckIn.value, planCheckOut.value) < 1) {
+    planError.value = '체크아웃은 체크인 다음 날부터 고를 수 있습니다.'
+    return
+  }
+  planError.value = ''
+  planSaving.value = true
+  try {
+    await myCamping.add({
+      campId: props.id,
+      campName: camp.value.name,
+      place: place.value,
+      checkIn: planCheckIn.value,
+      checkOut: planCheckOut.value,
+      memo: planMemo.value.trim(),
+    })
+    planStep.value = 'done'
+  } catch (e) {
+    planError.value = e.message // 중복 등록 등 서버 문구를 그대로 보여 준다
+  } finally {
+    planSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -219,11 +284,38 @@ const isFavorite = computed(() => favorite.has(props.id))
             <a v-if="camp.reservationUrl" class="reserve" :href="camp.reservationUrl" target="_blank"
               rel="noopener noreferrer">예약 사이트 ↗</a>
             <button v-else type="button" class="reserve" disabled title="예약 사이트 정보가 없어요">예약 사이트 ↗</button>
-            <!-- TODO: 2부 내 캠핑을 만들면 일정 등록을 연결한다 -->
-            <button type="button" class="plan" disabled title="준비 중">내 캠핑에 일정 등록</button>
+            <button type="button" class="plan" aria-haspopup="dialog" @click="openPlan">내 캠핑에 일정 등록</button>
           </div>
         </footer>
       </section>
+
+      <!-- 일정 등록 시트 -->
+      <BottomSheet v-if="planOpen" title="내 캠핑에 일정 등록" @close="planOpen = false">
+        <div v-if="planStep === 'login'" class="plan-msg">
+          <p>일정은 로그인하면 저장할 수 있어요.</p>
+          <RouterLink to="/login" class="plan-go">로그인하기</RouterLink>
+        </div>
+
+        <div v-else-if="planStep === 'done'" class="plan-msg">
+          <p><b>내 캠핑에 등록했어요.</b><br />내 캠핑 탭에서 확인할 수 있어요.</p>
+          <RouterLink to="/my-camping" class="plan-go">내 캠핑에서 보기</RouterLink>
+        </div>
+
+        <form v-else class="plan-form" @submit.prevent="savePlan">
+          <p class="plan-camp">{{ camp.name }}</p>
+          <label>체크인
+            <input v-model="planCheckIn" type="date" :min="todayIso()" />
+          </label>
+          <label>체크아웃
+            <input v-model="planCheckOut" type="date" :min="planCheckIn || todayIso()" />
+          </label>
+          <label>메모 (선택)
+            <input v-model.trim="planMemo" maxlength="100" placeholder="예: 예약번호, 준비물" />
+          </label>
+          <p v-if="planError" class="plan-error" role="alert">{{ planError }}</p>
+          <button type="submit" class="plan-go" :disabled="planSaving">{{ planSaving ? '등록 중...' : '등록하기' }}</button>
+        </form>
+      </BottomSheet>
     </template>
   </div>
 </template>
@@ -600,6 +692,69 @@ h1 {
 .plan:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* 일정 등록 시트 */
+.plan-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.plan-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-sub);
+}
+.plan-form input {
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--color-text);
+}
+.plan-camp {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 900;
+}
+.plan-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+.plan-go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.plan-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+.plan-msg p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.plan-go {
+  height: 50px;
+  border: none;
+  border-radius: 25px;
+  background: var(--color-text);
+  color: var(--color-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .link {
   padding: 0;
