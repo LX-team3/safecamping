@@ -2,12 +2,14 @@
 // 캠핑장 지도: 텐트 + 점수 마커(안전·주의·위험 색) + 고른 캠핑장 이름표 + 범례 · 레이어 · 내 위치 버튼
 // 카카오 키(VITE_KAKAO_MAP_KEY)가 있으면 카카오맵, 없으면 좌표 비율로 마커만 놓은 임시 그림을 보여 준다
 // 텐트 아이콘은 경로 지도 출발지와 같은 것 (utils/facilityIcon.js)
+// 고른 캠핑장의 가까운 시설(facilities)도 종류별 아이콘 배지로 그린다 — 색은 고른 캠핑장의 등급 색 (내 주변 지도와 같은 규칙)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 
 const props = defineProps({
   camps: { type: Array, default: () => [] },
+  facilities: { type: Array, default: () => [] }, // 고른 캠핑장의 가까운 시설 [{ no, id, type, name, lat, lng }] — 켜 둔 레이어만
   selectedId: { type: Number, default: null },
   bottomInset: { type: Number, default: 0 }, // 아래 시트가 가리는 높이(px) → 버튼·마커를 그 위로 올린다
 })
@@ -77,6 +79,16 @@ function markerEl(camp) {
   return btn
 }
 
+// 시설 마커 색 = 고른 캠핑장의 안전점수 등급 (없으면 회색)
+const selectedCamp = computed(() => props.camps.find((c) => c.id === props.selectedId) || null)
+const facilityGrade = computed(() => selectedCamp.value?.grade ?? null)
+
+function facilityEl(f) {
+  const badge = facilityBadgeEl({ type: f.type, grade: facilityGrade.value, no: f.no })
+  badge.title = f.name
+  return badge
+}
+
 function draw() {
   if (!map) return
   overlays.forEach((o) => o.setMap(null))
@@ -90,6 +102,17 @@ function draw() {
         zIndex: camp.id === props.selectedId ? 10 : 1, // 고른 마커가 위로
       }),
   )
+  // 시설은 캠핑장 마커보다 아래(zIndex 3 < 고른 캠핑장 10) — 고른 캠핑장 이름표를 가리지 않게
+  props.facilities.forEach((f) =>
+    overlays.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(f.lat, f.lng), content: facilityEl(f), zIndex: 3 })),
+  )
+}
+
+// 시설을 받아 오면 고른 캠핑장 + 시설이 한 화면에 들어오게 맞춘다
+function fitSelected() {
+  if (map && selectedCamp.value && props.facilities.length) {
+    fitPoints(kakao, map, [selectedCamp.value, ...props.facilities], [80, 60, props.bottomInset + 60, 60])
+  }
 }
 
 // 마커가 전부 보이게 지도 범위를 맞춘다 (아래 시트에 가리는 만큼 아래 여백을 더 준다)
@@ -110,6 +133,14 @@ watch(
     draw()
     const camp = props.camps.find((c) => c.id === id)
     if (map && camp) map.panTo(new kakao.maps.LatLng(camp.lat, camp.lng))
+  },
+)
+// 시설 목록이 바뀜 = 새 캠핑장의 시설을 받았거나 레이어를 켜고 껐다
+watch(
+  () => props.facilities,
+  (now, before) => {
+    draw()
+    if (now.length && !before.length) fitSelected() // 처음 받아 왔을 때만 범위를 맞춘다 (켜고 끌 때마다 움직이면 어지러움)
   },
 )
 
@@ -134,18 +165,21 @@ function locate() {
 }
 
 // ---- 임시 그림 (카카오 키 없음) ----
-// 캠핑장 좌표의 최소·최대를 0~100% 로 바꿔 마커 위치를 잡는다 (실제 지도 축척 아님)
-const fakeMarkers = computed(() => {
-  const list = props.camps
-  if (!list.length) return []
-  const lats = list.map((c) => c.lat)
-  const lngs = list.map((c) => c.lng)
+// 캠핑장 + 시설 좌표의 최소·최대를 0~100% 로 바꿔 마커 위치를 잡는다 (실제 지도 축척 아님)
+const fake = computed(() => {
+  const points = [...props.camps, ...props.facilities]
+  if (!points.length) return { camps: [], facilities: [] }
+  const lats = points.map((p) => p.lat)
+  const lngs = points.map((p) => p.lng)
   const [minLat, maxLat, minLng, maxLng] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)]
-  return list.map((c) => ({
-    camp: c,
-    left: maxLng === minLng ? 50 : ((c.lng - minLng) / (maxLng - minLng)) * 100,
-    top: maxLat === minLat ? 50 : ((maxLat - c.lat) / (maxLat - minLat)) * 100, // 위도는 위가 큼 → 뒤집음
-  }))
+  const pos = (p) => ({
+    left: maxLng === minLng ? 50 : ((p.lng - minLng) / (maxLng - minLng)) * 100,
+    top: maxLat === minLat ? 50 : ((maxLat - p.lat) / (maxLat - minLat)) * 100, // 위도는 위가 큼 → 뒤집음
+  })
+  return {
+    camps: props.camps.map((c) => ({ camp: c, ...pos(c) })),
+    facilities: props.facilities.map((f) => ({ ...f, ...pos(f) })),
+  }
 })
 </script>
 
@@ -156,7 +190,14 @@ const fakeMarkers = computed(() => {
       <template v-if="mode === 'fake'">
         <span class="fake-note">임시 지도 · {{ message ? '카카오 지도 불러오기 실패' : '카카오 키 없음' }} (위치는 좌표 비율)</span>
         <div class="fake-area" :style="{ bottom: bottomInset + 60 + 'px' }">
-          <button v-for="m in fakeMarkers" :key="m.camp.id" type="button" class="camp-marker fake-pos"
+          <!-- 시설 (카카오 지도의 facilityEl 과 같은 모양). 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
+          <span v-for="f in fake.facilities" :key="`f-${f.id}`" class="fac-badge camp-fac-pos"
+            :class="gradeClass(facilityGrade)" :title="f.name" :style="{ left: f.left + '%', top: f.top + '%' }">
+            <span v-if="facilityIcon(f.type)" class="fac-svg" v-html="facilityIcon(f.type)" />
+            <template v-else>{{ f.no }}</template>
+            <b v-if="facilityIcon(f.type) && f.no" class="fac-no">{{ f.no }}</b>
+          </span>
+          <button v-for="m in fake.camps" :key="m.camp.id" type="button" class="camp-marker fake-pos"
             :class="[m.camp.grade, { selected: m.camp.id === selectedId }]"
             :style="{ left: m.left + '%', top: m.top + '%', zIndex: m.camp.id === selectedId ? 10 : 1 }"
             :aria-label="`${m.camp.name} ${GRADE_LABEL[m.camp.grade]} ${m.camp.safetyScore ?? ''}`"
@@ -320,7 +361,8 @@ const fakeMarkers = computed(() => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   cursor: pointer;
 }
-.camp-marker.fake-pos {
+.camp-marker.fake-pos,
+.fac-badge.camp-fac-pos {
   position: absolute;
   transform: translate(-50%, -50%); /* 좌표가 마커 가운데에 오게 */
 }
