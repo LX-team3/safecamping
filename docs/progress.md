@@ -1,5 +1,12 @@
 # 진행 상황
 
+## 2026-11-09 누구와 언제 시트: 아이 선택 후 "없는 주소입니다" 고침
+- 원인: 로그인 + 아이 1명 이상이면 시트가 `PUT /api/members/me/children` 을 부르는데, 이 서버 코드(`MemberChild*`)가 `origin/lyh` 브랜치에만 있고 main 에 합쳐지지 않았음 → 404
+- 고침: `origin/lyh` 의 `MemberChildController·Mapper·Request·Service` + 테스트를 가져오고, 주소를 다른 회원 API 와 같은 `/api/member/children` 으로 바꿈 (SecurityConfig 의 `/api/member/**` 로그인 필요 규칙에 그대로 걸림). `TripSheet.vue` 호출 주소도 같이 바꿈
+- DB: 기존 `member_child` 테이블 그대로 사용 (schema_02.sql, 1.sql 둘 다 같은 모양). DB 변경 없음
+- 확인: `mvnw test` 통과, `npm run build` 통과
+- 확인 못 함: 실제 DB·브라우저에서 아이 선택 → 적용 흐름
+
 ## 2026-11-09 지도 시설 마커를 종류별 아이콘 + 안전점수 등급 색으로
 - 아이콘: 사용자가 준 SVG Repo 아이콘 5개(응급실 병원·소방서 불꽃·경찰서 경찰관·편의점 24 가게·약국 알약)를 `client/src/utils/facilityIcon.js` 한곳에 모음. 검정 → `currentColor` 로 바꿔 CSS 로 흰색 표시. 경찰관(선 아이콘)은 작게 보면 흐려서 선 굵기 1.4 → 1.8
 - 모양: 등급 색 동그라미 + 흰 아이콘 + 오른쪽 위 작은 번호(목록·칩 순서). 공통 스타일 `.fac-badge` 는 `styles/base.css` (카카오 지도 위 요소라 scoped 가 안 닿음)
