@@ -1,7 +1,7 @@
 <script setup>
 // "누구와, 언제 가세요?" 시트: 함께 가는 사람 · 어른/아이 인원 · 아이 나이대 · 달력(체크인→체크아웃)
 // "적용"을 누르면 서버 POST /api/trips/check 로 검사 → 통과하면 trip store 에 넣는다
-// 로그인 회원은 아이 나이대를 GET/PUT /api/members/me/children 로 불러오고 저장한다
+// 로그인 회원은 아이 나이대를 GET/PUT /api/member/children 로 불러오고 저장한다
 import { computed, onMounted, ref, watch } from 'vue'
 import BottomSheet from '@/components/common/BottomSheet.vue'
 import { api } from '@/utils/api'
@@ -45,7 +45,7 @@ watch(
 onMounted(async () => {
   if (!auth.isLoggedIn) return
   try {
-    const saved = await api('/api/members/me/children')
+    const saved = await api('/api/member/children')
     if (!saved.length) return
     // 이번에 아직 고르지 않은 칸만 지난번 정보로 채운다
     if (kids.value === 0) kids.value = saved.length
@@ -126,7 +126,7 @@ async function apply() {
   try {
     const checked = await api('/api/trips/check', { method: 'post', body })
     if (auth.isLoggedIn && kids.value > 0) {
-      await api('/api/members/me/children', { method: 'put', body: { ageGroups: childAges.value } })
+      await api('/api/member/children', { method: 'put', body: { ageGroups: childAges.value } })
     }
     trip.setWhoWhen(checked)
     emit('apply')
