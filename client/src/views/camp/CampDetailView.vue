@@ -1,7 +1,7 @@
 <script setup>
 // 캠핑장 상세: 경로 지도 위에 시트를 올린 한 화면
 //  - 시트를 올리면 상세 (안전점수 · 캠핑장 정보 · 관광지 탭)
-//  - "경로 보기"·손잡이로 내리면 경로 지도 (응급실·소방서·경찰서까지 카카오 자동차 경로, 형광 파란 선)
+//  - "경로 보기"·손잡이로 내리면 경로 지도 (응급실·소방서·경찰서·편의점·약국까지 카카오 자동차 경로, 형광 파란 선)
 //  - 안전점수 탭의 시설을 누르면 시설 상세, 관광지 탭의 관광지를 누르면 관광지 상세
 // 데이터: GET /api/camps/{id}, GET /api/camps/{id}/tours?prefer=, GET /api/camps/{id}/routes
 import { computed, ref, watch } from 'vue'
@@ -120,12 +120,13 @@ const origin = computed(() => (camp.value ? { name: camp.value.name, lat: camp.v
 const targets = computed(() =>
   facilities.value.map((f, i) => ({
     id: f.id,
+    type: f.type, // 마커 아이콘 고르기 (utils/facilityIcon.js)
     label: shortLabel(f),
     lat: f.lat,
     lng: f.lng,
     no: i + 1,
     path: routeOf(f)?.path,
-    // 실제 경로를 그릴 때 경로를 받지 않는 시설(편의점)은 직선을 빼고 마커만 → 직선과 도로가 섞여 헷갈리지 않게
+    // 실제 경로를 그릴 때 경로를 받지 않는 시설(지금은 화장실)은 직선을 빼고 마커만 → 직선과 도로가 섞여 헷갈리지 않게
     noLine: hasRoutes.value && !routes.value.some((r) => r.facilityId === f.id),
   })),
 )
@@ -211,7 +212,7 @@ async function savePlan() {
     <p v-else-if="!camp" class="state">불러오는 중...</p>
 
     <template v-else>
-      <RouteMap :origin="origin" :targets="targets" :selected-id="selectedId" :bottom-inset="COLLAPSED"
+      <RouteMap :origin="origin" :targets="targets" :grade="camp.grade" :selected-id="selectedId" :bottom-inset="COLLAPSED"
         @select="(fid) => (selectedId = fid)" />
       <p v-if="!sheetOpen" class="route-note">{{ routeNote }}</p>
 

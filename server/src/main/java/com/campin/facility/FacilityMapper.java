@@ -19,7 +19,8 @@ public interface FacilityMapper {
     // 이 캠핑장과 연결된 시설이 아니면 null
     @Select("""
             SELECT c.id AS campId, c.name AS campName, c.lat, c.lng,
-                   cf.distance_km AS distanceKm, cf.drive_min AS driveMin
+                   cf.distance_km AS distanceKm, cf.drive_min AS driveMin,
+                   c.safety_score AS safetyScore
               FROM camp_facility cf
               JOIN camp c ON c.id = cf.camp_id
              WHERE cf.facility_id = #{facilityId} AND cf.camp_id = #{campId}

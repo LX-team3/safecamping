@@ -1,12 +1,15 @@
 <script setup>
-// 내 주변 지도: 내 위치(검은 점 + 회색 원)와 번호 붙은 안전 시설 마커
+// 내 주변 지도: 내 위치(검은 점 + 회색 원)와 안전 시설 마커 (종류별 아이콘 + 작은 번호)
+// 마커 색 = 기준 캠핑장의 안전점수 등급 (안전·주의·위험) — utils/facilityIcon.js
 // 카카오 키가 있으면 카카오맵, 없으면 좌표 비율로 그린 임시 그림 (CampMap·RouteMap 과 같은 방식)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 
 const props = defineProps({
   me: { type: Object, default: null }, // { lat, lng }
-  facilities: { type: Array, default: () => [] }, // [{ no, id, name, lat, lng }] — 켜 둔 레이어만
+  facilities: { type: Array, default: () => [] }, // [{ no, id, type, name, lat, lng }] — 켜 둔 레이어만
+  grade: { type: String, default: null }, // 기준 캠핑장 안전점수 등급 safe·caution·danger (없으면 회색)
   bottomInset: { type: Number, default: 0 }, // 아래 패널이 가리는 높이(px)
 })
 
@@ -44,11 +47,9 @@ onBeforeUnmount(() => {
 })
 
 function facilityEl(f) {
-  const span = document.createElement('span')
-  span.className = 'nearby-marker'
-  span.textContent = f.no
-  span.title = f.name
-  return span
+  const badge = facilityBadgeEl({ type: f.type, grade: props.grade, no: f.no })
+  badge.title = f.name
+  return badge
 }
 
 function meEl() {
@@ -73,7 +74,7 @@ function draw() {
 }
 
 // 패널 높이(bottomInset)가 바뀌어도 다시 그려서, 패널을 내리면 지도가 넓어진 만큼 마커가 다시 맞춰진다
-watch(() => [props.me, props.facilities, props.bottomInset], draw)
+watch(() => [props.me, props.facilities, props.grade, props.bottomInset], draw)
 
 // ---- 임시 그림 (카카오 키 없음): 좌표의 최소·최대를 0~100 으로 바꿔 그린다 (실제 축척 아님) ----
 const fake = computed(() => {
@@ -98,8 +99,13 @@ const fake = computed(() => {
     <div ref="el" class="canvas" :class="{ fake: mode === 'fake' }">
       <template v-if="mode === 'fake'">
         <div class="area" :style="{ bottom: bottomInset + 40 + 'px' }">
-          <span v-for="f in fake.facilities" :key="f.id" class="nearby-marker fake-pos" :title="f.name"
-            :style="{ left: f.x + '%', top: f.y + '%' }">{{ f.no }}</span>
+          <!-- 카카오 지도 마커(facilityBadgeEl)와 같은 모양. 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
+          <span v-for="f in fake.facilities" :key="f.id" class="fac-badge fake-pos" :class="gradeClass(grade)"
+            :title="f.name" :style="{ left: f.x + '%', top: f.y + '%' }">
+            <span v-if="facilityIcon(f.type)" class="fac-svg" v-html="facilityIcon(f.type)" />
+            <template v-else>{{ f.no }}</template>
+            <b v-if="facilityIcon(f.type) && f.no" class="fac-no">{{ f.no }}</b>
+          </span>
           <span v-if="fake.me" class="nearby-me fake-pos" :style="{ left: fake.me.x + '%', top: fake.me.y + '%' }"><i /></span>
         </div>
         <span class="fake-note">임시 지도 · 카카오 키 없음 (위치는 좌표 비율)</span>
@@ -139,18 +145,7 @@ const fake = computed(() => {
 
 <!-- 마커는 카카오 지도 안에 직접 붙이는 요소라 scoped 가 적용되지 않는다 → 전역 style -->
 <style>
-.nearby-marker {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--color-text);
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-card);
-  color: var(--color-text);
-  font: 700 13px var(--font-base);
-}
+/* 시설 마커 모양은 styles/base.css 의 .fac-badge (경로 지도와 같이 씀) */
 /* 내 위치: 검은 점 + 주변 회색 원 (설계 스크린샷 모양) */
 .nearby-me {
   width: 110px;
@@ -171,7 +166,7 @@ const fake = computed(() => {
   background: var(--color-text);
   box-shadow: 0 0 0 2px var(--color-border);
 }
-.nearby-marker.fake-pos,
+.fac-badge.fake-pos,
 .nearby-me.fake-pos {
   position: absolute;
   transform: translate(-50%, -50%);
