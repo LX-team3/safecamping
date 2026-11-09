@@ -25,7 +25,7 @@ member/   # ①-3 로그인 · ①-4 회원가입 (member 테이블). 내 정보
 survey/   # ② 1분 진단 (3단계 5문항, survey_answer 테이블). 질문은 SurveyQuestions 한곳
 region/   # ③ 지역 찾기
 map/      # ④ 캠핑지도
-saved/    # 저장(목록 탭)·관심 캠핑장 비교 (saved_list·saved_camp 테이블). CampDummyData 는 캠핑장 데이터가 생기면 지운다
+saved/    # 저장(목록 탭)·하트(관심 캠핑장 기본 목록)·관심 캠핑장 비교 (saved_list·saved_camp 테이블, 비교 값은 camp·camp_facility·camps)
 alert/    # 내 정보 · 알림 (기상특보 + 재난문자). 기상특보 = KmaWarningClient(기상청 특보현황, 10분 캐시, 환경변수 KMA_SERVICE_KEY) + KmaWarningParser(t6 글 → 시·도별 Alert), 재난문자 = 아직 AlertDummyData. 지역은 Sido(임시 가장 가까운 시·도)
 family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치도 여기에
 tour/     # 관광지 상세 + 관광지 탭 여행 취향 TourPreference* (member_tour_preference 테이블. 선택지는 TourPreferenceOptions)

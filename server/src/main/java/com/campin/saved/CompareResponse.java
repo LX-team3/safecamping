@@ -3,9 +3,8 @@ package com.campin.saved;
 import java.util.List;
 
 // 관심 캠핑장 비교 화면. 항목(row)마다 캠핑장 수만큼 칸(cell)이 있다 → 화면은 항목별 카드에 캠핑장별 막대로 그린다
-// dummy: 값이 더미이면 true → 화면에 "더미 데이터" 표시
 // totalCount: 목록에 담긴 전체 수 (비교는 앞의 3곳만 보여 준다)
-public record CompareResponse(boolean dummy, Long listId, String listName, int totalCount,
+public record CompareResponse(Long listId, String listName, int totalCount,
                               List<Camp> camps, List<Row> rows) {
 
     public record Camp(String id, String name) {

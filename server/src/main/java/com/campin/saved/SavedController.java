@@ -57,21 +57,27 @@ public class SavedController {
         return ApiResponse.ok(null);
     }
 
-    // 캠핑장 담기: POST /api/saved/lists/3/camps/c1 (이미 담겨 있어도 성공)
+    // 하트 상태: GET /api/saved/favorites → {"listId": 3, "campIds": ["100568", ...]} ('관심 캠핑장' 기본 목록)
+    @GetMapping("/favorites")
+    public ApiResponse<FavoritesResponse> favorites(Authentication auth) {
+        return ApiResponse.ok(savedService.favorites(auth.getName()));
+    }
+
+    // 캠핑장 담기: POST /api/saved/lists/3/camps/100568 (이미 담겨 있어도 성공)
     @PostMapping("/lists/{listId}/camps/{campId}")
     public ApiResponse<Void> addCamp(Authentication auth, @PathVariable Long listId, @PathVariable String campId) {
         savedService.addCamp(auth.getName(), listId, campId);
         return ApiResponse.ok(null);
     }
 
-    // 캠핑장 빼기: DELETE /api/saved/lists/3/camps/c1
+    // 캠핑장 빼기: DELETE /api/saved/lists/3/camps/100568
     @DeleteMapping("/lists/{listId}/camps/{campId}")
     public ApiResponse<Void> removeCamp(Authentication auth, @PathVariable Long listId, @PathVariable String campId) {
         savedService.removeCamp(auth.getName(), listId, campId);
         return ApiResponse.ok(null);
     }
 
-    // 비교 표: GET /api/saved/lists/3/compare (값은 더미, dummy: true)
+    // 비교 표: GET /api/saved/lists/3/compare (앞의 3곳, 값은 DB 의 실제 데이터)
     @GetMapping("/lists/{listId}/compare")
     public ApiResponse<CompareResponse> compare(Authentication auth, @PathVariable Long listId) {
         return ApiResponse.ok(savedService.compare(auth.getName(), listId));

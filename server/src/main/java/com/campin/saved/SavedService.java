@@ -15,7 +15,7 @@ import com.campin.member.MemberMapper;
 
 import lombok.RequiredArgsConstructor;
 
-// 저장 화면 "목록" 탭과 관심 캠핑장 비교
+// 저장 화면 "목록" 탭 · 하트(관심 캠핑장) · 관심 캠핑장 비교
 // 로그인 정보에는 아이디(loginId)만 있으므로 먼저 회원 번호(member.id)로 바꿔서 쓴다
 @Service
 @RequiredArgsConstructor
@@ -76,7 +76,7 @@ public class SavedService {
 
     public void addCamp(String loginId, Long listId, String campId) {
         SavedList list = findOwnList(memberId(loginId), listId);
-        if (CampDummyData.find(campId) == null) {
+        if (!savedMapper.existsCamp(campId)) {
             throw new NotFoundException("캠핑장을 찾을 수 없습니다.");
         }
         savedMapper.insertCamp(list.getId(), campId);
@@ -87,67 +87,69 @@ public class SavedService {
         savedMapper.deleteCamp(list.getId(), campId);
     }
 
-    // 목록에 담긴 캠핑장 중 앞의 3곳을 표로 비교한다
+    // 하트 상태: '관심 캠핑장' 기본 목록(없으면 만든다)과 담긴 캠핑장 id
+    public FavoritesResponse favorites(String loginId) {
+        Long memberId = memberId(loginId);
+        ensureDefaultList(memberId);
+        Long listId = savedMapper.findDefaultListId(memberId);
+        return new FavoritesResponse(listId, savedMapper.findCampIds(listId));
+    }
+
+    // 목록에 담긴 캠핑장 중 앞의 3곳을 비교한다. 값은 DB(camp · camp_facility · camps)의 실제 데이터
+    // 대피소는 아직 데이터가 없어 "확인 필요"로만 보여 준다
     public CompareResponse compare(String loginId, Long listId) {
         SavedList list = findOwnList(memberId(loginId), listId);
-        List<String> campIds = savedMapper.findCampIds(list.getId());
-        List<CampDummyData.Camp> camps = campIds.stream()
-                .map(CampDummyData::find)
-                .filter(Objects::nonNull)
-                .limit(COMPARE_MAX)
-                .toList();
+        List<CompareCamp> all = savedMapper.findCompareCamps(list.getId());
+        List<CompareCamp> camps = all.stream().limit(COMPARE_MAX).toList();
 
-        int maxScore = camps.stream().mapToInt(CampDummyData.Camp::safetyScore).max().orElse(0);
         List<CompareResponse.Row> rows = camps.isEmpty() ? List.of() : List.of(
-                // 막대 비교로 바꾸면서 안전점수도 가장 높은 곳에 칩을 붙인다 (표일 때는 표시하지 않았음)
-                row("안전점수", "score", "가장 높음", camps, c -> c.safetyScore() + "점",
-                        CampDummyData.Camp::safetyScore, c -> c.safetyScore() == maxScore),
-                minutesRow("응급실까지", camps, CampDummyData.Camp::erMinutes),
-                minutesRow("소방서까지", camps, CampDummyData.Camp::fireMinutes),
-                shelterRow(camps),
-                yesNoRow("전기 사용", camps, CampDummyData.Camp::hasPower),
-                yesNoRow("반려동물", camps, CampDummyData.Camp::allowsPet));
+                scoreRow(camps),
+                minutesRow("응급실까지", camps, CompareCamp::getErMinutes),
+                minutesRow("소방서까지", camps, CompareCamp::getFireMinutes),
+                row("대피소까지", "minutes", "가장 가까움", camps, c -> UNKNOWN, c -> null, c -> false),
+                yesNoRow("전기 사용", camps, CompareCamp::getHasPower),
+                yesNoRow("반려동물", camps, CompareCamp::getAllowsPet));
 
-        return new CompareResponse(true, list.getId(), list.getName(), campIds.size(),
-                camps.stream().map(c -> new CompareResponse.Camp(c.id(), c.name())).toList(), rows);
+        return new CompareResponse(list.getId(), list.getName(), all.size(),
+                camps.stream().map(c -> new CompareResponse.Camp(c.getId(), c.getName())).toList(), rows);
     }
 
-    // 차로 가는 시간: 가장 짧은 곳이 가장 좋은 값 (같으면 모두)
-    private CompareResponse.Row minutesRow(String label, List<CampDummyData.Camp> camps,
-                                           Function<CampDummyData.Camp, Integer> minutes) {
-        int min = camps.stream().mapToInt(minutes::apply).min().orElse(0);
-        return row(label, "minutes", "가장 가까움", camps, c -> "차로 " + minutes.apply(c) + "분",
-                minutes, c -> minutes.apply(c) == min);
+    static final String UNKNOWN = "확인 필요";
+
+    // 안전점수: 가장 높은 곳에 칩. 점수가 없는 곳은 "확인 필요"
+    private CompareResponse.Row scoreRow(List<CompareCamp> camps) {
+        Integer max = camps.stream().map(CompareCamp::getSafetyScore).filter(Objects::nonNull)
+                .max(Integer::compare).orElse(null);
+        return row("안전점수", "score", "가장 높음", camps,
+                c -> c.getSafetyScore() == null ? UNKNOWN : c.getSafetyScore() + "점",
+                CompareCamp::getSafetyScore,
+                c -> c.getSafetyScore() != null && c.getSafetyScore().equals(max));
     }
 
-    // 대피소: 걸어서 갈 수 있는 곳을 먼저 친다 (재난 때는 차가 막히거나 못 쓸 수 있어서 — 임시 규칙, 설계 파일 표시와 같음)
-    // 걸어서 가는 곳이 있으면 그중 가장 짧은 곳, 없으면 차로 가장 짧은 곳
-    private CompareResponse.Row shelterRow(List<CampDummyData.Camp> camps) {
-        boolean anyOnFoot = camps.stream().anyMatch(CampDummyData.Camp::shelterOnFoot);
-        int min = camps.stream()
-                .filter(c -> c.shelterOnFoot() == anyOnFoot)
-                .mapToInt(CampDummyData.Camp::shelterMinutes)
-                .min().orElse(0);
-        // 걸어서 가는 곳과 차로 가는 곳이 섞이면 분 숫자를 같은 막대로 비교할 수 없어 막대를 그리지 않는다
-        boolean sameMode = camps.stream().allMatch(c -> c.shelterOnFoot() == anyOnFoot);
-        return row("대피소까지", "minutes", "가장 가까움", camps,
-                c -> (c.shelterOnFoot() ? "걸어서 " : "차로 ") + c.shelterMinutes() + "분",
-                c -> sameMode ? c.shelterMinutes() : null,
-                c -> c.shelterOnFoot() == anyOnFoot && c.shelterMinutes() == min);
+    // 차로 가는 시간(추정): 가장 짧은 곳이 가장 좋은 값 (같으면 모두). 값이 없는 곳은 "확인 필요"
+    private CompareResponse.Row minutesRow(String label, List<CompareCamp> camps,
+                                           Function<CompareCamp, Integer> minutes) {
+        Integer min = camps.stream().map(minutes).filter(Objects::nonNull).min(Integer::compare).orElse(null);
+        return row(label, "minutes", "가장 가까움", camps,
+                c -> minutes.apply(c) == null ? UNKNOWN : "차로 약 " + minutes.apply(c) + "분",
+                minutes, c -> minutes.apply(c) != null && minutes.apply(c).equals(min));
     }
 
-    private CompareResponse.Row yesNoRow(String label, List<CampDummyData.Camp> camps,
-                                         Predicate<CampDummyData.Camp> yes) {
-        return row(label, "yesno", "가능", camps, c -> yes.test(c) ? "가능" : "불가", c -> null, yes);
+    // 가능/불가. 원본에 값이 없으면 "확인 필요"
+    private CompareResponse.Row yesNoRow(String label, List<CompareCamp> camps,
+                                         Function<CompareCamp, Boolean> yes) {
+        return row(label, "yesno", "가능", camps,
+                c -> yes.apply(c) == null ? UNKNOWN : (yes.apply(c) ? "가능" : "불가"),
+                c -> null, c -> Boolean.TRUE.equals(yes.apply(c)));
     }
 
     // 캠핑장이 1곳뿐이면 비교할 대상이 없으므로 "가장 좋은 값" 표시를 하지 않는다
-    private CompareResponse.Row row(String label, String kind, String bestLabel, List<CampDummyData.Camp> camps,
-                                    Function<CampDummyData.Camp, String> text,
-                                    Function<CampDummyData.Camp, Integer> value,
-                                    Predicate<CampDummyData.Camp> best) {
+    private CompareResponse.Row row(String label, String kind, String bestLabel, List<CompareCamp> camps,
+                                    Function<CompareCamp, String> text,
+                                    Function<CompareCamp, Integer> value,
+                                    Predicate<CompareCamp> best) {
         List<CompareResponse.Cell> cells = new ArrayList<>();
-        for (CampDummyData.Camp c : camps) {
+        for (CompareCamp c : camps) {
             cells.add(new CompareResponse.Cell(text.apply(c), value.apply(c), camps.size() > 1 && best.test(c)));
         }
         return new CompareResponse.Row(label, kind, bestLabel, cells);

@@ -1,5 +1,14 @@
 # 진행 상황
 
+## 2026-11-09 하트 → 관심 캠핑장 저장 · 비교를 실제 DB 값으로 (더미 삭제)
+- 하트(`stores/favorite.js`): 로그인했으면 캠핑장 하트를 서버 '관심 캠핑장' 기본 목록에 담고 뺀다 → 저장 탭·비교 화면에 그대로 나옴. 로그인 안 했거나 관광지 하트는 지금처럼 sessionStorage. 로그인하면 그 전에 누른 캠핑장 하트를 서버로 옮김. 서버 반영이 실패하면 하트를 원래대로 되돌림
+- 서버: `GET /api/saved/favorites` 추가 (기본 목록 id + 담긴 캠핑장 id). 캠핑장 담기는 `camp` 테이블에 있는 id 만 허용 (예전 더미 `c1`~`c3` 은 404)
+- 비교(`GET /api/saved/lists/{id}/compare`): `camp`(안전점수·응급실 시간) · `camp_facility`(소방서 시간) · 원본 `camps`(전기·반려동물, `camp.source_id` 로 연결)에서 읽음. 값이 없으면 "확인 필요". 대피소는 데이터가 없어 모두 "확인 필요". 응답의 `dummy` 칸 삭제
+- 삭제: 서버 `saved/CampDummyData.java`, 클라이언트 `DUMMY_CAMP_IDS` · 비교 화면 "예시 캠핑장 담기 (더미)" 버튼 · "더미 데이터" 안내. 빈 목록에서는 "캠핑장 둘러보기"(탐색) 링크
+- DB: 변경 없음. 단 비교 SQL 이 `camp.source_id`·원본 `camps` 를 쓰므로 `merge_to_public.sql` 을 돌린 DB 여야 함
+- 확인: `SavedServiceTest` 9개 통과, `npm run build` 통과, 로컬 DB 에 서버(8090)를 띄워 가입 → 담기(없는 id `c1` 은 404) → favorites → compare(실제 점수·시간) → 빼기 확인. 테스트 계정 `cltest01` 이 로컬 DB 에 남아 있음
+- 확인 못 함: 브라우저에서 하트 누르기 → 저장 탭 → 비교 화면까지 실제 클릭 흐름
+
 ## 2026-11-09 누구와 언제 시트: 아이 선택 후 "없는 주소입니다" 고침
 - 원인: 로그인 + 아이 1명 이상이면 시트가 `PUT /api/members/me/children` 을 부르는데, 이 서버 코드(`MemberChild*`)가 `origin/lyh` 브랜치에만 있고 main 에 합쳐지지 않았음 → 404
 - 고침: `origin/lyh` 의 `MemberChildController·Mapper·Request·Service` + 테스트를 가져오고, 주소를 다른 회원 API 와 같은 `/api/member/children` 으로 바꿈 (SecurityConfig 의 `/api/member/**` 로그인 필요 규칙에 그대로 걸림). `TripSheet.vue` 호출 주소도 같이 바꿈

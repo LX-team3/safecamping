@@ -1,16 +1,17 @@
 <script setup>
-// 관심 캠핑장 비교 (설계: Compare.dc.html). 표의 값은 서버 더미(CampDummyData) — 화면에 더미라고 크게 표시한다
+// 관심 캠핑장 비교 (설계: Compare.dc.html). 값은 서버가 DB(camp · camp_facility · camps)에서 읽은 실제 데이터
+// 캠핑장은 탐색 목록·캠핑장 상세의 하트로 담는다 (stores/favorite.js)
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
-import { useSavedStore, DUMMY_CAMP_IDS } from '@/stores/saved'
+import { useSavedStore } from '@/stores/saved'
 
 const route = useRoute()
 const auth = useAuthStore()
 const saved = useSavedStore()
 
-const data = ref(null) // CompareResponse: { dummy, listName, totalCount, camps, rows }
+const data = ref(null) // CompareResponse: { listName, totalCount, camps, rows }
 const error = ref('')
 const busy = ref(false)
 
@@ -54,14 +55,6 @@ async function run(action) {
   }
 }
 
-// 이미 담은 캠핑장은 건너뛴다 (1곳만 담겨 있을 때도 나머지만 더 담도록)
-function addDummyCamps() {
-  return run(async () => {
-    const have = new Set(data.value?.camps.map((c) => c.id))
-    for (const id of DUMMY_CAMP_IDS) if (!have.has(id)) await saved.addCamp(listId.value, id)
-  })
-}
-
 function remove(campId) {
   return run(() => saved.removeCamp(listId.value, campId))
 }
@@ -87,28 +80,20 @@ function remove(campId) {
     <p v-else-if="error" class="error" role="alert">{{ error }}</p>
 
     <template v-else-if="data">
-      <!-- 안전 수치를 지어내지 않는다는 규칙: 더미 값이면 표 위에 항상 보이게 -->
-      <p v-if="data.dummy" class="dummy" role="note">
-        <b>더미 데이터</b> 설계 예시 값이에요. 실제 거리·시간·안전점수가 아니에요.
-      </p>
-
       <div v-if="data.camps.length === 0" class="empty">
-        <p>아직 담은 캠핑장이 없어요.</p>
-        <!-- 캠핑장 상세 화면이 아직 없어서, 시험용으로 더미 캠핑장을 담는 버튼을 둔다 -->
-        <button type="button" class="primary" :disabled="busy" @click="addDummyCamps">예시 캠핑장 3곳 담기 (더미)</button>
+        <p>아직 담은 캠핑장이 없어요. 탐색에서 하트를 눌러 담아 보세요.</p>
+        <RouterLink to="/explore" class="primary">캠핑장 둘러보기</RouterLink>
       </div>
 
       <template v-else>
         <!-- 1곳뿐이면 비교가 아니라 그 캠핑장 정보만 보여 주고, 더 담으라고 안내한다 -->
         <div v-if="!canCompare" class="need-more">
           <p>2곳 이상 담으면 항목별로 비교할 수 있어요.</p>
-          <!-- 캠핑장 상세 화면이 아직 없어서, 시험용으로 더미 캠핑장을 담는 버튼을 둔다 -->
-          <button type="button" class="primary" :disabled="busy" @click="addDummyCamps">예시 캠핑장 더 담기 (더미)</button>
+          <RouterLink to="/explore" class="primary">캠핑장 더 담기</RouterLink>
         </div>
 
-        <span v-else class="sub">
-          항목마다 가장 좋은 곳에 표시가 붙어요.
-          <template v-if="data.totalCount > data.camps.length">담은 {{ data.totalCount }}곳 중 앞의 {{ data.camps.length }}곳만 비교해요.</template>
+        <span v-else-if="data.totalCount > data.camps.length" class="sub">
+          담은 {{ data.totalCount }}곳 중 앞의 {{ data.camps.length }}곳만 비교해요.
         </span>
 
         <!-- 비교 중인 캠핑장 (빼기) -->
@@ -163,19 +148,6 @@ h1 {
   font-weight: 900;
   letter-spacing: -0.02em;
 }
-.dummy {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-input);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-soft);
-  font-size: 13px;
-  color: var(--color-text-sub);
-}
-.dummy b {
-  margin-right: 4px;
-  color: var(--color-text);
-}
 .sub {
   font-size: 13px;
   color: var(--color-text-sub);
@@ -203,10 +175,8 @@ h1 {
   align-items: center;
   font-size: 15px;
   font-weight: 700;
+  text-decoration: none; /* 링크(RouterLink)로도 쓴다 */
   cursor: pointer;
-}
-.primary:disabled {
-  opacity: 0.6;
 }
 .error {
   margin: 0;
