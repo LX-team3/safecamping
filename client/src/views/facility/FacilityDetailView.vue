@@ -36,7 +36,8 @@ const origin = computed(() => {
 })
 const targets = computed(() =>
   facility.value
-    ? [{ id: facility.value.id, type: facility.value.type, label: FACILITY_LABEL[facility.value.type], lat: facility.value.lat, lng: facility.value.lng }]
+    // 지도에는 아이콘만 (종류 이름은 화면 위 태그에 이미 있음). name 은 화면 읽기 프로그램용
+    ? [{ id: facility.value.id, type: facility.value.type, name: FACILITY_LABEL[facility.value.type], lat: facility.value.lat, lng: facility.value.lng }]
     : [],
 )
 const place = computed(() => {
