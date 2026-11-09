@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 
 // 알림 (기상특보 + 재난문자 모아 보기)
 // 기상특보: 기상청 실제 데이터(WarningSource). 받지 못하면 더미로 대신하고 warningDummy=true
-// 재난문자: 아직 더미(AlertDummyData) → 재난문자 API 를 붙이면 여기만 바꾼다
+// 재난문자: 행정안전부 긴급재난문자(DisasterSource). 받지 못하면 더미로 대신하고 disasterDummy=true
 @Service
 @RequiredArgsConstructor
 public class AlertService {
@@ -23,6 +23,7 @@ public class AlertService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final WarningSource warningSource;
+    private final DisasterSource disasterSource;
 
     // sido 를 주면 그 지역, 위치(lat·lon)를 주면 가장 가까운 시·도, 둘 다 없으면 전국
     public AlertResponse find(String sido, Double lat, Double lon) {
@@ -31,11 +32,14 @@ public class AlertService {
         Optional<List<Alert>> realWarnings = warningSource.activeWarnings();
         boolean warningDummy = realWarnings.isEmpty();
         List<Alert> warnings = realWarnings.orElseGet(AlertDummyData::warnings);
-        boolean disasterDummy = true;
-        List<Alert> disasters = AlertDummyData.disasters();
+        Optional<List<Alert>> realDisasters = disasterSource.recentMessages();
+        boolean disasterDummy = realDisasters.isEmpty();
+        List<Alert> disasters = realDisasters.orElseGet(AlertDummyData::disasters);
 
         List<Alert> items = Stream.concat(warnings.stream(), disasters.stream())
-                .filter(a -> region == null || a.sido().equals(region))
+                // 전국에 보낸 재난문자는 어느 지역을 골라도 보인다
+                .filter(a -> region == null || a.sido().equals(region)
+                        || DisasterMessageParser.NATIONWIDE.equals(a.sido()))
                 .sorted(Comparator.comparing(Alert::issuedAt).reversed())  // 최신순
                 .toList();
         List<Alert> active = items.stream().filter(a -> "warning".equals(a.kind()) && a.active()).toList();

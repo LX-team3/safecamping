@@ -1,6 +1,16 @@
 # 진행 상황
 
-<<<<<<< HEAD
+## 2026-11-09 알림: 재난문자를 행정안전부 긴급재난문자 API 로
+- 서버: `alert/SafetyDataDisasterClient` (재난안전데이터 공유플랫폼 `DSSP-IF-00247`) + `DisasterMessageParser` + `DisasterSource` 인터페이스. `AlertService` 가 받으면 실제, 못 받으면 지금처럼 `AlertDummyData` 예시 (`disasterDummy`)
+- 키: 환경변수 `SAFETY_DATA_KEY` (`application-local.properties` 에 넣음). **키를 신청할 때 등록한 IP 에서만 불린다** — 다른 IP 면 `resultCode 32` → 예시로 대신. 발표 장소 IP 도 미리 등록 필요
+- 호출 수: 하루 한도 99회 → 20분에 한 번만 부르고 결과를 저장 (실패해도 20분 쉼, 하루 최대 72회). 오늘 날짜(`crtDt`)로 요청하고 최근 24시간 문자만 보여 줌
+- 지역: 수신 지역 이름(예: `강원특별자치도 인제군,경기도 가평군`)을 시·도별로 나눠 한 건씩. 시·도를 모르는 지역(`전국`)은 어느 지역을 골라도 보이게
+- 실제 응답으로 확인함: 성공 `resultCode 00`, 칸 이름 `MSG_CN`·`RCPTN_RGN_NM`·`CRT_DT`(`2026/11/09 14:26:21`)·`DST_SE_NM`(안개·화재·기타 등)·`SN`(숫자). `crtDt=yyyyMMdd` 를 붙이면 그날 문자만 옴 (안 붙이면 2023년 문자부터 오래된 순). 오류는 `30` 키 · `32` 등록 안 된 IP
+- 화면: 바꾼 것 없음 (`disasterDummy` 가 false 면 이미 "예시" 표시를 뺌)
+- 확인: `mvnw test` 통과 (`DisasterMessageParserTest` 8개 — 실제 응답 모양 포함 · `AlertServiceTest` 재난문자 1개 추가), 브라우저에서 실제 API 응답 확인
+- 확인 못 함: 서버를 켜서 알림 화면에 실제 재난문자가 뜨는지
+- 실종자 찾기 문자는 뺌 (사용자 결정): 경찰청이 "OOO씨를 찾습니다 … ☎182" 모양으로 보내는 문자. "찾습니다" + (실종·배회·182) 가 있으면 제외 (`DisasterMessageParser.isMissingPerson`)
+
 ## 2026-11-09 하트 → 관심 캠핑장 저장 · 비교를 실제 DB 값으로 (더미 삭제)
 - 하트(`stores/favorite.js`): 로그인했으면 캠핑장 하트를 서버 '관심 캠핑장' 기본 목록에 담고 뺀다 → 저장 탭·비교 화면에 그대로 나옴. 로그인 안 했거나 관광지 하트는 지금처럼 sessionStorage. 로그인하면 그 전에 누른 캠핑장 하트를 서버로 옮김. 서버 반영이 실패하면 하트를 원래대로 되돌림
 - 서버: `GET /api/saved/favorites` 추가 (기본 목록 id + 담긴 캠핑장 id). 캠핑장 담기는 `camp` 테이블에 있는 id 만 허용 (예전 더미 `c1`~`c3` 은 404)
@@ -9,7 +19,6 @@
 - DB: 변경 없음. 단 비교 SQL 이 `camp.source_id`·원본 `camps` 를 쓰므로 `merge_to_public.sql` 을 돌린 DB 여야 함
 - 확인: `SavedServiceTest` 9개 통과, `npm run build` 통과, 로컬 DB 에 서버(8090)를 띄워 가입 → 담기(없는 id `c1` 은 404) → favorites → compare(실제 점수·시간) → 빼기 확인. 테스트 계정 `cltest01` 이 로컬 DB 에 남아 있음
 - 확인 못 함: 브라우저에서 하트 누르기 → 저장 탭 → 비교 화면까지 실제 클릭 흐름
-=======
 ## 2026-11-09 칩 줄 가로 넘기기 (PC 마우스에서도)
 - 원인: 칩 줄(탐색 필터, 캠핑장 상세 시설 칩)은 원래 `overflow-x: auto` 라 손가락으로는 넘어갔지만, 막대를 숨겨 두고 마우스 휠은 위아래만 움직여서 PC 에서 옆 칩을 볼 수 없었음
 - 새 지시어 `utils/hscroll.js` (`v-hscroll`): 칩 줄 위에서 휠을 굴리면 옆으로 넘김. 끝에 닿으면 원래 화면 스크롤
@@ -41,7 +50,6 @@
 - 지도 캠핑장 마커는 이제 등급으로 거르지 않고 전부 보인다 (범례는 그대로)
 - 확인: `npm run build` 통과
 - 확인 못 함: 브라우저에서 마커 고르기 → 시설 표시 · 레이어 켜고 끄기, 카카오 지도 위 겹침 모양
->>>>>>> origin/main
 
 ## 2026-11-09 누구와 언제 시트: 아이 선택 후 "없는 주소입니다" 고침
 - 원인: 로그인 + 아이 1명 이상이면 시트가 `PUT /api/members/me/children` 을 부르는데, 이 서버 코드(`MemberChild*`)가 `origin/lyh` 브랜치에만 있고 main 에 합쳐지지 않았음 → 404

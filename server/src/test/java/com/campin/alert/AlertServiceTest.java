@@ -13,16 +13,19 @@ import org.junit.jupiter.api.Test;
 
 import com.campin.common.InvalidRequestException;
 
-// 알림 규칙 확인. 기상청은 부르지 않고 WarningSource 자리에 가짜 결과를 넣는다
+// 알림 규칙 확인. 기상청·재난문자 API 는 부르지 않고 WarningSource·DisasterSource 자리에 가짜 결과를 넣는다
 class AlertServiceTest {
 
+    // 재난문자 결과를 못 받은 경우 (키 없음·등록 안 된 IP·호출 실패) → 재난문자 더미
+    private static final DisasterSource NO_SMS = Optional::empty;
+
     // 기상청 결과를 못 받은 경우 (키 없음·호출 실패) → 기상특보 더미
-    private final AlertService noKma = new AlertService(Optional::empty);
+    private final AlertService noKma = new AlertService(Optional::empty, NO_SMS);
 
     // 기상청에서 실제로 받은 것처럼: 강원·경북 건조주의보 (2026-11-08 응답 모양)
     private final List<Alert> kmaWarnings = KmaWarningParser.parse(
             "o 건조주의보 : 강원도(동해평지, 삼척평지), 경상북도(울진평지)", "202611080200");
-    private final AlertService withKma = new AlertService(() -> Optional.of(kmaWarnings));
+    private final AlertService withKma = new AlertService(() -> Optional.of(kmaWarnings), NO_SMS);
 
     @Test
     void 지역을_주면_그_지역_알림만_최신순으로() {
@@ -56,10 +59,33 @@ class AlertServiceTest {
 
     @Test
     void 기상청_결과에_특보가_없으면_발효_중도_없다() {
-        AlertService empty = new AlertService(() -> Optional.of(List.of()));
+        AlertService empty = new AlertService(() -> Optional.of(List.of()), NO_SMS);
         AlertResponse res = empty.find("강원", null, null);
         assertFalse(res.warningDummy());
         assertTrue(res.activeWarnings().isEmpty());
+    }
+
+    @Test
+    void 재난문자를_받으면_실제로_표시하고_전국_문자는_어느_지역에서나_보인다() {
+        String now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"));
+        List<Alert> sms = DisasterMessageParser.parse("""
+                {"header":{"resultCode":"00","resultMsg":"NORMAL SERVICE"},
+                 "body":[
+                   {"SN":1,"CRT_DT":"%s","MSG_CN":"인제군 호우경보","RCPTN_RGN_NM":"강원특별자치도 인제군","DST_SE_NM":"호우"},
+                   {"SN":2,"CRT_DT":"%s","MSG_CN":"전국 민방위 훈련","RCPTN_RGN_NM":"전국","DST_SE_NM":"기타"},
+                   {"SN":3,"CRT_DT":"%s","MSG_CN":"제주 강풍","RCPTN_RGN_NM":"제주특별자치도 제주시","DST_SE_NM":"강풍"}]}
+                """.formatted(now, now, now));
+        AlertService real = new AlertService(Optional::empty, () -> Optional.of(sms));
+
+        AlertResponse res = real.find("강원", null, null);
+        assertFalse(res.disasterDummy());
+        List<String> messages = res.items().stream().filter(a -> a.kind().equals("disaster"))
+                .map(Alert::message).toList();
+        assertTrue(messages.contains("인제군 호우경보"));
+        assertTrue(messages.contains("전국 민방위 훈련"));
+        assertFalse(messages.contains("제주 강풍"));
+        assertEquals(2, res.todayDisasterCount());
     }
 
     @Test
