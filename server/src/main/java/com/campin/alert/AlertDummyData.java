@@ -7,7 +7,7 @@ import java.util.List;
 // 알림 더미 — 실제 기상특보·재난문자가 아니다 (화면에 "예시"로 표시됨)
 // 시각은 "지금"에서 몇 분 전으로 만들어 늘 최근 알림처럼 보이게 한다
 // 기상특보 더미: 기상청 키(KMA_SERVICE_KEY)가 없거나 기상청 호출에 실패했을 때만 쓴다
-// 재난문자 더미: 재난문자 API 를 붙이기 전까지 쓴다 → 붙이면 disasters() 는 지운다
+// 재난문자 더미: 긴급재난문자 키(SAFETY_DATA_KEY)가 없거나 호출에 실패했을 때만 쓴다 (등록하지 않은 IP 에서 켠 경우 포함)
 public final class AlertDummyData {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
