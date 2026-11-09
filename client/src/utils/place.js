@@ -1,6 +1,6 @@
 // 상세 화면들이 같이 쓰는 이름표·링크
 
-export const FACILITY_LABEL = { er: '응급실', fire: '소방서', police: '지구대', store: '편의점', toilet: '화장실' }
+export const FACILITY_LABEL = { er: '응급실', fire: '소방서', police: '지구대', store: '편의점', toilet: '화장실', pharmacy: '약국' }
 
 // 강원특별자치도 → 강원
 const SHORT_SIDO = {

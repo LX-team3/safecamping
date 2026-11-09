@@ -1,7 +1,7 @@
 <script setup>
 // "지도에 보일 것" 시트 (내 주변 지도 오른쪽 위 레이어 버튼)
 // 탭: 안전 시설만 동작. 지도 종류 · 날씨·재난은 아직 없어서 눌리지 않게 둔다
-// 줄 목록은 서버(GET /api/nearby/layers)가 정본 — 약국·대피소는 데이터가 없어 켜도 지도에 아무것도 안 나온다
+// 줄 목록은 서버(GET /api/nearby/layers)가 정본 — 대피소는 데이터가 없어 켜도 지도에 아무것도 안 나온다
 import BottomSheet from '@/components/common/BottomSheet.vue'
 
 defineProps({

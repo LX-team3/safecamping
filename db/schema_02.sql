@@ -61,7 +61,7 @@ ALTER TABLE camp ADD COLUMN IF NOT EXISTS reservation_url varchar(300);    -- �
 -- 안전 시설 (응급실·소방서 등). 캠핑장과의 거리는 camp_facility 에 둔다
 CREATE TABLE IF NOT EXISTS facility (
     id        bigserial     PRIMARY KEY,
-    type      varchar(15)   NOT NULL CHECK (type IN ('er', 'fire', 'police', 'store', 'toilet')),  -- 응급실·소방서·지구대·편의점·화장실
+    type      varchar(15)   NOT NULL CHECK (type IN ('er', 'fire', 'police', 'store', 'toilet', 'pharmacy')),  -- 응급실·소방서·지구대·편의점·화장실·약국
     name      varchar(50)   NOT NULL,
     sido      varchar(20)   NOT NULL,
     sigungu   varchar(20)   NOT NULL,
@@ -74,6 +74,12 @@ CREATE TABLE IF NOT EXISTS facility (
     is_dummy  boolean       NOT NULL DEFAULT true,
     UNIQUE (name, sigungu)
 );
+
+-- 이미 facility 를 만든 DB 는 위 CREATE 가 건너뛰어지므로, 약국(pharmacy)을 허용하도록 CHECK 를 다시 건다 (여러 번 실행해도 안전)
+-- facility_type_check 는 PostgreSQL 이 위 CHECK 에 자동으로 붙이는 이름
+ALTER TABLE facility DROP CONSTRAINT IF EXISTS facility_type_check;
+ALTER TABLE facility ADD CONSTRAINT facility_type_check
+    CHECK (type IN ('er', 'fire', 'police', 'store', 'toilet', 'pharmacy'));
 
 -- 캠핑장별 가까운 시설. sort_order 가 화면의 1·2·3 번호
 CREATE TABLE IF NOT EXISTS camp_facility (

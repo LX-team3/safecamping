@@ -2,14 +2,17 @@
 // 경로 지도: 출발지(캠핑장)에서 시설까지 형광 파란 선을 긋는다. 고른 시설은 진하고 굵게, 나머지는 옅게
 // 카카오 키가 있으면 카카오맵, 없으면 좌표 비율로 그린 임시 그림 (CampMap 과 같은 방식)
 // 시설에 path(도로 경로 좌표)가 있으면 그 길을 따라 그리고, 없으면 두 좌표를 잇는 직선을 긋는다
-// noLine: 선 없이 마커만 (실제 경로 사이에 직선이 섞이면 헷갈려서 — 예: 경로를 받지 않는 편의점)
+// noLine: 선 없이 마커만 (실제 경로 사이에 직선이 섞이면 헷갈려서 — 예: 경로를 받지 않는 화장실)
+// 시설 마커 = 종류별 아이콘 배지(색은 캠핑장 안전점수 등급) + 이름표, 출발지 = 텐트 배지 + 캠핑장 이름 — utils/facilityIcon.js
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 
 const props = defineProps({
   origin: { type: Object, default: null }, // { name, lat, lng }
-  // [{ id, label, lat, lng, no, path?, noLine? }] no: 마커 번호 (없으면 십자), path: [[위도, 경도], ...]
+  // [{ id, type, label, lat, lng, no, path?, noLine? }] type: 아이콘 고르기, no: 작은 번호, path: [[위도, 경도], ...]
   targets: { type: Array, default: () => [] },
+  grade: { type: String, default: null }, // 캠핑장 안전점수 등급 safe·caution·danger (없으면 회색)
   selectedId: { type: Number, default: null },
   bottomInset: { type: Number, default: 0 }, // 아래 시트가 가리는 높이(px)
   dotted: { type: Boolean, default: false }, // 시설 상세처럼 점선 한 줄
@@ -59,20 +62,18 @@ function markerEl(target) {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = `route-marker${target.id === props.selectedId ? ' selected' : ''}`
-  if (target.no) {
-    const no = document.createElement('i')
-    no.textContent = target.no
-    btn.appendChild(no)
-  }
+  btn.appendChild(facilityBadgeEl({ type: target.type, grade: props.grade, no: target.no }))
   btn.appendChild(document.createTextNode(target.label))
   btn.addEventListener('click', () => emit('select', target.id))
   return btn
 }
 
+// 출발지(캠핑장): 텐트 아이콘 배지(등급 색) + 캠핑장 이름
 function originEl() {
   const span = document.createElement('span')
   span.className = 'route-origin'
-  span.textContent = props.origin.name
+  span.appendChild(facilityBadgeEl({ type: 'camp', grade: props.grade }))
+  span.appendChild(document.createTextNode(props.origin.name))
   return span
 }
 
@@ -159,7 +160,7 @@ watch(
     fit()
   },
 )
-watch(() => props.selectedId, draw)
+watch(() => [props.selectedId, props.grade], draw)
 
 // ---- 임시 그림 (카카오 키 없음): 좌표의 최소·최대를 0~100 으로 바꿔 그린다 (실제 축척 아님) ----
 const fake = computed(() => {
@@ -200,9 +201,15 @@ const fake = computed(() => {
         <button v-for="t in fake.targets" :key="t.id" type="button" class="route-marker fake-pos"
           :class="{ selected: t.id === selectedId }" :style="{ left: t.x + '%', top: t.y + '%' }"
           @click="emit('select', t.id)">
-          <i v-if="t.no">{{ t.no }}</i>{{ t.label }}
+          <!-- 카카오 지도 마커(facilityBadgeEl)와 같은 모양. 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
+          <span class="fac-badge" :class="gradeClass(grade)">
+            <span v-if="facilityIcon(t.type)" class="fac-svg" v-html="facilityIcon(t.type)" />
+            <template v-else>{{ t.no }}</template>
+            <b v-if="facilityIcon(t.type) && t.no" class="fac-no">{{ t.no }}</b>
+          </span>{{ t.label }}
         </button>
         <span v-if="fake.origin" class="route-origin fake-pos" :style="{ left: fake.origin.x + '%', top: fake.origin.y + '%' }">
+          <span class="fac-badge" :class="gradeClass(grade)"><span class="fac-svg" v-html="facilityIcon('camp')" /></span>
           {{ fake.origin.name }}
         </span>
       </div>
@@ -259,11 +266,12 @@ const fake = computed(() => {
 
 <!-- 마커는 카카오 지도 안에 직접 붙이는 요소라 scoped 가 적용되지 않는다 → 전역 style -->
 <style>
+/* 흰 알약 이름표 안 왼쪽에 아이콘 배지 (.fac-badge 는 styles/base.css) */
 .route-marker {
-  height: 30px;
-  padding: 0 10px 0 5px;
+  height: 34px;
+  padding: 0 11px 0 3px;
   border: none;
-  border-radius: 15px;
+  border-radius: 17px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -274,30 +282,32 @@ const fake = computed(() => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
 }
-.route-marker i {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-text-sub);
-  color: var(--color-card);
-  font-style: normal;
+.route-marker .fac-badge {
+  --fac-size: 28px;
+  box-shadow: none;
 }
+/* 고른 시설: 글씨 진하게 + 검은 테두리로 또렷하게 */
 .route-marker.selected {
   color: var(--color-text);
+  box-shadow: 0 0 0 2px var(--color-text), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
-.route-marker.selected i {
-  background: var(--color-text);
-}
+/* 출발지(캠핑장): 진한 이름표 + 왼쪽 텐트 배지 — 시설 이름표(흰색)와 구분되게 바탕은 primary 색 */
 .route-origin {
-  padding: 3px 8px;
-  border-radius: 10px;
+  height: 34px;
+  padding: 0 11px 0 3px;
+  border-radius: 17px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--color-primary);
   color: var(--color-card);
   font: 700 12px var(--font-base);
   white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.route-origin .fac-badge {
+  --fac-size: 28px;
+  box-shadow: none;
 }
 .route-marker.fake-pos,
 .route-origin.fake-pos {
