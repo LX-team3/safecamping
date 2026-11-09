@@ -25,11 +25,36 @@ button {
   color: inherit;
 }
 
+/* ---- 가로로 넘기는 칩 줄 (탐색 필터 · 캠핑장 상세 시설 칩) ----
+   휴대폰(손가락)에서는 막대를 숨기고, 마우스를 쓰는 기기에서만 얇은 막대를 보여 줘 "옆으로 더 있다"를 알린다
+   휠로 넘기는 것은 utils/hscroll.js (v-hscroll) */
+.hscroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hscroll::-webkit-scrollbar {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hscroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .hscroll::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+  }
+  .hscroll::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background: var(--color-border);
+  }
+}
+
 /* ---- 지도 시설 마커 아이콘 배지 (utils/facilityIcon.js 가 만듦) ----
    카카오 지도 위에 직접 붙이는 요소라 화면 scoped style 이 안 닿는다 → 여기 전역으로 한 번만
    바탕색 = 캠핑장 안전점수 등급 (안전 초록 · 주의 주황 · 위험 빨강 · 점수 없음 회색), 아이콘은 흰색 */
 .fac-badge {
-  --fac-size: 30px;
+  --fac-size: 34px; /* 2026-11-09 30 → 34: 지도 이름표에서 시설 이름을 빼고 아이콘으로 알아보게 함 */
   position: relative;
   flex: none;
   width: var(--fac-size);
@@ -47,8 +72,8 @@ button {
   display: contents; /* 임시 지도에서 v-html 을 감싼 칸 — 크기 계산에서 빠지게 */
 }
 .fac-badge svg {
-  width: 58%;
-  height: 58%;
+  width: 64%;
+  height: 64%;
 }
 .fac-badge.safe { background: var(--color-green); }
 .fac-badge.caution { background: var(--color-caution); }

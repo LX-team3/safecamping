@@ -4,17 +4,20 @@
 //  - 손잡이(가로 줄)·"지도" 버튼을 누르면 시트가 접혀 지도가 보인다
 //  - 목록 한 줄을 누르면 캠핑장 상세. 지도 마커는 한 번 누르면 이름표, 이름표를 다시 누르면 상세
 //  - 지역 칩 → RegionSheet(어디로), 날짜 칩 → TripSheet(누구와·언제). 고른 값은 trip store
-// 데이터: GET /api/camps (지도 마커·전체 목록), /api/camps/recommend (추천)
+//  - 지도 레이어 버튼 → 내 주변과 같은 LayerSheet(안전 시설 켜고 끄기). 고른 캠핑장의 가까운 시설을 지도에 보여 준다
+// 데이터: GET /api/camps (지도 마커·전체 목록), /api/camps/recommend (추천),
+//         /api/nearby/layers (레이어 줄 목록), /api/camps/{id} (고른 캠핑장의 가까운 시설)
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CampMap from '@/components/map/CampMap.vue'
 import CampRow from '@/components/explore/CampRow.vue'
 import RegionSheet from '@/components/explore/RegionSheet.vue'
 import TripSheet from '@/components/explore/TripSheet.vue'
-import MapLayerSheet from '@/components/explore/MapLayerSheet.vue'
+import LayerSheet from '@/components/nearby/LayerSheet.vue'
 import BottomNav from '@/components/common/BottomNav.vue'
 import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
 import { api } from '@/utils/api'
+import { vHscroll } from '@/utils/hscroll'
 import { shortLabel } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
@@ -34,7 +37,6 @@ const sheetOpen = ref(true) // true: 목록 / false: 지도
 const query = ref('') // 검색어 (이름·지역)
 const matchMine = ref(true) // "내 유형 맞춤" 켜짐
 const openSheet = ref(null) // null | 'region' | 'trip' | 'layers' — 열려 있는 아래 시트
-const gradeOn = ref({ safe: true, caution: true, danger: true }) // 지도에 보일 등급 (레이어 시트)
 const sort = ref('score') // score | er
 const showExcluded = ref(false) // "따로 보기": 추천에서 뺀 위험 등급 보기
 const selectedId = ref(null)
@@ -108,6 +110,7 @@ onMounted(async () => {
 })
 
 onMounted(load)
+onMounted(loadLayers) // 켜짐 기본값을 미리 받아 둔다 (시트를 열기 전에도 지도에 맞게 보이도록)
 watch([() => trip.state.sido, () => trip.state.sigungu, sort], load)
 watch(matchMine, () => (showExcluded.value = false))
 
@@ -125,13 +128,50 @@ const listCamps = computed(() => {
   else list = allCamps.value
   return list.filter(matches)
 })
-// 지도에는 위험 등급까지 전부 보여 준다 (안전 정보라 기본은 숨기지 않음). 레이어 시트에서 사용자가 끈 등급만 뺀다
-// 점수 없음(unknown)은 시트에 없으니 항상 보인다
-const mapCamps = computed(() => allCamps.value.filter(matches).filter((c) => gradeOn.value[c.grade] !== false))
+// 지도에는 위험 등급까지 전부 보여 준다 (안전 정보라 숨기지 않음)
+const mapCamps = computed(() => allCamps.value.filter(matches))
 
-function toggleGrade(code) {
-  gradeOn.value = { ...gradeOn.value, [code]: !gradeOn.value[code] }
+// ---- 지도 레이어 (안전 시설) ----
+// 줄 목록은 내 주변과 같은 서버 목록(GET /api/nearby/layers)을 쓴다 → 두 화면의 시트가 늘 같다
+const layers = ref([]) // [{ code, icon, label, desc, ready, on }]
+const facilityOn = ref({}) // { er: true, ... } 켜짐 여부
+const campFacilities = ref([]) // 고른 캠핑장의 가까운 시설 [{ no, id, type, name, lat, lng }]
+
+async function loadLayers() {
+  try {
+    const list = await api('/api/nearby/layers')
+    layers.value = list
+    facilityOn.value = Object.fromEntries(list.map((l) => [l.code, l.on]))
+  } catch {
+    // 못 불러오면 레이어 버튼을 눌렀을 때 다시 시도한다 (그동안 시설은 전부 보인다)
+  }
 }
+
+async function openLayers() {
+  if (!layers.value.length) await loadLayers()
+  if (layers.value.length) openSheet.value = 'layers'
+}
+
+function toggleFacility(code) {
+  facilityOn.value = { ...facilityOn.value, [code]: !facilityOn.value[code] }
+}
+
+// 캠핑장 마커를 고르면 그 캠핑장의 가까운 시설을 받아 온다 (캠핑장 상세 API 를 그대로 씀)
+// 빠르게 다른 캠핑장을 누르면 앞 응답이 늦게 와도 덮어쓰지 않게, 마지막으로 고른 id 인지 확인한다
+watch(selectedId, async (id) => {
+  campFacilities.value = []
+  if (id == null) return
+  try {
+    const detail = await api(`/api/camps/${id}`)
+    if (selectedId.value !== id) return
+    campFacilities.value = detail.facilities.map((f, i) => ({ ...f, no: i + 1 }))
+  } catch {
+    // 시설을 못 받아도 캠핑장 마커는 그대로 쓸 수 있다
+  }
+})
+
+// 켜 둔 종류만 지도에. 레이어 목록을 아직 못 받았으면(undefined) 보여 준다 (안전 정보라 기본은 숨기지 않음)
+const mapFacilities = computed(() => campFacilities.value.filter((f) => facilityOn.value[f.type] !== false))
 
 const isRanked = computed(() => matchMine.value && !showExcluded.value)
 const title = computed(() => {
@@ -184,8 +224,8 @@ function onMarker(id) {
 <template>
   <div class="explore">
     <div class="stage">
-      <CampMap :camps="mapCamps" :selected-id="selectedId" :bottom-inset="COLLAPSED"
-        @select="onMarker" @layers="openSheet = 'layers'" />
+      <CampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="selectedId" :bottom-inset="COLLAPSED"
+        @select="onMarker" @layers="openLayers" />
 
       <!-- 지도 위 시트 -->
       <section class="sheet" :class="{ open: sheetOpen }" :style="{ top: sheetOpen ? '0px' : `calc(100% - ${COLLAPSED}px)` }">
@@ -204,8 +244,8 @@ function onMarker(id) {
             @focus="sheetOpen = true" />
         </label>
 
-        <!-- 필터 줄 (가로 스크롤) -->
-        <div class="filters">
+        <!-- 필터 줄 (가로 스크롤: 손가락 밀기 · 마우스 휠(v-hscroll) · 마우스 기기에선 얇은 막대(.hscroll)) -->
+        <div v-hscroll class="filters hscroll">
           <button type="button" class="chip icon" disabled title="상세 필터 (준비 중)" aria-label="상세 필터 (준비 중)">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" aria-hidden="true">
@@ -293,7 +333,8 @@ function onMarker(id) {
     <!-- 아래 시트 (화면 전체를 어둡게 덮음) -->
     <RegionSheet v-if="openSheet === 'region'" @close="openSheet = null" @apply="applied" />
     <TripSheet v-if="openSheet === 'trip'" @close="openSheet = null" @apply="applied" />
-    <MapLayerSheet v-if="openSheet === 'layers'" :on="gradeOn" @close="openSheet = null" @toggle="toggleGrade" />
+    <LayerSheet v-if="openSheet === 'layers'" :layers="layers" :on="facilityOn" @close="openSheet = null"
+      @toggle="toggleFacility" />
   </div>
 </template>
 
@@ -366,11 +407,7 @@ function onMarker(id) {
   gap: 8px;
   margin: 12px -16px 0;
   padding: 0 16px 12px;
-  overflow-x: auto;
-  scrollbar-width: none; /* 가로 스크롤 막대 숨김 */
-}
-.filters::-webkit-scrollbar {
-  display: none;
+  /* 가로 넘김·막대 모양은 전역 .hscroll (styles/base.css) */
 }
 .chip {
   flex: none;
