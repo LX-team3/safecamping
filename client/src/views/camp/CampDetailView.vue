@@ -4,7 +4,7 @@
 //  - "경로 보기"·손잡이로 내리면 경로 지도 (응급실·소방서·경찰서·편의점·약국까지 카카오 자동차 경로, 형광 파란 선)
 //  - 안전점수 탭의 시설을 누르면 시설 상세, 관광지 탭의 관광지를 누르면 관광지 상세
 // 데이터: GET /api/camps/{id}, GET /api/camps/{id}/tours?prefer=, GET /api/camps/{id}/routes
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import RouteMap from '@/components/map/RouteMap.vue'
 import DetailTopBar from '@/components/detail/DetailTopBar.vue'
@@ -12,6 +12,7 @@ import PhotoBox from '@/components/detail/PhotoBox.vue'
 import InfoRows from '@/components/detail/InfoRows.vue'
 import BottomSheet from '@/components/common/BottomSheet.vue'
 import { api } from '@/utils/api'
+import { vHscroll } from '@/utils/hscroll'
 import { FACILITY_LABEL, shortSido } from '@/utils/place'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
@@ -45,6 +46,13 @@ const sheetOpen = ref(true)
 // "다른 관광지"로 돌아올 때 ?tab=tour 로 관광지 탭을 연다
 const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'safety')
 const selectedId = ref(null) // 경로 지도에서 고른 시설
+const chipsEl = ref(null) // 시설 칩 줄 (가로로 넘김)
+
+// 지도 마커로 시설을 고르면 그 칩이 줄 밖에 있어도 보이게 옆으로 넘긴다
+watch(selectedId, async (id) => {
+  await nextTick() // 칩의 on 표시가 그려진 뒤에
+  chipsEl.value?.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+})
 const routes = ref([]) // 카카오 자동차 경로 [{ facilityId, type, ok, dummy, distanceKm, durationMin, path }]
 const routeState = ref('loading') // loading | kakao | straight | error
 
@@ -121,7 +129,8 @@ const targets = computed(() =>
   facilities.value.map((f, i) => ({
     id: f.id,
     type: f.type, // 마커 아이콘 고르기 (utils/facilityIcon.js)
-    label: shortLabel(f),
+    name: FACILITY_LABEL[f.type], // 화면 읽기 프로그램용. 지도에는 쓰지 않음 (아이콘으로 알아봄)
+    label: `${driveMinOf(f)}분`, // 지도 이름표는 시간만 (아래 칩·목록에는 이름이 그대로 있음)
     lat: f.lat,
     lng: f.lng,
     no: i + 1,
@@ -307,8 +316,9 @@ async function savePlan() {
             <b>{{ camp.name }}</b>
             <span class="badge" :class="camp.grade"><i />{{ GRADE_LABEL[camp.grade] }} {{ camp.safetyScore ?? '' }}</span>
           </div>
-          <div class="chips">
-            <button v-for="f in facilities" :key="f.id" type="button" class="chip" :class="{ on: f.id === selectedId }"
+          <!-- 칩이 많으면 옆으로 넘김: 손가락 밀기 · 마우스 휠(v-hscroll) · 마우스 기기에선 얇은 막대(.hscroll) -->
+          <div ref="chipsEl" v-hscroll class="chips hscroll">
+            <button v-for="f in facilities" :key="f.id" type="button" class="chip" :data-id="f.id" :class="{ on: f.id === selectedId }"
               :aria-pressed="f.id === selectedId" @click="selectedId = f.id">
               {{ shortLabel(f) }}
             </button>
@@ -659,12 +669,8 @@ h1 {
   display: flex;
   gap: 8px;
   margin: 10px -16px 0;
-  padding: 0 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.chips::-webkit-scrollbar {
-  display: none;
+  padding: 0 16px 4px; /* 아래 4px: 마우스 기기에서 보이는 얇은 막대가 칩에 붙지 않게 */
+  /* 가로 넘김·막대 모양은 전역 .hscroll (styles/base.css) */
 }
 .chip {
   flex: none;
