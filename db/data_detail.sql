@@ -28,6 +28,50 @@ SELECT c.id, f.id, v.sort_order, v.distance_km, v.drive_min
 ON CONFLICT (camp_id, facility_id) DO NOTHING;
 
 -- ---------------------------
+-- 편의점 추가 (내 주변 지도 레이어용). 이름·좌표·거리·시간 모두 가상 값 (is_dummy = true)
+-- 이름은 실제 가게와 헷갈리지 않게 "지역 + 종류"로만 짓는다
+-- ---------------------------
+INSERT INTO facility (type, name, sido, sigungu, eupmyeon, lat, lng, is_dummy) VALUES
+    ('store', '북면 편의점',   '강원특별자치도', '인제군', '북면',   38.150000, 128.215000, true),
+    ('store', '인제읍 편의점', '강원특별자치도', '인제군', '인제읍', 38.070000, 128.175000, true)
+ON CONFLICT (name, sigungu) DO NOTHING;
+
+-- 설하캠핑장과 연결해야 지도·상세에 나온다 (기존 1~4 다음 번호)
+INSERT INTO camp_facility (camp_id, facility_id, sort_order, distance_km, drive_min)
+SELECT c.id, f.id, v.sort_order, v.distance_km, v.drive_min
+  FROM camp c,
+       facility f,
+       (VALUES
+        ('북면 편의점',   5,  2.0,  4),
+        ('인제읍 편의점', 7, 11.0, 15)
+       ) AS v (facility_name, sort_order, distance_km, drive_min)
+ WHERE c.name = '설하캠핑장' AND c.sigungu = '인제군'
+   AND f.name = v.facility_name AND f.sigungu = '인제군'
+ON CONFLICT (camp_id, facility_id) DO NOTHING;
+
+-- ---------------------------
+-- 약국 추가 (내 주변 지도 · 경로 지도). 이름·좌표·거리·시간 모두 가상 값 (is_dummy = true)
+-- 'pharmacy' 는 schema_02.sql 의 facility.type CHECK 에 들어 있어야 한다 → schema_02.sql 을 먼저 다시 실행
+-- 편의점과 따로 둔 이유: CHECK 가 아직 옛날 것이면 이 구간만 실패하고 위 편의점은 그대로 들어간다
+-- ---------------------------
+INSERT INTO facility (type, name, sido, sigungu, eupmyeon, lat, lng, is_dummy) VALUES
+    ('pharmacy', '북면 약국',   '강원특별자치도', '인제군', '북면',   38.155000, 128.225000, true),
+    ('pharmacy', '인제읍 약국', '강원특별자치도', '인제군', '인제읍', 38.068000, 128.172000, true)
+ON CONFLICT (name, sigungu) DO NOTHING;
+
+INSERT INTO camp_facility (camp_id, facility_id, sort_order, distance_km, drive_min)
+SELECT c.id, f.id, v.sort_order, v.distance_km, v.drive_min
+  FROM camp c,
+       facility f,
+       (VALUES
+        ('북면 약국',   6,  3.2,  6),
+        ('인제읍 약국', 8, 11.5, 16)
+       ) AS v (facility_name, sort_order, distance_km, drive_min)
+ WHERE c.name = '설하캠핑장' AND c.sigungu = '인제군'
+   AND f.name = v.facility_name AND f.sigungu = '인제군'
+ON CONFLICT (camp_id, facility_id) DO NOTHING;
+
+-- ---------------------------
 -- 관광지
 -- ---------------------------
 INSERT INTO tour (name, category, category_label, nature, popularity_rank, sido, sigungu, eupmyeon, lat, lng, is_dummy) VALUES

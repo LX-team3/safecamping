@@ -24,3 +24,50 @@ button {
   font-family: inherit;
   color: inherit;
 }
+
+/* ---- 지도 시설 마커 아이콘 배지 (utils/facilityIcon.js 가 만듦) ----
+   카카오 지도 위에 직접 붙이는 요소라 화면 scoped style 이 안 닿는다 → 여기 전역으로 한 번만
+   바탕색 = 캠핑장 안전점수 등급 (안전 초록 · 주의 주황 · 위험 빨강 · 점수 없음 회색), 아이콘은 흰색 */
+.fac-badge {
+  --fac-size: 30px;
+  position: relative;
+  flex: none;
+  width: var(--fac-size);
+  height: var(--fac-size);
+  border: 2px solid var(--color-card);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-card);
+  font: 700 13px var(--font-base);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.fac-badge .fac-svg {
+  display: contents; /* 임시 지도에서 v-html 을 감싼 칸 — 크기 계산에서 빠지게 */
+}
+.fac-badge svg {
+  width: 58%;
+  height: 58%;
+}
+.fac-badge.safe { background: var(--color-green); }
+.fac-badge.caution { background: var(--color-caution); }
+.fac-badge.danger { background: var(--color-danger); }
+.fac-badge.unknown { background: var(--color-text-sub); }
+/* 오른쪽 위 작은 번호 (아래 목록·칩 순서와 맞춤) */
+.fac-no {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-text);
+  color: var(--color-card);
+  font: 700 10px var(--font-base);
+  line-height: 1;
+}

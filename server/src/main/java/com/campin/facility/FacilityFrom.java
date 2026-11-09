@@ -17,4 +17,5 @@ public class FacilityFrom {
     private double lng;
     private double distanceKm;
     private int driveMin;
+    private Integer safetyScore; // 캠핑장 안전점수 (없으면 null) → 지도 마커 색 등급
 }

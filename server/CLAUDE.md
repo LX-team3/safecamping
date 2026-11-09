@@ -30,7 +30,7 @@ alert/    # 내 정보 · 알림 (기상특보 + 재난문자). 기상특보 = K
 family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치도 여기에
 tour/     # 관광지 상세 + 관광지 탭 여행 취향 TourPreference* (member_tour_preference 테이블. 선택지는 TourPreferenceOptions)
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
-route/    # 캠핑장 → 응급실·소방서·경찰서 자동차 경로 (카카오모빌리티 길찾기, 키는 환경변수 KAKAO_REST_KEY). DirectionsSource = 테스트용 인터페이스
+route/    # 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (카카오모빌리티 길찾기, 키는 환경변수 KAKAO_REST_KEY). DirectionsSource = 테스트용 인터페이스
 nearby/   # 내 주변 탭 (내 위치 → 가장 가까운 캠핑장 기준 안전점수·시설). 레이어 목록은 NearbyLayer 한곳
 mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개
 ```
@@ -78,10 +78,10 @@ mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테�
 | `GET`·`POST /api/family/places` · `DELETE /api/family/places/{id}` | 모일 장소 목록·추가 `{ name, description?, lon?, lat? }`·삭제 (다른 방 장소 id 는 404) |
 | `GET`·`POST /api/family/children` · `PUT`·`DELETE /api/family/children/{id}` | 아이 건강 응급 카드 목록·추가·수정·삭제 `{ name, birthDate?, bloodType?, allergy?, disease?, medicine?, memo? }` |
 | `GET`·`POST /api/family/schedules` · `DELETE /api/family/schedules/{id}` | 가족 일정 목록(시간 순)·추가 `{ title, startAt: "2026-11-14T06:00:00+09:00", memo? }`·삭제 |
-| `GET /api/camps/{id}/routes` | 캠핑장 → 응급실·소방서·경찰서 자동차 경로 (카카오모빌리티, 시설마다 1번씩 동시 호출, 전부 성공하면 24시간 메모리 저장). `{ source: kakao·straight, routes: [{ facilityId, type, name, ok, dummy, distanceKm, durationMin, path: [[위도, 경도], ...] }] }`. 키 없음·실패면 `ok: false` + 직선 두 점 + DB 시간. 없는 캠핑장 400. 로그인 없이 됨 |
+| `GET /api/camps/{id}/routes` | 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (화장실 뺌) (카카오모빌리티, 시설마다 1번씩 동시 호출, 전부 성공하면 24시간 메모리 저장). `{ source: kakao·straight, routes: [{ facilityId, type, name, ok, dummy, distanceKm, durationMin, path: [[위도, 경도], ...] }] }`. 키 없음·실패면 `ok: false` + 직선 두 점 + DB 시간. 없는 캠핑장 400. 로그인 없이 됨 |
 | `GET /api/nearby?lat=&lng=` | 내 주변 (**더미**). 시설 데이터가 있는 가장 가까운 캠핑장 기준 → `{ dummy, basis: { campId, campName, sido, sigungu, eupmyeon, lat, lng, distanceKm, far }, safetyScore, grade, facilities: [{ no, id, type, name, lat, lng, distanceKm, driveMin, tone, dummy }] }`. `far` 는 10km 초과(임시). 없으면 `basis: null`. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
 | `GET`·`POST /api/member/camp-plans` · `DELETE /api/member/camp-plans/{id}` | 내 캠핑 (캠핑장 상세 "내 캠핑에 일정 등록"). GET → 체크인 빠른 순 `[{ id, campId, campName, place, checkIn, checkOut, memo }]`. POST `{ campId, campName, place?, checkIn: "2026-11-14", checkOut, memo? }` → 201. 지난 체크인·체크아웃 ≤ 체크인·같은 캠핑장+체크인 중복 400. 남의 id 삭제 404. 로그인 필요 |
-| `GET /api/nearby/layers` | "지도에 보일 것" 안전 시설 목록 `[{ code, icon, label, desc, ready, on }]` (응급실·소방서·경찰서·편의점·약국·대피소, 공중화장실 뺌). 약국·대피소는 `ready: false` (데이터 없음) |
+| `GET /api/nearby/layers` | "지도에 보일 것" 안전 시설 목록 `[{ code, icon, label, desc, ready, on }]` (응급실·소방서·경찰서·편의점·약국·대피소, 공중화장실 뺌). 대피소는 `ready: false` (데이터 없음). 약국은 더미 데이터가 있어 `ready: true` |
 
 - 로그인은 Spring Security **세션 방식**. remember-me 서명 키는 환경변수 `REMEMBER_ME_KEY` (없으면 실행마다 임시 키)
 - CSRF 켜 둠 (`csrf.spa()`): POST·PUT·PATCH·DELETE 는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 보내야 한다 (axios 는 자동, 없으면 403). curl·Postman 으로 시험할 때는 먼저 GET 으로 쿠키를 받는다
