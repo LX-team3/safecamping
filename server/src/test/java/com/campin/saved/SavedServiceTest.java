@@ -23,6 +23,7 @@ class SavedServiceTest {
 
     private final List<SavedList> lists = new ArrayList<>();
     private final List<String[]> camps = new ArrayList<>(); // [목록 id, 캠핑장 id]
+    private final Map<String, CompareCamp> campTable = new HashMap<>(); // camp 테이블 대신 (id → 비교 값)
     private SavedService service;
 
     @BeforeEach
@@ -49,6 +50,13 @@ class SavedServiceTest {
             @Override public boolean existsDefaultList(Long memberId) {
                 return lists.stream().anyMatch(l -> l.getMemberId().equals(memberId) && l.getIsDefault());
             }
+            @Override public Long findDefaultListId(Long memberId) {
+                return lists.stream().filter(l -> l.getMemberId().equals(memberId) && l.getIsDefault())
+                        .map(SavedList::getId).findFirst().orElse(null);
+            }
+            @Override public boolean existsCamp(String campId) {
+                return campTable.containsKey(campId);
+            }
             @Override public boolean existsListName(Long memberId, String name) {
                 return lists.stream().anyMatch(l -> l.getMemberId().equals(memberId) && l.getName().equals(name));
             }
@@ -68,6 +76,9 @@ class SavedServiceTest {
             @Override public List<String> findCampIds(Long listId) {
                 return camps.stream().filter(c -> c[0].equals(listId.toString())).map(c -> c[1]).toList();
             }
+            @Override public List<CompareCamp> findCompareCamps(Long listId) {
+                return findCampIds(listId).stream().filter(campTable::containsKey).map(campTable::get).toList();
+            }
             @Override public int insertCamp(Long listId, String campId) {
                 if (findCampIds(listId).contains(campId)) return 0;
                 camps.add(new String[] {listId.toString(), campId});
@@ -78,6 +89,11 @@ class SavedServiceTest {
             }
         };
         service = new SavedService(fakeSavedMapper, fakeMemberMapper);
+
+        // 비교 값이 서로 다른 캠핑장 3곳 (실제 데이터처럼 비어 있는 값도 섞는다)
+        campTable.put("100568", camp("100568", "내린천 글램핑", 87, 8, 12, true, true));
+        campTable.put("101137", camp("101137", "갯골자연휴양림 야영장", 85, 9, 5, true, false));
+        campTable.put("8175", camp("8175", "진동리 국민여가캠핑장", 27, 46, null, null, false));
     }
 
     private static Member member(Long id, String loginId) {
@@ -85,6 +101,19 @@ class SavedServiceTest {
         m.setId(id);
         m.setLoginId(loginId);
         return m;
+    }
+
+    private static CompareCamp camp(String id, String name, Integer score, Integer er, Integer fire,
+                                    Boolean power, Boolean pet) {
+        CompareCamp c = new CompareCamp();
+        c.setId(id);
+        c.setName(name);
+        c.setSafetyScore(score);
+        c.setErMinutes(er);
+        c.setFireMinutes(fire);
+        c.setHasPower(power);
+        c.setAllowsPet(pet);
+        return c;
     }
 
     private Long defaultListId(String loginId) {
@@ -118,50 +147,84 @@ class SavedServiceTest {
     @Test
     void 남의_목록은_없는_목록처럼_404() {
         Long othersList = defaultListId("other");
-        assertThrows(NotFoundException.class, () -> service.addCamp("me", othersList, "c1"));
+        assertThrows(NotFoundException.class, () -> service.addCamp("me", othersList, "100568"));
         assertThrows(NotFoundException.class, () -> service.compare("me", othersList));
     }
 
     @Test
     void 없는_캠핑장은_담을_수_없고_같은_캠핑장은_한_번만_담긴다() {
         Long id = defaultListId("me");
-        assertThrows(NotFoundException.class, () -> service.addCamp("me", id, "없는id"));
+        assertThrows(NotFoundException.class, () -> service.addCamp("me", id, "c1")); // 예전 더미 id 도 이제 없는 캠핑장
 
-        service.addCamp("me", id, "c1");
-        service.addCamp("me", id, "c1");
+        service.addCamp("me", id, "100568");
+        service.addCamp("me", id, "100568");
         assertEquals(1, service.findLists("me").get(0).campCount());
     }
 
     @Test
-    void 비교표는_가장_좋은_값을_표시하고_더미임을_알린다() {
+    void 하트_상태는_기본_목록과_담긴_캠핑장을_돌려준다() {
+        FavoritesResponse empty = service.favorites("me"); // 처음이면 기본 목록을 만든다
+        assertEquals(List.of(), empty.campIds());
+
+        service.addCamp("me", empty.listId(), "100568");
+        service.addCamp("me", empty.listId(), "8175");
+        FavoritesResponse result = service.favorites("me");
+        assertEquals(empty.listId(), result.listId());
+        assertEquals(List.of("100568", "8175"), result.campIds());
+    }
+
+    @Test
+    void 비교표는_실제_값으로_가장_좋은_곳을_표시하고_빈_값은_확인_필요() {
         Long id = defaultListId("me");
-        service.addCamp("me", id, "c1");
-        service.addCamp("me", id, "c2");
-        service.addCamp("me", id, "c3");
+        service.addCamp("me", id, "100568");
+        service.addCamp("me", id, "101137");
+        service.addCamp("me", id, "8175");
 
         CompareResponse result = service.compare("me", id);
-        assertTrue(result.dummy());
+        assertEquals(3, result.totalCount());
         assertEquals(6, result.rows().size());
 
-        // 응급실: 햇살글램핑(차로 9분)이 가장 가깝다
+        // 안전점수: 내린천 글램핑(87)이 가장 높다
+        List<CompareResponse.Cell> score = result.rows().get(0).cells();
+        assertEquals(List.of(true, false, false), score.stream().map(CompareResponse.Cell::best).toList());
+        assertEquals("87점", score.get(0).text());
+        // 응급실: 내린천 글램핑(8분)이 가장 가깝다. 막대는 분 숫자로
         List<CompareResponse.Cell> er = result.rows().get(1).cells();
-        assertEquals(List.of(false, false, true), er.stream().map(CompareResponse.Cell::best).toList());
-        // 대피소: 걸어서 가는 곳 중 가장 짧은 설하캠핑장 (차로 4분보다 먼저 친다)
+        assertEquals(List.of(true, false, false), er.stream().map(CompareResponse.Cell::best).toList());
+        assertEquals(List.of(8, 9, 46), er.stream().map(CompareResponse.Cell::value).toList());
+        // 소방서: 값이 없는 곳은 "확인 필요"이고 가장 좋은 값 후보에서 빠진다
+        List<CompareResponse.Cell> fire = result.rows().get(2).cells();
+        assertEquals(List.of(false, true, false), fire.stream().map(CompareResponse.Cell::best).toList());
+        assertEquals("확인 필요", fire.get(2).text());
+        // 대피소: 데이터가 없어 모두 "확인 필요", 표시 없음
         List<CompareResponse.Cell> shelter = result.rows().get(3).cells();
-        assertEquals(List.of(true, false, false), shelter.stream().map(CompareResponse.Cell::best).toList());
-        // 막대: 응급실은 분 숫자로 그리고, 대피소는 걸어서·차로가 섞여 막대를 그리지 않는다
-        assertEquals(List.of(17, 21, 9), er.stream().map(CompareResponse.Cell::value).toList());
-        assertTrue(shelter.stream().allMatch(c -> c.value() == null));
-        // 안전점수: 가장 높은 설하캠핑장(90)에 칩
-        assertEquals("가장 높음", result.rows().get(0).bestLabel());
-        assertEquals(List.of(true, false, false),
-                result.rows().get(0).cells().stream().map(CompareResponse.Cell::best).toList());
+        assertTrue(shelter.stream().allMatch(c -> c.text().equals("확인 필요") && !c.best() && c.value() == null));
+        // 전기: 원본에 값이 없으면 "확인 필요"
+        assertEquals(List.of("가능", "가능", "확인 필요"),
+                result.rows().get(4).cells().stream().map(CompareResponse.Cell::text).toList());
+    }
+
+    @Test
+    void 비교는_camp_테이블에_있는_캠핑장만_앞의_3곳까지() {
+        Long id = defaultListId("me");
+        camps.add(new String[] {id.toString(), "c1"}); // 예전에 담아 둔 더미 id (camp 테이블에 없음)
+        service.addCamp("me", id, "100568");
+        service.addCamp("me", id, "101137");
+        campTable.put("3383", camp("3383", "하추자연휴양림 야영장", 52, 25, 9, true, false));
+        campTable.put("100886", camp("100886", "햇살글램핑", 76, 12, 7, false, false));
+        service.addCamp("me", id, "3383");
+        service.addCamp("me", id, "100886");
+
+        CompareResponse result = service.compare("me", id);
+        assertEquals(4, result.totalCount()); // c1 은 세지 않는다
+        assertEquals(List.of("100568", "101137", "3383"),
+                result.camps().stream().map(CompareResponse.Camp::id).toList());
     }
 
     @Test
     void 캠핑장이_한_곳이면_가장_좋은_값을_표시하지_않는다() {
         Long id = defaultListId("me");
-        service.addCamp("me", id, "c1");
+        service.addCamp("me", id, "100568");
 
         CompareResponse result = service.compare("me", id);
         assertFalse(result.rows().stream().flatMap(r -> r.cells().stream()).anyMatch(CompareResponse.Cell::best));
