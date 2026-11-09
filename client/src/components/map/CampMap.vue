@@ -1,7 +1,9 @@
 <script setup>
-// 캠핑장 지도: 점수 마커(안전·주의·위험 색) + 고른 캠핑장 이름표 + 범례 · 레이어 · 내 위치 버튼
+// 캠핑장 지도: 텐트 + 점수 마커(안전·주의·위험 색) + 고른 캠핑장 이름표 + 범례 · 레이어 · 내 위치 버튼
 // 카카오 키(VITE_KAKAO_MAP_KEY)가 있으면 카카오맵, 없으면 좌표 비율로 마커만 놓은 임시 그림을 보여 준다
+// 텐트 아이콘은 경로 지도 출발지와 같은 것 (utils/facilityIcon.js)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 
 const props = defineProps({
@@ -61,10 +63,15 @@ function markerEl(camp) {
   btn.className = `camp-marker ${camp.grade}${selected ? ' selected' : ''}`
   btn.setAttribute('aria-label', `${camp.name} ${GRADE_LABEL[camp.grade]} ${camp.safetyScore ?? ''}`)
   if (selected) {
-    btn.appendChild(document.createElement('i')) // 등급 색 점
+    btn.appendChild(facilityBadgeEl({ type: 'camp', grade: camp.grade })) // 등급 색 텐트 배지
     btn.appendChild(document.createTextNode(`${camp.name} ${camp.safetyScore ?? '-'}`))
   } else {
-    btn.textContent = camp.safetyScore ?? '-'
+    // 등급 색 바탕 위에 흰 텐트 + 점수 (아이콘은 우리 상수에서만 오므로 innerHTML 이 안전)
+    const icon = document.createElement('span')
+    icon.className = 'camp-icon'
+    icon.innerHTML = facilityIcon('camp')
+    btn.appendChild(icon)
+    btn.appendChild(document.createTextNode(camp.safetyScore ?? '-'))
   }
   btn.addEventListener('click', () => emit('select', camp.id))
   return btn
@@ -154,8 +161,12 @@ const fakeMarkers = computed(() => {
             :style="{ left: m.left + '%', top: m.top + '%', zIndex: m.camp.id === selectedId ? 10 : 1 }"
             :aria-label="`${m.camp.name} ${GRADE_LABEL[m.camp.grade]} ${m.camp.safetyScore ?? ''}`"
             @click="emit('select', m.camp.id)">
-            <template v-if="m.camp.id === selectedId"><i />{{ m.camp.name }} {{ m.camp.safetyScore ?? '-' }}</template>
-            <template v-else>{{ m.camp.safetyScore ?? '-' }}</template>
+            <!-- 카카오 지도 마커(markerEl)와 같은 모양 -->
+            <template v-if="m.camp.id === selectedId">
+              <span class="fac-badge" :class="gradeClass(m.camp.grade)"><span class="fac-svg" v-html="facilityIcon('camp')" /></span>
+              {{ m.camp.name }} {{ m.camp.safetyScore ?? '-' }}
+            </template>
+            <template v-else><span class="camp-icon" v-html="facilityIcon('camp')" />{{ m.camp.safetyScore ?? '-' }}</template>
           </button>
         </div>
       </template>
@@ -325,24 +336,25 @@ const fakeMarkers = computed(() => {
 .camp-marker.unknown {
   background: var(--color-text-sub);
 }
-/* 고른 캠핑장: 검은 이름표 + 등급 색 점 */
+/* 점수 앞 흰 텐트 (글씨와 같은 흰색 = currentColor) */
+.camp-marker .camp-icon {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  margin-left: -2px;
+}
+.camp-marker .camp-icon svg {
+  width: 100%;
+  height: 100%;
+}
+/* 고른 캠핑장: 검은 이름표 + 왼쪽 등급 색 텐트 배지 (.fac-badge 는 styles/base.css) */
 .camp-marker.selected {
   background: var(--color-text);
-  padding: 0 12px;
+  padding: 0 12px 0 3px;
 }
-.camp-marker i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-.camp-marker.safe i {
-  background: var(--color-green);
-}
-.camp-marker.caution i {
-  background: var(--color-caution);
-}
-.camp-marker.danger i {
-  background: var(--color-danger);
+.camp-marker.selected .fac-badge {
+  --fac-size: 28px;
+  box-shadow: none;
 }
 .my-location {
   display: block;

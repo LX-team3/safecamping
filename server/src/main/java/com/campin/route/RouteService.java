@@ -44,7 +44,7 @@ public class RouteService {
         }
         List<RouteFacility> facilities = routeMapper.findFacilities(campId);
 
-        // 시설 3곳을 동시에 부른다 → 기다리는 시간은 한 번 부를 때와 비슷하다
+        // 시설들을 동시에 부른다 → 기다리는 시간은 한 번 부를 때와 비슷하다
         List<CompletableFuture<RouteResponse.Route>> jobs = facilities.stream()
                 .map(f -> CompletableFuture.supplyAsync(() -> routeOf(camp, f)))
                 .toList();

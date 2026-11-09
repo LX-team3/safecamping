@@ -1,5 +1,35 @@
 # 진행 상황
 
+## 2026-11-09 지도 시설 마커를 종류별 아이콘 + 안전점수 등급 색으로
+- 아이콘: 사용자가 준 SVG Repo 아이콘 5개(응급실 병원·소방서 불꽃·경찰서 경찰관·편의점 24 가게·약국 알약)를 `client/src/utils/facilityIcon.js` 한곳에 모음. 검정 → `currentColor` 로 바꿔 CSS 로 흰색 표시. 경찰관(선 아이콘)은 작게 보면 흐려서 선 굵기 1.4 → 1.8
+- 모양: 등급 색 동그라미 + 흰 아이콘 + 오른쪽 위 작은 번호(목록·칩 순서). 공통 스타일 `.fac-badge` 는 `styles/base.css` (카카오 지도 위 요소라 scoped 가 안 닿음)
+- 색 = **캠핑장 안전점수 등급** (사용자 결정): 안전 70↑ 초록 `--color-green` · 주의 40~70 주황 `--color-caution` · 위험 40↓ 빨강 `--color-danger` · 점수 없음 회색 (`CampService.gradeOf` 기준 그대로). 기존 색 변수만 씀
+  - 그래서 한 지도 안의 시설 마커는 모두 같은 색 (시설별 차로 시간 색 `DriveTone` 과는 별개)
+- 적용한 지도: 내 주변(`NearbyMap.vue`, 기준 캠핑장 `data.grade`), 캠핑장 상세 경로(`RouteMap.vue`, 흰 이름표 왼쪽에 배지, 고른 시설은 검은 테두리), 시설 상세(`RouteMap.vue` 같이 씀). 카카오 키 없는 임시 지도도 같은 모양
+- 서버: 시설 상세 `GET /api/facilities/{id}?campId=` 의 `from` 에 `grade` 추가 (`FacilityMapper` 에서 `c.safety_score` 조회 → `CampService.gradeOf`). DB 변경 없음
+- 확인: `mvnw test` 통과 (86개), `npm run build` 통과
+- 확인 못 함: 브라우저에서 실제 모양(아이콘 크기·선명도, 특히 편의점·약국처럼 세밀한 아이콘이 18px 정도에서 잘 보이는지), 시설 상세 API 실제 DB 응답
+- 남은 일: SVG Repo 아이콘은 아이콘마다 라이선스가 달라 **배포 전 각 아이콘 페이지에서 라이선스·출처 표기 필요 여부 확인**. "지도에 보일 것" 시트(`LayerSheet.vue`)의 글자 아이콘(+·119·P·24·약)도 같은 아이콘으로 맞출지 결정
+
+## 2026-11-09 약국 · 편의점 더미 데이터 추가 (내 주변 지도 레이어)
+- DB: `db/data_detail.sql` 에 시설 4곳 추가 — 편의점(`북면 편의점`·`인제읍 편의점`), 약국(`북면 약국`·`인제읍 약국`). 이름은 실제 가게와 헷갈리지 않게 "지역 + 종류"로만. 좌표·거리·시간은 **가상 값** (`is_dummy = true`)
+- 설하캠핑장과 `camp_facility` 로 연결 (번호 5~8) → 내 주변 지도·캠핑장 상세 목록에 나옴 (상세 목록이 4곳 → 8곳)
+- 스키마: `db/schema_02.sql` facility.type CHECK 에 `pharmacy` 추가 + 이미 만든 DB 용 `ALTER TABLE ... facility_type_check` (DROP IF EXISTS 후 다시 걺) — **schema_02.sql → data_detail.sql 순으로 DB 에 다시 실행해야 함**
+- 서버: `NearbyLayer` 약국 `ready: true`, 설명 "상비약 · 해열제 구하기". 대피소만 `ready: false` 로 남음
+- 프론트: `utils/place.js` FACILITY_LABEL 에 `pharmacy: '약국'`. 내 주변 점수 아래 "차로 n분" 줄에서 약국도 편의점처럼 뺌 (응급 시설 아님)
+- 확인: `mvnw test` 통과 (86개), `npm run build` 통과
+- 확인 못 함: 실제 DB 에서 ALTER·INSERT 실행 (제약 이름 `facility_type_check` 은 PostgreSQL 자동 이름으로 가정), 브라우저에서 약국 레이어 켜기·마커
+- 참고: 경로 API(`/api/camps/{id}/routes`)는 캠핑장에 연결된 시설을 전부 부르므로 설하캠핑장은 카카오 호출이 4번 → 8번으로 늘어남
+- 남은 일: 실제 약국·편의점 공공데이터 연동, 대피소 데이터(CHECK 에 shelter 추가 필요)
+
+## 2026-11-09 캠핑장 상세 경로 지도에 편의점 · 약국 자동차 경로 추가
+- 서버: `RouteMapper.findFacilities` 의 시설 종류를 `er·fire·police` → `er·fire·police·store·pharmacy` 로 넓힘 (화장실만 뺌). API 모양은 그대로
+- 화면 변경 없음: 경로 지도 칩·"○○ · n km · 차로 n분" 줄은 원래 캠핑장 시설 전부를 보여 주고 있었음. 편의점은 지금까지 경로를 안 받아 선 없이 마커만 나왔는데, 이제 다른 시설처럼 도로를 따라 파란 선 + 카카오 시간·거리
+- 주석·문서 정리: `CampDetailView.vue`·`RouteMap.vue`·`RouteService.java`·`server/CLAUDE.md`
+- 설하캠핑장은 카카오 호출이 시설 8곳 = 8번 (동시 호출이라 기다리는 시간은 비슷). 24시간 캐시는 그대로
+- 확인: `mvnw test` 통과 (86개), `npm run build` 통과
+- 확인 못 함: 실제 카카오 호출(키 필요)·실제 DB 응답, 브라우저에서 선 8개가 겹쳐 보이는 모양
+
 ## 2026-11-08 캠핑장 상세 · 경로 지도에 카카오 자동차 경로 (응급실·소방서·경찰서)
 - 흐름: 탐색(추천 TOP5 · 지도 마커) → 캠핑장 상세 → "경로 보기" → 3곳까지 도로를 따라 **형광 파란 선** + 자차 시간·거리. 고른 시설은 진하고 굵게(빛 + 밝은 심), 나머지는 옅게
 - 서버: `route/` — `GET /api/camps/{id}/routes`. 카카오모빌리티 길찾기(`/v1/directions`)를 시설마다 1번씩 동시에 호출, 전부 성공하면 캠핑장별 24시간 메모리 저장, 실패 후 1분은 다시 안 부름. 키는 환경변수 `KAKAO_REST_KEY` (REST API 키)

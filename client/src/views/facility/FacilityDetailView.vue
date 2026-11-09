@@ -36,7 +36,7 @@ const origin = computed(() => {
 })
 const targets = computed(() =>
   facility.value
-    ? [{ id: facility.value.id, label: FACILITY_LABEL[facility.value.type], lat: facility.value.lat, lng: facility.value.lng }]
+    ? [{ id: facility.value.id, type: facility.value.type, label: FACILITY_LABEL[facility.value.type], lat: facility.value.lat, lng: facility.value.lng }]
     : [],
 )
 const place = computed(() => {
@@ -68,7 +68,8 @@ async function copyPhone() {
 
     <template v-else>
       <div class="map">
-        <RouteMap :origin="origin" :targets="targets" :selected-id="facility.id" dotted />
+        <!-- 마커 색 = 출발 캠핑장의 안전점수 등급 (캠핑장 없이 들어오면 회색) -->
+        <RouteMap :origin="origin" :targets="targets" :grade="facility.from?.grade" :selected-id="facility.id" dotted />
       </div>
 
       <main class="body">

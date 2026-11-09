@@ -2,6 +2,7 @@ package com.campin.facility;
 
 import org.springframework.stereotype.Service;
 
+import com.campin.camp.CampService;
 import com.campin.common.DriveTone;
 import com.campin.common.InvalidRequestException;
 import com.campin.place.PlaceMapper;
@@ -34,6 +35,7 @@ public class FacilityService {
             return null;
         }
         return new FacilityDetailResponse.From(from.getCampId(), from.getCampName(), from.getLat(), from.getLng(),
-                from.getDistanceKm(), from.getDriveMin(), DriveTone.of(from.getDriveMin()));
+                from.getDistanceKm(), from.getDriveMin(), DriveTone.of(from.getDriveMin()),
+                CampService.gradeOf(from.getSafetyScore()));
     }
 }

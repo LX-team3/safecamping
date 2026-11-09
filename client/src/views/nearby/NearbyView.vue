@@ -98,9 +98,10 @@ const warningLabel = computed(() => {
 })
 
 // 점수 아래 한 줄: 차로 몇 분만 (예: 소방서 5분 · 지구대 9분 · 응급실 17분)
+// 편의점·약국은 응급 시설이 아니라서 이 줄에서 뺀다 (지도·목록에는 나옴)
 const summary = computed(() =>
   facilities.value
-    .filter((f) => f.type !== 'store')
+    .filter((f) => f.type !== 'store' && f.type !== 'pharmacy')
     .map((f) => `${SHORT_LABEL[f.type] || FACILITY_LABEL[f.type]} ${f.driveMin}분`)
     .join(' · '),
 )
@@ -155,7 +156,7 @@ async function shareLocation() {
 <template>
   <div class="nearby">
     <div class="stage">
-      <NearbyMap :me="me" :facilities="shown" :bottom-inset="panelHeight" />
+      <NearbyMap :me="me" :facilities="shown" :grade="data?.grade" :bottom-inset="panelHeight" />
 
       <!-- 왼쪽 위: 지역 · 기상특보 -->
       <div class="status">
