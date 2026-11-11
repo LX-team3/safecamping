@@ -163,7 +163,6 @@ async function shareLocation() {
         <i :class="{ warn: warnings }" aria-hidden="true" />
         <div>
           <b>{{ regionLabel }} · {{ warningLabel }}</b>
-          <span>날씨 정보는 준비 중이에요</span>
         </div>
       </div>
 
@@ -192,7 +191,13 @@ async function shareLocation() {
         <p v-else-if="!basis" class="state">주변 안전 데이터가 아직 없어요.</p>
 
         <template v-else>
-          <div class="score">
+          <!-- 가장 가까운 캠핑장이 멀면(서버 FAR_KM, 10km) 그 캠핑장 점수를 "지금 이 위치" 점수처럼 보이지 않게 숨긴다 -->
+          <div v-if="basis.far" class="no-data">
+            <h1>이 지역은 아직 안전 데이터가 없어요</h1>
+            <p>지금은 강원 인제군 캠핑장만 안전점수를 계산해요. 가장 가까운 곳은 {{ basis.campName }}({{ basis.distanceKm }}km)이에요.</p>
+          </div>
+
+          <div v-else class="score">
             <div class="circle" :class="data.grade">
               <b>{{ data.safetyScore ?? '-' }}</b>{{ GRADE_LABEL[data.grade] }}
             </div>
@@ -209,7 +214,7 @@ async function shareLocation() {
           </div>
           <p v-if="shareMsg" class="share-msg" role="status">{{ shareMsg }}</p>
 
-          <ol class="list">
+          <ol v-if="!basis.far" class="list">
             <li v-for="f in shown" :key="f.id" class="row">
               <span class="no">{{ f.no }}</span>
               <div class="name">
@@ -220,7 +225,7 @@ async function shareLocation() {
               <button type="button" class="go" @click="route(f)">길찾기</button>
             </li>
           </ol>
-          <p v-if="!shown.length" class="state small">지도에 보일 시설을 켜 주세요.</p>
+          <p v-if="!basis.far && !shown.length" class="state small">지도에 보일 시설을 켜 주세요.</p>
         </template>
       </section>
     </div>
@@ -486,6 +491,20 @@ h1 {
 .state.small {
   margin: 16px 0;
   font-size: 13px;
+}
+.no-data {
+  padding: 4px 0 8px;
+}
+.no-data h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.no-data p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-sub);
 }
 .link {
   padding: 0;

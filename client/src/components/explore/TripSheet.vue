@@ -173,7 +173,7 @@ async function apply() {
       <!-- 아이가 있으면 나이대 -->
       <div v-if="kids > 0" class="ages">
         <h4>아이 나이대</h4>
-        <p class="hint">나이에 맞는 안전 안내를 드려요<template v-if="loadedSaved"> · 지난번 정보를 불러왔어요</template></p>
+        <p class="hint">나이에 맞는 안전 안내를 드려요<template v-if="loadedSaved"> · 지난번 정보를 불러옵니다</template></p>
         <div v-for="(age, i) in childAges" :key="i" class="age-row">
           <span class="who">아이 {{ i + 1 }}</span>
           <button v-for="a in AGES" :key="a.code" type="button" class="age" :class="{ on: age === a.code }"
@@ -182,7 +182,7 @@ async function apply() {
           </button>
         </div>
         <p class="save-note">
-          {{ auth.isLoggedIn ? '내 정보 › 함께 가는 가족에 저장돼요' : '로그인하면 다음에도 불러올 수 있어요' }}
+          {{ auth.isLoggedIn ? '내 정보 › 함께 가는 가족에 저장됩니다' : '로그인하면 다음에도 불러올 수 있어요' }}
         </p>
       </div>
     </section>

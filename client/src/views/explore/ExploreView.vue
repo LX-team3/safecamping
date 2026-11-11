@@ -184,7 +184,7 @@ const title = computed(() => {
 const NEARBY_LABEL = { er: '응급실', fire: '소방서', police: '파출소', store: '편의점', toilet: '공중화장실', cctv: 'CCTV', light: '보안등', house: '인근 주택' }
 const reason = computed(() => {
   if (showExcluded.value) return '안전점수가 낮아 추천하지 않는 곳이에요'
-  if (!matchMine.value) return '조건에 맞는 캠핑장을 모두 보여 드려요'
+  if (!matchMine.value) return '' // 내 유형 맞춤을 끄면 안내 문구 없이 목록만
   const parts = []
   const heating = diagnosis.value.heating || []
   if (heating.includes('fuel') || heating.includes('wood')) parts.push('난방 안전')
@@ -269,7 +269,7 @@ function onMarker(id) {
           <div class="list-head">
             <div>
               <h1>{{ title }}</h1>
-              <p class="reason">{{ reason }}</p>
+              <p v-if="reason" class="reason">{{ reason }}</p>
             </div>
             <label class="sort">
               <select v-model="sort" aria-label="정렬">
