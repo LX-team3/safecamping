@@ -119,7 +119,7 @@ async function remove(child) {
               <span class="age">{{ info(c.birthDate).age }}</span>
             </div>
             <div class="effect">
-              <b>이렇게 바뀌어요</b>
+              <b>체크리스트</b>
               <span>{{ info(c.birthDate).effect }}</span>
             </div>
           </div>
