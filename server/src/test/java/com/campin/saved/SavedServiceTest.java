@@ -22,8 +22,8 @@ import com.campin.member.MemberMapper;
 class SavedServiceTest {
 
     private final List<SavedList> lists = new ArrayList<>();
-    private final List<String[]> camps = new ArrayList<>(); // [목록 id, 캠핑장 id]
-    private final Map<String, CompareCamp> campTable = new HashMap<>(); // camp 테이블 대신 (id → 비교 값)
+    private final List<Long[]> camps = new ArrayList<>(); // [목록 id, 캠핑장 id]
+    private final Map<Long, CompareCamp> campTable = new HashMap<>(); // camp 테이블 대신 (id → 비교 값)
     private SavedService service;
 
     @BeforeEach
@@ -41,7 +41,7 @@ class SavedServiceTest {
         SavedMapper fakeSavedMapper = new SavedMapper() {
             @Override public List<SavedList> findLists(Long memberId) {
                 return lists.stream().filter(l -> l.getMemberId().equals(memberId)).peek(l ->
-                        l.setCampCount((int) camps.stream().filter(c -> c[0].equals(l.getId().toString())).count())).toList();
+                        l.setCampCount((int) camps.stream().filter(c -> c[0].equals(l.getId())).count())).toList();
             }
             @Override public SavedList findList(Long memberId, Long listId) {
                 return lists.stream().filter(l -> l.getMemberId().equals(memberId) && l.getId().equals(listId))
@@ -54,7 +54,7 @@ class SavedServiceTest {
                 return lists.stream().filter(l -> l.getMemberId().equals(memberId) && l.getIsDefault())
                         .map(SavedList::getId).findFirst().orElse(null);
             }
-            @Override public boolean existsCamp(String campId) {
+            @Override public boolean existsCamp(Long campId) {
                 return campTable.containsKey(campId);
             }
             @Override public boolean existsListName(Long memberId, String name) {
@@ -73,27 +73,27 @@ class SavedServiceTest {
             @Override public int deleteList(Long memberId, Long listId) {
                 return lists.removeIf(l -> l.getId().equals(listId) && !l.getIsDefault()) ? 1 : 0;
             }
-            @Override public List<String> findCampIds(Long listId) {
-                return camps.stream().filter(c -> c[0].equals(listId.toString())).map(c -> c[1]).toList();
+            @Override public List<Long> findCampIds(Long listId) {
+                return camps.stream().filter(c -> c[0].equals(listId)).map(c -> c[1]).toList();
             }
             @Override public List<CompareCamp> findCompareCamps(Long listId) {
                 return findCampIds(listId).stream().filter(campTable::containsKey).map(campTable::get).toList();
             }
-            @Override public int insertCamp(Long listId, String campId) {
+            @Override public int insertCamp(Long listId, Long campId) {
                 if (findCampIds(listId).contains(campId)) return 0;
-                camps.add(new String[] {listId.toString(), campId});
+                camps.add(new Long[] {listId, campId});
                 return 1;
             }
-            @Override public int deleteCamp(Long listId, String campId) {
-                return camps.removeIf(c -> c[0].equals(listId.toString()) && c[1].equals(campId)) ? 1 : 0;
+            @Override public int deleteCamp(Long listId, Long campId) {
+                return camps.removeIf(c -> c[0].equals(listId) && c[1].equals(campId)) ? 1 : 0;
             }
         };
         service = new SavedService(fakeSavedMapper, fakeMemberMapper);
 
         // 비교 값이 서로 다른 캠핑장 3곳 (실제 데이터처럼 비어 있는 값도 섞는다)
-        campTable.put("100568", camp("100568", "내린천 글램핑", 87, 8, 12, true, true));
-        campTable.put("101137", camp("101137", "갯골자연휴양림 야영장", 85, 9, 5, true, false));
-        campTable.put("8175", camp("8175", "진동리 국민여가캠핑장", 27, 46, null, null, false));
+        campTable.put(100568L, camp(100568L, "내린천 글램핑", 87, 8, 12, true, true));
+        campTable.put(101137L, camp(101137L, "갯골자연휴양림 야영장", 85, 9, 5, true, false));
+        campTable.put(8175L, camp(8175L, "진동리 국민여가캠핑장", 27, 46, null, null, false));
     }
 
     private static Member member(Long id, String loginId) {
@@ -103,7 +103,7 @@ class SavedServiceTest {
         return m;
     }
 
-    private static CompareCamp camp(String id, String name, Integer score, Integer er, Integer fire,
+    private static CompareCamp camp(Long id, String name, Integer score, Integer er, Integer fire,
                                     Boolean power, Boolean pet) {
         CompareCamp c = new CompareCamp();
         c.setId(id);
@@ -147,17 +147,17 @@ class SavedServiceTest {
     @Test
     void 남의_목록은_없는_목록처럼_404() {
         Long othersList = defaultListId("other");
-        assertThrows(NotFoundException.class, () -> service.addCamp("me", othersList, "100568"));
+        assertThrows(NotFoundException.class, () -> service.addCamp("me", othersList, 100568L));
         assertThrows(NotFoundException.class, () -> service.compare("me", othersList));
     }
 
     @Test
     void 없는_캠핑장은_담을_수_없고_같은_캠핑장은_한_번만_담긴다() {
         Long id = defaultListId("me");
-        assertThrows(NotFoundException.class, () -> service.addCamp("me", id, "c1")); // 예전 더미 id 도 이제 없는 캠핑장
+        assertThrows(NotFoundException.class, () -> service.addCamp("me", id, 999L)); // camp 테이블에 없는 캠핑장
 
-        service.addCamp("me", id, "100568");
-        service.addCamp("me", id, "100568");
+        service.addCamp("me", id, 100568L);
+        service.addCamp("me", id, 100568L);
         assertEquals(1, service.findLists("me").get(0).campCount());
     }
 
@@ -166,19 +166,19 @@ class SavedServiceTest {
         FavoritesResponse empty = service.favorites("me"); // 처음이면 기본 목록을 만든다
         assertEquals(List.of(), empty.campIds());
 
-        service.addCamp("me", empty.listId(), "100568");
-        service.addCamp("me", empty.listId(), "8175");
+        service.addCamp("me", empty.listId(), 100568L);
+        service.addCamp("me", empty.listId(), 8175L);
         FavoritesResponse result = service.favorites("me");
         assertEquals(empty.listId(), result.listId());
-        assertEquals(List.of("100568", "8175"), result.campIds());
+        assertEquals(List.of(100568L, 8175L), result.campIds());
     }
 
     @Test
     void 비교표는_실제_값으로_가장_좋은_곳을_표시하고_빈_값은_확인_필요() {
         Long id = defaultListId("me");
-        service.addCamp("me", id, "100568");
-        service.addCamp("me", id, "101137");
-        service.addCamp("me", id, "8175");
+        service.addCamp("me", id, 100568L);
+        service.addCamp("me", id, 101137L);
+        service.addCamp("me", id, 8175L);
 
         CompareResponse result = service.compare("me", id);
         assertEquals(3, result.totalCount());
@@ -205,26 +205,25 @@ class SavedServiceTest {
     }
 
     @Test
-    void 비교는_camp_테이블에_있는_캠핑장만_앞의_3곳까지() {
+    void 비교는_담은_순서대로_앞의_3곳까지() {
         Long id = defaultListId("me");
-        camps.add(new String[] {id.toString(), "c1"}); // 예전에 담아 둔 더미 id (camp 테이블에 없음)
-        service.addCamp("me", id, "100568");
-        service.addCamp("me", id, "101137");
-        campTable.put("3383", camp("3383", "하추자연휴양림 야영장", 52, 25, 9, true, false));
-        campTable.put("100886", camp("100886", "햇살글램핑", 76, 12, 7, false, false));
-        service.addCamp("me", id, "3383");
-        service.addCamp("me", id, "100886");
+        service.addCamp("me", id, 100568L);
+        service.addCamp("me", id, 101137L);
+        campTable.put(3383L, camp(3383L, "하추자연휴양림 야영장", 52, 25, 9, true, false));
+        campTable.put(100886L, camp(100886L, "햇살글램핑", 76, 12, 7, false, false));
+        service.addCamp("me", id, 3383L);
+        service.addCamp("me", id, 100886L);
 
         CompareResponse result = service.compare("me", id);
-        assertEquals(4, result.totalCount()); // c1 은 세지 않는다
-        assertEquals(List.of("100568", "101137", "3383"),
+        assertEquals(4, result.totalCount());
+        assertEquals(List.of(100568L, 101137L, 3383L),
                 result.camps().stream().map(CompareResponse.Camp::id).toList());
     }
 
     @Test
     void 캠핑장이_한_곳이면_가장_좋은_값을_표시하지_않는다() {
         Long id = defaultListId("me");
-        service.addCamp("me", id, "100568");
+        service.addCamp("me", id, 100568L);
 
         CompareResponse result = service.compare("me", id);
         assertFalse(result.rows().stream().flatMap(r -> r.cells().stream()).anyMatch(CompareResponse.Cell::best));

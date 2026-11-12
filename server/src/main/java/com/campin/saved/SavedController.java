@@ -57,7 +57,7 @@ public class SavedController {
         return ApiResponse.ok(null);
     }
 
-    // 하트 상태: GET /api/saved/favorites → {"listId": 3, "campIds": ["100568", ...]} ('관심 캠핑장' 기본 목록)
+    // 하트 상태: GET /api/saved/favorites → {"listId": 3, "campIds": [100568, ...]} ('관심 캠핑장' 기본 목록)
     @GetMapping("/favorites")
     public ApiResponse<FavoritesResponse> favorites(Authentication auth) {
         return ApiResponse.ok(savedService.favorites(auth.getName()));
@@ -65,14 +65,14 @@ public class SavedController {
 
     // 캠핑장 담기: POST /api/saved/lists/3/camps/100568 (이미 담겨 있어도 성공)
     @PostMapping("/lists/{listId}/camps/{campId}")
-    public ApiResponse<Void> addCamp(Authentication auth, @PathVariable Long listId, @PathVariable String campId) {
+    public ApiResponse<Void> addCamp(Authentication auth, @PathVariable Long listId, @PathVariable Long campId) {
         savedService.addCamp(auth.getName(), listId, campId);
         return ApiResponse.ok(null);
     }
 
     // 캠핑장 빼기: DELETE /api/saved/lists/3/camps/100568
     @DeleteMapping("/lists/{listId}/camps/{campId}")
-    public ApiResponse<Void> removeCamp(Authentication auth, @PathVariable Long listId, @PathVariable String campId) {
+    public ApiResponse<Void> removeCamp(Authentication auth, @PathVariable Long listId, @PathVariable Long campId) {
         savedService.removeCamp(auth.getName(), listId, campId);
         return ApiResponse.ok(null);
     }
