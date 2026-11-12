@@ -7,7 +7,7 @@ import java.util.List;
 public record CompareResponse(Long listId, String listName, int totalCount,
                               List<Camp> camps, List<Row> rows) {
 
-    public record Camp(String id, String name) {
+    public record Camp(Long id, String name) {
     }
 
     // kind: "score"(안전점수, 막대는 100점 기준) · "minutes"(시간, 막대는 가장 긴 값 기준) · "yesno"(가능/불가, 막대 없음)

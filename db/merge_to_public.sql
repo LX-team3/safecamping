@@ -12,7 +12,7 @@
 --
 -- 이 파일이 하는 일 (자세한 내용은 MERGE_CHANGELOG.md)
 --   0. 거리 계산 함수(임시) 만들기 — PostGIS 없이 위도·경도로 계산
---   1. 화면 테이블의 더미 데이터 지우기 (camp · facility · tour 와 거기 딸린 줄)
+--   1. 화면 테이블 비우기 (facility · tour 와 거기 딸린 줄. camp 는 지우지 않고 3 단계에서 덮어쓴다)
 --   2. facility.type 허용 값에 pharmacy(약국) 추가, 원본 id 를 기록할 source_id 칸 추가
 --   3. 캠핑장 23곳 옮기기       camps      → camp
 --   4. 안전시설 옮기기          facilities → facility (응급실·소방서·경찰서·편의점)
@@ -53,7 +53,10 @@ RETURNS varchar LANGUAGE sql IMMUTABLE AS $$
 $$;
 
 -- ---------------------------------------------------------------------
--- 1. 더미 데이터 지우기
+-- 1. 화면 테이블 비우기 (다시 채우기 전에)
+--    camp 는 지우지 않는다 (2026-11-12 변경): 회원 데이터 saved_camp · camp_plan 이 외래키로 camp.id 를 가리키므로
+--    지우면 에러가 나거나(외래키) 회원이 저장한 캠핑장이 사라진다 → 3 단계에서 같은 id 를 덮어쓴다(UPSERT)
+--    facility · tour 는 회원 데이터가 가리키지 않아서 지우고 새로 채운다 (그래서 id 가 바뀔 수 있다)
 -- ---------------------------------------------------------------------
 DELETE FROM place_info WHERE place_type = 'camp'     AND place_id IN (SELECT id FROM camp);
 DELETE FROM place_note WHERE place_type = 'camp'     AND place_id IN (SELECT id FROM camp);
@@ -63,7 +66,6 @@ DELETE FROM place_info WHERE place_type = 'tour'     AND place_id IN (SELECT id 
 DELETE FROM place_note WHERE place_type = 'tour'     AND place_id IN (SELECT id FROM tour);
 DELETE FROM camp_facility;
 DELETE FROM camp_tour;
-DELETE FROM camp;
 DELETE FROM facility;
 DELETE FROM tour;
 
@@ -83,7 +85,15 @@ ALTER TABLE tour     ADD COLUMN IF NOT EXISTS source_id varchar(20);  -- raw.spo
 -- ---------------------------------------------------------------------
 -- 3. 캠핑장 23곳: raw.camps → camp
 --    id 는 고캠핑 번호(content_id)를 그대로 쓴다 (예: 101289) → 원본과 바로 맞춰 볼 수 있다
+--    UPSERT: 이미 있는 id 면 값만 새로 덮어쓰고(ON CONFLICT … DO UPDATE), 없으면 새로 넣는다
+--            → 다시 돌려도 id 가 그대로라 회원이 저장한 캠핑장·일정이 유지된다
 -- ---------------------------------------------------------------------
+-- 3-1. 원본에서 빠진 캠핑장만 지운다 (예전 더미 캠핑장 포함)
+--      회원이 저장·일정 등록한 캠핑장이면 외래키 때문에 여기서 에러 → 전체 취소. 그 회원 데이터를 먼저 정리할지 정한다
+DELETE FROM camp
+ WHERE id NOT IN (SELECT content_id::bigint FROM raw.camps WHERE address LIKE '%인제군%');
+
+-- 3-2. 넣거나 덮어쓰기
 INSERT INTO camp (id, source_id, name, sido, sigungu, eupmyeon, camp_type, lat, lng,
                   safety_score, er_drive_min, image_url, reservation_url, is_dummy)
 SELECT c.content_id::bigint,
@@ -101,7 +111,21 @@ SELECT c.content_id::bigint,
        CASE WHEN c.homepage ~* '^https?://' AND length(c.homepage) <= 300 THEN c.homepage END,  -- '전화예약' 같은 글자는 뺀다
        false
   FROM raw.camps c
- WHERE c.address LIKE '%인제군%';
+ WHERE c.address LIKE '%인제군%'
+ON CONFLICT (id) DO UPDATE SET            -- EXCLUDED = 방금 넣으려던 값
+    source_id       = EXCLUDED.source_id,
+    name            = EXCLUDED.name,
+    sido            = EXCLUDED.sido,
+    sigungu         = EXCLUDED.sigungu,
+    eupmyeon        = EXCLUDED.eupmyeon,
+    camp_type       = EXCLUDED.camp_type,
+    lat             = EXCLUDED.lat,
+    lng             = EXCLUDED.lng,
+    safety_score    = EXCLUDED.safety_score,     -- NULL 로 비웠다가 8 단계에서 다시 계산
+    er_drive_min    = EXCLUDED.er_drive_min,
+    image_url       = EXCLUDED.image_url,
+    reservation_url = EXCLUDED.reservation_url,
+    is_dummy        = EXCLUDED.is_dummy;
 
 -- ---------------------------------------------------------------------
 -- 4. 안전시설: raw.facilities → facility
