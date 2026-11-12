@@ -16,6 +16,14 @@
 - 불리언은 `is_`/`has_`로 시작 (예: `is_open`)
 - 외래키 컬럼은 `참조테이블_id` 형태 (예: `camp_id`)
 
+## 스키마 나누기 (2026-11-12, `schema_03.sql`)
+- `raw` — 공공데이터 원본 (`camps` · `facilities` · `spot` · `score_weights` · `er_detail`). **읽기만 한다**
+- `public` — 서버가 읽는 화면용 테이블 + 회원 데이터
+- 화면용(`camp` · `facility` · `tour` · `camp_facility` · `camp_tour` · `place_info` · `place_note`)은 `merge_to_public.sql` 이 raw 에서 만든다
+- 값이 틀리면: 원본·화면용을 직접 `UPDATE` 하지 말고 `merge_to_public.sql` 안에서 보정한다 (직접 고치면 다음 merge 때 사라짐)
+- 회원 데이터(`member` · `saved_*` · `camp_plan` · `family_*` 등)만 직접 고친다
+- 서버 SQL 에서 원본을 읽을 때는 `raw.camps` 처럼 스키마를 꼭 붙인다 (접속 기본 스키마가 public)
+
 ## 테이블 설계 기본
 
 - 더미 데이터는 실제 데이터와 구분할 수 있게 넣는다 (안전 수치 규칙은 루트 CLAUDE.md)
