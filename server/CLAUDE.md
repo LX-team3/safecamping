@@ -70,7 +70,7 @@ mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테�
 | `GET /api/alerts?sido=` · `?lat=&lon=` | 알림 (기상특보 = 기상청 실제, 못 받으면 더미 `warningDummy: true` / 재난문자 = 더미 `disasterDummy: true`). 지역 → 위치(가장 가까운 시·도) → 없으면 전국. `{ warningDummy, disasterDummy, sido, regions, activeWarnings, todayDisasterCount, items: [{ kind: warning·disaster, area, category, message, issuedAt, active }] }`. 로그인 없이 됨 |
 | `GET /api/saved/lists` | 내 저장 목록 (`관심 캠핑장` 기본 목록이 없으면 만들어 줌). 이하 `/api/saved/**` 전부 로그인 필요 |
 | `POST /api/saved/lists` · `PATCH`·`DELETE /api/saved/lists/{id}` | 목록 만들기 `{ name }`·이름 바꾸기·삭제 (기본 목록은 바꾸기·삭제 불가 400) |
-| `POST`·`DELETE /api/saved/lists/{id}/camps/{campId}` | 캠핑장 담기·빼기 (지금 campId 는 더미 `c1`~`c3`) |
+| `POST`·`DELETE /api/saved/lists/{id}/camps/{campId}` | 캠핑장 담기·빼기 (campId 는 `camp.id` 숫자, 예: 100568. 없는 캠핑장은 404) |
 | `GET /api/saved/lists/{id}/compare` | 목록 앞의 3곳 비교 (더미, `dummy: true`). `rows: [{ label, kind: score·minutes·yesno, bestLabel, cells: [{ text, value, best }] }]` — value 는 막대 길이용 숫자(막대 없으면 null). 남의 목록 id 는 404 |
 | `GET /api/family/room` | 내 가족방 (없으면 `data: null`). 이하 `/api/family/**` 전부 로그인 필요. 한 사람당 방 하나라 주소에 방 번호를 넣지 않는다 |
 | `POST /api/family/room` · `POST /api/family/room/join` | 가족방 만들기 `{ name }` → 201 / 초대코드로 들어가기 `{ inviteCode }` (이미 방이 있으면 400) |

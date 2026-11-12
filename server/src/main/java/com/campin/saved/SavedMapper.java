@@ -42,9 +42,9 @@ public interface SavedMapper {
     @Select("SELECT id FROM saved_list WHERE member_id = #{memberId} AND is_default")
     Long findDefaultListId(@Param("memberId") Long memberId);
 
-    // camp 테이블에 있는 캠핑장인지. saved_camp.camp_id 가 글자 칸이라 camp.id 도 글자로 바꿔 비교한다 (숫자가 아닌 값이 와도 오류 없이 false)
-    @Select("SELECT EXISTS (SELECT 1 FROM camp WHERE id::text = #{campId})")
-    boolean existsCamp(@Param("campId") String campId);
+    // camp 테이블에 있는 캠핑장인지 (없는 캠핑장이면 서비스에서 404 로 알려 준다. DB 외래키도 한 번 더 막는다)
+    @Select("SELECT EXISTS (SELECT 1 FROM camp WHERE id = #{campId})")
+    boolean existsCamp(@Param("campId") Long campId);
 
     @Select("SELECT EXISTS (SELECT 1 FROM saved_list WHERE member_id = #{memberId} AND name = #{name})")
     boolean existsListName(@Param("memberId") Long memberId, @Param("name") String name);
@@ -72,9 +72,9 @@ public interface SavedMapper {
 
     // 담은 순서대로
     @Select("SELECT camp_id FROM saved_camp WHERE saved_list_id = #{listId} ORDER BY created_at, id")
-    List<String> findCampIds(@Param("listId") Long listId);
+    List<Long> findCampIds(@Param("listId") Long listId);
 
-    // 비교 표 값. 담은 순서대로, camp 테이블에 있는 캠핑장만 (예전 더미 id 'c1' 등은 빠진다)
+    // 비교 표 값. 담은 순서대로 (saved_camp.camp_id 는 camp.id 외래키라 항상 camp 에 있다 — db/schema_04.sql)
     // 소방서까지 시간은 camp_facility(캠핑장별 가까운 시설), 전기·반려동물은 원본 raw.camps 를 source_id 로 잇는다
     // 원본은 raw 스키마에 있다 (db/schema_03.sql 2단계). 접속 기본 스키마가 public 이라 raw. 를 꼭 붙인다
     @Select("""
@@ -84,7 +84,7 @@ public interface SavedMapper {
                      WHERE cf.camp_id = c.id AND f.type = 'fire') AS fireMinutes,
                    src.has_electricity AS hasPower, src.pet_allowed AS allowsPet
               FROM saved_camp sc
-              JOIN camp c ON c.id::text = sc.camp_id
+              JOIN camp c ON c.id = sc.camp_id
               LEFT JOIN raw.camps src ON src.content_id = c.source_id
              WHERE sc.saved_list_id = #{listId}
              ORDER BY sc.created_at, sc.id
@@ -96,8 +96,8 @@ public interface SavedMapper {
             INSERT INTO saved_camp (saved_list_id, camp_id) VALUES (#{listId}, #{campId})
             ON CONFLICT (saved_list_id, camp_id) DO NOTHING
             """)
-    int insertCamp(@Param("listId") Long listId, @Param("campId") String campId);
+    int insertCamp(@Param("listId") Long listId, @Param("campId") Long campId);
 
     @Delete("DELETE FROM saved_camp WHERE saved_list_id = #{listId} AND camp_id = #{campId}")
-    int deleteCamp(@Param("listId") Long listId, @Param("campId") String campId);
+    int deleteCamp(@Param("listId") Long listId, @Param("campId") Long campId);
 }

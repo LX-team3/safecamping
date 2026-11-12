@@ -74,7 +74,7 @@ public class SavedService {
         savedMapper.deleteList(memberId, listId);
     }
 
-    public void addCamp(String loginId, Long listId, String campId) {
+    public void addCamp(String loginId, Long listId, Long campId) {
         SavedList list = findOwnList(memberId(loginId), listId);
         if (!savedMapper.existsCamp(campId)) {
             throw new NotFoundException("캠핑장을 찾을 수 없습니다.");
@@ -82,7 +82,7 @@ public class SavedService {
         savedMapper.insertCamp(list.getId(), campId);
     }
 
-    public void removeCamp(String loginId, Long listId, String campId) {
+    public void removeCamp(String loginId, Long listId, Long campId) {
         SavedList list = findOwnList(memberId(loginId), listId);
         savedMapper.deleteCamp(list.getId(), campId);
     }
@@ -95,7 +95,7 @@ public class SavedService {
         return new FavoritesResponse(listId, savedMapper.findCampIds(listId));
     }
 
-    // 목록에 담긴 캠핑장 중 앞의 3곳을 비교한다. 값은 DB(camp · camp_facility · camps)의 실제 데이터
+    // 목록에 담긴 캠핑장 중 앞의 3곳을 비교한다. 값은 DB(camp · camp_facility · raw.camps)의 실제 데이터
     // 대피소는 아직 데이터가 없어 "확인 필요"로만 보여 준다
     public CompareResponse compare(String loginId, Long listId) {
         SavedList list = findOwnList(memberId(loginId), listId);
