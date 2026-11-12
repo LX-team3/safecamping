@@ -75,7 +75,8 @@ public interface SavedMapper {
     List<String> findCampIds(@Param("listId") Long listId);
 
     // 비교 표 값. 담은 순서대로, camp 테이블에 있는 캠핑장만 (예전 더미 id 'c1' 등은 빠진다)
-    // 소방서까지 시간은 camp_facility(캠핑장별 가까운 시설), 전기·반려동물은 원본 camps 를 source_id 로 잇는다
+    // 소방서까지 시간은 camp_facility(캠핑장별 가까운 시설), 전기·반려동물은 원본 raw.camps 를 source_id 로 잇는다
+    // 원본은 raw 스키마에 있다 (db/schema_03.sql 2단계). 접속 기본 스키마가 public 이라 raw. 를 꼭 붙인다
     @Select("""
             SELECT sc.camp_id AS id, c.name, c.safety_score AS safetyScore, c.er_drive_min AS erMinutes,
                    (SELECT min(cf.drive_min)
@@ -84,7 +85,7 @@ public interface SavedMapper {
                    src.has_electricity AS hasPower, src.pet_allowed AS allowsPet
               FROM saved_camp sc
               JOIN camp c ON c.id::text = sc.camp_id
-              LEFT JOIN camps src ON src.content_id = c.source_id
+              LEFT JOIN raw.camps src ON src.content_id = c.source_id
              WHERE sc.saved_list_id = #{listId}
              ORDER BY sc.created_at, sc.id
             """)

@@ -1,11 +1,12 @@
 -- =====================================================================
--- campin 원본 테이블(복수형) → 서버 화면 테이블(단수형) 채우기  — 모두 public 스키마 안에서
--- 작성: 2026-11-09
+-- campin 원본 테이블(raw 스키마) → 서버 화면 테이블(public 스키마) 채우기
+-- 작성: 2026-11-09 / 2026-11-12 원본을 public → raw 스키마로 옮김 (schema_03.sql 2단계)
 --
 -- 실행 전 준비
---   1) public 스키마에 아래가 모두 있어야 한다 (이 순서로 실행)
+--   1) 아래가 모두 있어야 한다 (이 순서로 실행)
 --        campin 덤프(01_schema.sql, 02_data.sql) — camps · facilities · spot · score_weights · er_detail
 --        schema.sql → schema_02.sql → data_region.sql (data_camp.sql · data_detail.sql 더미는 돌리지 않아도 됨)
+--        schema_03.sql — 위 원본 5개를 raw 스키마로 옮긴다 (이 파일은 raw.camps 처럼 raw 에서 읽는다)
 --   2) pgAdmin 이면 이 파일 전체를 한 번에 실행한다 (Ctrl+A → F5)
 --   3) 먼저 테스트용 DB 에서 돌려 보고, 문제없으면 공용 DB 에 넣는다
 --
@@ -75,12 +76,12 @@ ALTER TABLE facility ADD  CONSTRAINT facility_type_check
     CHECK (type IN ('er', 'fire', 'police', 'store', 'pharmacy', 'toilet'));
 
 -- 원본(public) id 를 남겨 두는 칸. 나중에 원본이 바뀌면 이 칸으로 찾아 다시 맞출 수 있다
-ALTER TABLE camp     ADD COLUMN IF NOT EXISTS source_id varchar(20);  -- public.camps.content_id
-ALTER TABLE facility ADD COLUMN IF NOT EXISTS source_id varchar(60);  -- public.facilities.id
-ALTER TABLE tour     ADD COLUMN IF NOT EXISTS source_id varchar(20);  -- public.spot.spot_id
+ALTER TABLE camp     ADD COLUMN IF NOT EXISTS source_id varchar(20);  -- raw.camps.content_id
+ALTER TABLE facility ADD COLUMN IF NOT EXISTS source_id varchar(60);  -- raw.facilities.id
+ALTER TABLE tour     ADD COLUMN IF NOT EXISTS source_id varchar(20);  -- raw.spot.spot_id
 
 -- ---------------------------------------------------------------------
--- 3. 캠핑장 23곳: public.camps → camp
+-- 3. 캠핑장 23곳: raw.camps → camp
 --    id 는 고캠핑 번호(content_id)를 그대로 쓴다 (예: 101289) → 원본과 바로 맞춰 볼 수 있다
 -- ---------------------------------------------------------------------
 INSERT INTO camp (id, source_id, name, sido, sigungu, eupmyeon, camp_type, lat, lng,
@@ -99,13 +100,13 @@ SELECT c.content_id::bigint,
              AND length(c.image_url) <= 300 THEN c.image_url END,    -- 블로그 글 주소는 사진이 아니라 뺀다
        CASE WHEN c.homepage ~* '^https?://' AND length(c.homepage) <= 300 THEN c.homepage END,  -- '전화예약' 같은 글자는 뺀다
        false
-  FROM public.camps c
+  FROM raw.camps c
  WHERE c.address LIKE '%인제군%';
 
 -- ---------------------------------------------------------------------
--- 4. 안전시설: public.facilities → facility
+-- 4. 안전시설: raw.facilities → facility
 --    화면(캠핑장 상세 · 시설 상세)에 보여 줄 응급실·소방서·경찰서·편의점만 옮긴다
---    보안등·CCTV 는 옮기지 않는다 → 안전점수 계산(8 단계)에서 public.facilities 를 직접 읽는다
+--    보안등·CCTV 는 옮기지 않는다 → 안전점수 계산(8 단계)에서 raw.facilities 를 직접 읽는다
 -- ---------------------------------------------------------------------
 INSERT INTO facility (source_id, type, name, sido, sigungu, eupmyeon, address, phone, hours, lat, lng, is_dummy)
 SELECT f.id,
@@ -120,7 +121,7 @@ SELECT f.id,
        round(f.lat::numeric, 6),
        round(f.lng::numeric, 6),
        false
-  FROM public.facilities f
+  FROM raw.facilities f
   JOIN (VALUES ('51110', '춘천시'), ('51130', '원주시'), ('51150', '강릉시'), ('51170', '동해시'),
                ('51190', '태백시'), ('51210', '속초시'), ('51230', '삼척시'), ('51720', '홍천군'),
                ('51730', '횡성군'), ('51750', '영월군'), ('51760', '평창군'), ('51770', '정선군'),
@@ -132,7 +133,7 @@ SELECT f.id,
    AND f.lat IS NOT NULL;
 
 -- ---------------------------------------------------------------------
--- 5. 관광지: public.spot → tour (spot 이 있는 만큼, 덤프 기준 26곳)
+-- 5. 관광지: raw.spot → tour (spot 이 있는 만큼, 덤프 기준 26곳)
 --    spot.themes 표기가 DB 마다 달라서(예: 덤프 '트레킹' / 공용 DB '산행·트레킹', '숲·호수 산책')
 --    값이 정확히 같은지가 아니라 "키워드가 들어 있는지"로 고른다. 여러 개가 맞으면 prio 가 작은 것 하나
 --    category · nature 는 서버 TourPreferenceOptions 의 code 만 쓴다
@@ -155,7 +156,7 @@ SELECT DISTINCT ON (s.spot_id)
        round(s.latitude, 6),
        round(s.longitude, 6),
        false
-  FROM public.spot s
+  FROM raw.spot s
   JOIN (VALUES
         ( 1, '박물관',   'culture',  '문화 · 전시',      NULL),
         ( 2, '미술관',   'culture',  '문화 · 전시',      NULL),
@@ -218,17 +219,17 @@ SELECT camp_id, tour_id, pg_temp.drive_min(d), NULL, false
 --    점수 = (받은 가중치 합 ÷ 데이터가 있는 종류의 가중치 합) × 100
 --      → 데이터가 하나도 없는 종류(지금은 약국)는 계산에서 빼고 100점 만점으로 환산
 --    쓰는 시설: 운영 중(is_active)이고 좌표가 있는 것. CCTV 는 방범용(role='safety')만
---    public.facilities 를 직접 읽으므로 보안등·CCTV 도 들어간다
+--    raw.facilities 를 직접 읽으므로 보안등·CCTV 도 들어간다
 -- ---------------------------------------------------------------------
 WITH src AS (
     SELECT type, lat, lng
-      FROM public.facilities
+      FROM raw.facilities
      WHERE is_active AND lat IS NOT NULL
-       AND type IN (SELECT facility_type FROM public.score_weights)
+       AND type IN (SELECT facility_type FROM raw.score_weights)
        AND NOT (type = 'cctv' AND role <> 'safety')
 ),
 w AS (   -- 데이터가 실제로 있는 종류만
-    SELECT sw.* FROM public.score_weights sw
+    SELECT sw.* FROM raw.score_weights sw
      WHERE EXISTS (SELECT 1 FROM src WHERE src.type = sw.facility_type)
 ),
 nearest AS (
@@ -261,7 +262,7 @@ UPDATE camp c
 -- 9-1. 캠핑장 정보 줄
 INSERT INTO place_info (place_type, place_id, sort_order, label, value)
 SELECT 'camp', c.content_id::bigint, v.sort_order, v.label, left(v.value, 200)
-  FROM public.camps c
+  FROM raw.camps c
  CROSS JOIN LATERAL (VALUES
         (1, '주소',     c.address),
         (2, '전화',     CASE WHEN c.tel ~ '^507-' THEN '0' || c.tel ELSE c.tel END),  -- 앞자리 0 빠진 번호 바로잡기
@@ -282,15 +283,15 @@ SELECT 'camp', id, row_number() OVER (PARTITION BY id ORDER BY ord), level, body
   FROM (
         SELECT content_id::bigint AS id, 1 AS ord, 'danger' AS level,
                '지금은 휴장 중이에요. 가기 전에 꼭 전화로 확인하세요.' AS body
-          FROM public.camps WHERE status = '휴장'
+          FROM raw.camps WHERE status = '휴장'
         UNION ALL
         SELECT content_id::bigint, 2, 'caution',
                '일산화탄소 경보기가 확인되지 않았어요. 텐트 안 난방을 한다면 개인 경보기를 꼭 챙기세요.'
-          FROM public.camps WHERE has_co_alarm IS DISTINCT FROM true
+          FROM raw.camps WHERE has_co_alarm IS DISTINCT FROM true
         UNION ALL
         SELECT content_id::bigint, 3, 'safe',
                '일산화탄소 경보기가 있는 캠핑장이에요.'
-          FROM public.camps WHERE has_co_alarm
+          FROM raw.camps WHERE has_co_alarm
        ) n
  WHERE EXISTS (SELECT 1 FROM camp WHERE camp.id = n.id);
 
@@ -298,10 +299,10 @@ SELECT 'camp', id, row_number() OVER (PARTITION BY id ORDER BY ord), level, body
 INSERT INTO place_info (place_type, place_id, sort_order, label, value)
 SELECT 'facility', f.id, v.sort_order, v.label, v.value
   FROM facility f
-  LEFT JOIN public.er_detail e ON e.id = f.source_id
+  LEFT JOIN raw.er_detail e ON e.id = f.source_id
  CROSS JOIN LATERAL (VALUES
         (1, '운영', f.hours),
-        (2, '구분', (SELECT pf.category FROM public.facilities pf WHERE pf.id = f.source_id)),
+        (2, '구분', (SELECT pf.category FROM raw.facilities pf WHERE pf.id = f.source_id)),
         (3, '진료', CASE WHEN f.type = 'er' THEN coalesce(e.er_note, '소아 진료 여부 확인 필요') END)
        ) AS v (sort_order, label, value)
  WHERE v.sort_order <> 3 OR f.type = 'er';
@@ -316,7 +317,7 @@ SELECT 'facility', id, 1, 'danger',
 INSERT INTO place_info (place_type, place_id, sort_order, label, value)
 SELECT 'tour', t.id, v.sort_order, v.label, nullif(left(v.value, 200), '')
   FROM tour t
-  JOIN public.spot s ON s.spot_id::text = t.source_id
+  JOIN raw.spot s ON s.spot_id::text = t.source_id
  CROSS JOIN LATERAL (VALUES
         (1, '운영', s.open_hours),
         (2, '휴무', s.closed_days),
@@ -329,7 +330,7 @@ SELECT 'tour', t.id, v.sort_order, v.label, nullif(left(v.value, 200), '')
 INSERT INTO place_note (place_type, place_id, sort_order, level, body)
 SELECT 'tour', t.id, 1, 'caution', left(s.safety_info, 200)
   FROM tour t
-  JOIN public.spot s ON s.spot_id::text = t.source_id
+  JOIN raw.spot s ON s.spot_id::text = t.source_id
  WHERE nullif(trim(s.safety_info), '') IS NOT NULL;
 
 -- ---------------------------------------------------------------------

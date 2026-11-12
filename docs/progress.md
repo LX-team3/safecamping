@@ -1,5 +1,24 @@
 # 진행 상황
 
+## 2026-11-12 DB 정리 1단계: 쓰지 않는 백업 테이블 삭제 (브랜치 `db-cleanup`)
+- 새 파일 `db/schema_03.sql`: `facilities_backup`(9,586줄) · `bak1109_*` 7개를 `DROP` (사용자 승인). 서버 코드·`merge_to_public.sql` 어디서도 읽지 않는 백업
+- 지우지 않은 것: 원본 `camps`·`facilities`·`spot`·`score_weights`·`er_detail` — 서버가 직접 안 읽어도 `merge_to_public.sql` 의 재료
+- 되돌리기: 2026-11-11 공유 DB 덤프(`campin.dump`)에 그대로 있음 (`pg_restore -t 테이블이름`)
+- 확인: 로컬 DB(`campin_local`)에서 pgAdmin 으로 실행 성공
+- 확인 못 함: 서버를 켜서 화면이 그대로 나오는지 (지운 테이블을 읽는 코드가 없어 영향 없을 것으로 봄)
+- 아직: 공유 DB 반영 안 함 — 팀에 알리고 백업 덤프를 뜬 뒤 실행
+- 다음 단계: `saved_camp.camp_id` 숫자 타입 + 외래키 (분석은 노션 "campin DB 정리·최적화 분석")
+
+## 2026-11-12 DB 정리 2단계: 원본 테이블을 raw 스키마로 분리 (브랜치 `db-cleanup`)
+- `db/schema_03.sql` 2단계: `camps`·`facilities`·`spot`·`score_weights`·`er_detail` → `raw` 스키마 (`ALTER TABLE … SET SCHEMA`, 데이터·인덱스 그대로). teamuser 가 있으면 `raw` 읽기 권한 부여
+- 왜: 원본 `camps` / 화면용 `camp` 처럼 한 글자 차이라 헷갈림 → `raw.camps` / `public.camp`
+- 함께 바꾼 코드: `merge_to_public.sql`(`public.camps` → `raw.camps` 등 전부), `saved/SavedMapper` 비교 SQL(`raw.camps`), `dbtest/TestMapper`(`raw.er_detail`)
+- 규칙 문서: `db/CLAUDE.md` 에 "스키마 나누기" (raw 는 읽기만, 값 보정은 merge 안에서, 회원 데이터만 직접 수정)
+- 새 DB 를 처음부터 만들 때 순서가 바뀜: 원본 덤프 → schema.sql → schema_02.sql → **schema_03.sql → merge_to_public.sql**
+- 확인: `mvnw test` 통과, 로컬 DB(`campin_local`)에서 schema_03.sql 전체 실행 → `raw` 에 5개 확인
+- 확인 못 함: 비교 화면(전기·반려동물 칸)이 그대로 나오는지, merge 를 raw 에서 다시 돌려 보기
+- 아직: 공유 DB 반영 안 함
+
 ## 2026-11-09 알림: 재난문자를 행정안전부 긴급재난문자 API 로
 - 서버: `alert/SafetyDataDisasterClient` (재난안전데이터 공유플랫폼 `DSSP-IF-00247`) + `DisasterMessageParser` + `DisasterSource` 인터페이스. `AlertService` 가 받으면 실제, 못 받으면 지금처럼 `AlertDummyData` 예시 (`disasterDummy`)
 - 키: 환경변수 `SAFETY_DATA_KEY` (`application-local.properties` 에 넣음). **키를 신청할 때 등록한 IP 에서만 불린다** — 다른 IP 면 `resultCode 32` → 예시로 대신. 발표 장소 IP 도 미리 등록 필요
