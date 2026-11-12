@@ -14,9 +14,10 @@ public interface TestMapper {
     @Select("select now()")
     String now();
 
-    @Select("select count(*) from er_detail")
+    // er_detail 은 원본이라 raw 스키마에 있다 (db/schema_03.sql 2단계)
+    @Select("select count(*) from raw.er_detail")
     int countErDetail();
 
-    @Select("select * from er_detail limit 10")
+    @Select("select * from raw.er_detail limit 10")
     List<Map<String, Object>> getErDetailList();
 }
