@@ -1,5 +1,16 @@
 # 진행 상황
 
+## 2026-11-12 DB 정리 3단계: saved_camp.camp_id 숫자 + 캠핑장 외래키 (브랜치 `db-cleanup-2`)
+- 새 파일 `db/schema_04.sql`: ① camp 에 없는 캠핑장을 가리키는 `saved_camp` 줄 삭제 (더미 `c1`~`c3`, 덤프 기준 4줄) ② `saved_camp.camp_id` varchar → bigint ③ 외래키 `saved_camp.camp_id` · `camp_plan.camp_id` → `camp(id)`
+- 왜: `camp.id` 는 숫자인데 저장 칸만 글자라 `c.id::text = sc.camp_id` 로 비교(인덱스 못 씀), 외래키가 없어 없는 캠핑장도 저장됐음
+- `merge_to_public.sql`: `DELETE FROM camp` 를 없애고 camp 를 UPSERT(`ON CONFLICT (id) DO UPDATE`)로. 원본에서 빠진 캠핑장만 지움 → 다시 돌려도 회원이 저장한 캠핑장·일정 유지. 저장된 캠핑장이 원본에서 빠지면 외래키 에러로 merge 전체 취소 (일부러 막음)
+- 서버 `saved/`: campId `String` → `Long` (SavedMapper · SavedService · SavedController · CompareCamp · CompareResponse.Camp · FavoritesResponse). 응답 JSON 의 캠핑장 id 가 글자 `"100568"` → 숫자 `100568`
+- 프론트: 바꾼 것 없음 (`favorite.js` 는 숫자로 바꿔 쓰고 있었고, `CompareView` 는 id 를 키·주소에만 씀)
+- 확인: `mvnw test` 통과 (`SavedServiceTest` id 를 숫자로, 더미 `c1` 케이스 정리), 로컬 DB(`campin_local`)에서 schema_04 실행 → camp_id bigint · 외래키 2개 · saved_camp 1줄(101137)
+- 확인: 외래키가 걸린 상태에서 바뀐 merge 를 로컬에서 다시 실행 → COMMIT, 저장한 캠핑장 유지, camp 23곳 · 안전점수 23곳 다시 계산됨. 화면에서 하트로 새로 담은 줄(100568)이 숫자로 저장됨
+- 확인 못 함: 비교 화면에서 빼기 · 하트 끄기
+- 남은 것: 숫자가 아닌 campId(예: `/camps/c1`)는 지금 500 (listId 와 같은 동작). 공통 예외 처리에 400 을 넣을지 따로 정함
+
 ## 2026-11-12 DB 정리 1단계: 쓰지 않는 백업 테이블 삭제 (브랜치 `db-cleanup`)
 - 새 파일 `db/schema_03.sql`: `facilities_backup`(9,586줄) · `bak1109_*` 7개를 `DROP` (사용자 승인). 서버 코드·`merge_to_public.sql` 어디서도 읽지 않는 백업
 - 지우지 않은 것: 원본 `camps`·`facilities`·`spot`·`score_weights`·`er_detail` — 서버가 직접 안 읽어도 `merge_to_public.sql` 의 재료
