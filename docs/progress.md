@@ -30,6 +30,18 @@
 - 확인 못 함: 비교 화면(전기·반려동물 칸)이 그대로 나오는지, merge 를 raw 에서 다시 돌려 보기
 - 아직: 공유 DB 반영 안 함
 
+## 2026-11-11 안전점수: 직선거리 → 카카오 소요시간(분) 기준 (서버 일괄 계산)
+- 새 패키지 `server/.../score/`: `SafetyScoreService`(계산) · `ScoreRules`(분 기준 상수 한곳) · `ScoreMapper`(SQL) · `ScoreRunner`(`--score` 인자로 켤 때 한 번) · 모델 `ScoreCamp`·`ScoreCampFacility`·`ScoreWeight`·`ScoreNearest`
+- 방식: 캠핑장에 연결된 시설(`camp_facility`, 종류마다 직선으로 가장 가까운 1곳)까지 카카오 소요시간 → `ScoreRules.TIME` 의 분 기준으로 부분점수. 기준이 없는 종류(보안등·CCTV 등)는 예전처럼 `public.score_weights` 거리 기준. 점수 공식 모양은 `merge_to_public.sql` 8 단계와 같음
+- 저장: **DB 구조·SQL 파일·application.properties 는 그대로**. 고치는 칸은 `camp.safety_score`·`er_drive_min`, `camp_facility.drive_min` 뿐. **km(`distance_km`)는 직선거리 그대로**
+- 한 캠핑장에서 하나라도 길을 못 찾으면 그 캠핑장은 안 고침. 카카오를 아예 못 부르면(키 없음·한도) 그 자리에서 멈춤. 카카오 104(5m 이내)는 0분 → 화면 1분
+- 실행: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--score"` (환경변수 `KAKAO_REST_KEY` 필요, 별도 스레드라 서버는 요청을 그대로 받음). 인자 없이 켜면 안 돎
+- **`ScoreRules.TIME` 분 기준은 비어 있음 — 팀 결정 필요. 비어 있으면 계산하지 않음**
+- 화면: 바꾼 것 없음. 경로 지도(`RouteService`)는 지금처럼 카카오 도로거리 km 를 보여 줌 → 상세 목록(직선 km)과 다를 수 있음
+- 확인: `mvnw clean test` 통과 (99개, 새 `SafetyScoreServiceTest` 5개 포함)
+- 확인 못 함: 실제 DB·카카오로 돌려 보기 (`public.score_weights`·`public.facilities` 칸 이름은 `merge_to_public.sql` 을 보고 맞춤), 호출 수(캠핑장 수 × 연결 시설 수)가 카카오 하루 한도 안에 드는지
+- 주의: `merge_to_public.sql` 을 다시 돌리면 직선 추정값으로 돌아감 → 다시 계산
+
 ## 2026-11-09 알림: 재난문자를 행정안전부 긴급재난문자 API 로
 - 서버: `alert/SafetyDataDisasterClient` (재난안전데이터 공유플랫폼 `DSSP-IF-00247`) + `DisasterMessageParser` + `DisasterSource` 인터페이스. `AlertService` 가 받으면 실제, 못 받으면 지금처럼 `AlertDummyData` 예시 (`disasterDummy`)
 - 키: 환경변수 `SAFETY_DATA_KEY` (`application-local.properties` 에 넣음). **키를 신청할 때 등록한 IP 에서만 불린다** — 다른 IP 면 `resultCode 32` → 예시로 대신. 발표 장소 IP 도 미리 등록 필요

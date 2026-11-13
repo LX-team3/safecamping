@@ -13,8 +13,8 @@ public class CompareCamp {
     private Long id;              // saved_camp.camp_id (= camp.id)
     private String name;
     private Integer safetyScore;  // camp.safety_score
-    private Integer erMinutes;    // camp.er_drive_min (가장 가까운 응급실까지 차로, 추정)
-    private Integer fireMinutes;  // camp_facility 중 소방서까지 차로 (추정)
+     private Integer erMinutes;    // camp.er_drive_min (가장 가까운 응급실까지 차로. score/ 계산 전이면 직선 추정, 계산 후 카카오 시간)
+    private Integer fireMinutes;  // camp_facility 중 소방서까지 차로 (계산 전 추정 / 계산 후 카카오)
     private Boolean hasPower;     // 원본 camps.has_electricity
     private Boolean allowsPet;    // 원본 camps.pet_allowed
 }

@@ -17,7 +17,7 @@ public class RouteFacility {
     private String name;
     private double lat;
     private double lng;
-    private double distanceKm;
-    private int driveMin;
+    private double distanceKm; 
+    private int driveMin; // (distanceKm 는 직선거리. driveMin 은 score/SafetyScoreService 를 돌린 뒤면 카카오 시간, 그 전이면 직선 추정)
     private boolean dummy;    // 시설 좌표가 더미면 true → 화면에 "예시 위치 기준"
 }
