@@ -33,6 +33,7 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 route/    # 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (카카오모빌리티 길찾기, 키는 환경변수 KAKAO_REST_KEY). DirectionsSource = 테스트용 인터페이스
 nearby/   # 내 주변 탭 (내 위치 → 가장 가까운 캠핑장 기준 안전점수·시설). 레이어 목록은 NearbyLayer 한곳
 mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개
+score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 분 기준은 ScoreRules.TIME 한곳 (없는 종류 보안등·CCTV 는 public.score_weights 거리 기준). 실행: 서버를 --score 인자로 켤 때 한 번
 ```
 
 ## 상세 의존성 목록
