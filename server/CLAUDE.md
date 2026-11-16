@@ -33,6 +33,7 @@ dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본�
 route/    # 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (카카오모빌리티 길찾기, 키는 환경변수 KAKAO_REST_KEY). DirectionsSource = 테스트용 인터페이스
 nearby/   # 내 주변 탭 (내 위치 → 가장 가까운 캠핑장 기준 안전점수·시설). 레이어 목록은 NearbyLayer 한곳
 mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개
+chabak/   # 차박 판정 (지도에서 찍은 지점 → 불가·주의·제한 없음·야영 가능). 판정 규칙은 전부 DB chabak 스키마 함수(fn_verdict → fn_verdict_json)에 있고 서버는 그 JSON 을 ChabakVerdictResponse 로 옮겨 전달. 범위 인제군
 score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 분 기준은 ScoreRules.TIME 한곳 (없는 종류 보안등·CCTV 는 public.score_weights 거리 기준). 실행: 서버를 --score 인자로 켤 때 한 번
 ```
 
@@ -82,6 +83,9 @@ score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(�
 | `GET /api/camps/{id}/routes` | 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (화장실 뺌) (카카오모빌리티, 시설마다 1번씩 동시 호출, 전부 성공하면 24시간 메모리 저장). `{ source: kakao·straight, routes: [{ facilityId, type, name, ok, dummy, distanceKm, durationMin, path: [[위도, 경도], ...] }] }`. 키 없음·실패면 `ok: false` + 직선 두 점 + DB 시간. 없는 캠핑장 400. 로그인 없이 됨 |
 | `GET /api/nearby?lat=&lng=` | 내 주변 (**더미**). 시설 데이터가 있는 가장 가까운 캠핑장 기준 → `{ dummy, basis: { campId, campName, sido, sigungu, eupmyeon, lat, lng, distanceKm, far }, safetyScore, grade, facilities: [{ no, id, type, name, lat, lng, distanceKm, driveMin, tone, dummy }] }`. `far` 는 10km 초과(임시). 없으면 `basis: null`. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
 | `GET`·`POST /api/member/camp-plans` · `DELETE /api/member/camp-plans/{id}` | 내 캠핑 (캠핑장 상세 "내 캠핑에 일정 등록"). GET → 체크인 빠른 순 `[{ id, campId, campName, place, checkIn, checkOut, memo }]`. POST `{ campId, campName, place?, checkIn: "2026-11-14", checkOut, memo? }` → 201. 지난 체크인·체크아웃 ≤ 체크인·같은 캠핑장+체크인 중복 400. 남의 id 삭제 404. 로그인 필요 |
+| `GET /api/chabak/verdict?lat=&lng=` | 차박 판정 (DB 함수 `chabak.fn_verdict_json` 결과를 `ChabakVerdictResponse` 로 옮김). `{ pnu, jibun, jimok, owner, landUse, terrain, roadSide, verdict: 불가·주의·제한 없음·야영 가능, reasons[], zones[], nearBoundary, nearbyCamps: [{ name, distM }], alternatives: [{ jibun, owner, radiusM, distM, lat, lng }], parcel: GeoJSON }`. 위치 빠짐·범위 밖 400, 인제군 밖 404. 로그인 없이 됨. 공공데이터 기준 참고용 판정 |
+| `GET /api/chabak/layer?type=` | 차박 지도 위쪽 칩 레이어. `no` 불가 구역 · `caution` 주의 구역 (`chabak.regulation` 을 판정별로 **한 덩어리로 합침**(ST_Union, 20m 단순화), 주의 구역은 불가 구역과 겹친 부분을 뺌 → `geometry` GeoJSON 1개. 처음 한 번만 계산해 서버가 기억 — 규제 데이터를 바꾸면 서버 재시작) / `open` 차박 후보지 (`chabak.open_spot`, 넓은 순 1000곳까지) · `camp` 등록 야영장 (`camp`, `id` 로 상세) → `[{ id, name, lat, lng, geometry }]`. 그 밖의 type 400. PostGIS 함수는 `extensions.` 를 붙여 부른다 (공유 DB 설치 위치). 로그인 없이 됨 |
+| `GET /api/chabak/facilities?lat=&lng=` | 차박 지도 "지도에 보일 것" 레이어: 찍은 지점에서 종류별(er·fire·police·store·pharmacy) 가까운 3곳 `[{ id, type, name, lat, lng, distanceKm, dummy }]` 가까운 순. 거리는 위도·경도 어림. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
 | `GET /api/nearby/layers` | "지도에 보일 것" 안전 시설 목록 `[{ code, icon, label, desc, ready, on }]` (응급실·소방서·경찰서·편의점·약국·대피소, 공중화장실 뺌). 대피소는 `ready: false` (데이터 없음). 약국은 더미 데이터가 있어 `ready: true` |
 
 - 로그인은 Spring Security **세션 방식**. remember-me 서명 키는 환경변수 `REMEMBER_ME_KEY` (없으면 실행마다 임시 키)

@@ -6,6 +6,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
+import { applyMapType, mapType } from '@/utils/mapType'
 
 const props = defineProps({
   camps: { type: Array, default: () => [] },
@@ -29,6 +30,9 @@ let overlays = []
 let myOverlay = null
 let stopSizing = null
 
+// 지도 종류를 바꾸면 바로 적용 (세 지도가 같은 값을 봄)
+watch(mapType, () => applyMapType(kakao, map))
+
 onMounted(async () => {
   try {
     kakao = await loadKakaoMap()
@@ -46,6 +50,7 @@ onMounted(async () => {
     level: 9,
   })
   stopSizing = keepMapSized(map, el.value)
+  applyMapType(kakao, map) // 지도 설정 시트에서 고른 종류 (지도·스카이뷰)
   draw()
   fit()
 })
@@ -214,12 +219,22 @@ const fake = computed(() => {
     </div>
 
     <!-- 오른쪽 위: 레이어 + 범례 (재난 위험 레이어는 2부 예정) -->
-    <div class="top-right">
-      <button type="button" class="round" aria-label="지도에 보일 것" aria-haspopup="dialog" @click="emit('layers')">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
+    <!-- 오른쪽 위에 모은 지도 버튼: 지도 설정 · 내 위치 (모양은 전역 .map-btns · .map-btn, 차박 지도와 같음) + 등급 범례 -->
+    <div class="map-btns">
+      <button type="button" class="map-btn" aria-label="지도 설정" aria-haspopup="dialog" @click="emit('layers')">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3l9 5-9 5-9-5z" />
           <path d="M3 13l9 5 9-5" />
+        </svg>
+      </button>
+      <!-- 내 위치 (카카오 지도일 때만) — 지도 앱에서 흔히 쓰는 조준점 모양 -->
+      <button v-if="mode === 'kakao'" type="button" class="map-btn" aria-label="내 위치로" @click="locate">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="7" />
+          <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
         </svg>
       </button>
       <ul class="legend">
@@ -228,15 +243,6 @@ const fake = computed(() => {
         <li><i class="danger" />위험</li>
       </ul>
     </div>
-
-    <!-- 왼쪽 아래: 내 위치 (카카오 지도일 때만) -->
-    <button v-if="mode === 'kakao'" type="button" class="round locate" :style="{ bottom: bottomInset + 16 + 'px' }"
-      aria-label="내 위치로" @click="locate">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linejoin="round" aria-hidden="true">
-        <path d="M21 3L3 10.5l7.5 3L13.5 21z" />
-      </svg>
-    </button>
 
     <p v-if="message" class="message" role="status" :style="{ bottom: bottomInset + 80 + 'px' }">{{ message }}</p>
   </div>
@@ -258,7 +264,7 @@ const fake = computed(() => {
 }
 .fake-note {
   position: absolute;
-  top: 20px;
+  top: 72px; /* 위쪽 가운데 "캠핑장 | 차박" 토글(ExploreView) 아래 */
   left: 16px;
   font-size: 12px;
   color: var(--color-text-sub);
@@ -268,31 +274,6 @@ const fake = computed(() => {
   top: 120px;
   left: 56px;
   right: 56px;
-}
-.top-right {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  z-index: 20;
-}
-.round {
-  width: 52px;
-  height: 52px;
-  border: none;
-  border-radius: 50%;
-  background: var(--color-text);
-  color: var(--color-card);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.round:disabled {
-  cursor: default;
 }
 .legend {
   margin: 0;
@@ -323,11 +304,6 @@ const fake = computed(() => {
 }
 .legend .danger {
   background: var(--color-danger);
-}
-.locate {
-  position: absolute;
-  left: 16px;
-  z-index: 20;
 }
 .message {
   position: absolute;

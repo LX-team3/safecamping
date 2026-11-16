@@ -50,6 +50,52 @@ button {
   }
 }
 
+/* ---- 지도 위 버튼 (탐색 · 차박 지도 오른쪽 위에 세로로 모음: 지도 설정 · 내 위치) ----
+   흰 원 + 옅은 그림자 → 지도보다 튀지 않게. 44px 는 손가락으로 누르기 충분한 크기 */
+.map-btns {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.map-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-card);
+  color: var(--color-text);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.map-btn:disabled {
+  color: var(--color-text-sub);
+  cursor: default;
+}
+
+/* ---- 끌어서 올리고 내리는 아래 시트 (utils/dragSheet.js) — 차박 · 내 주변 · 탐색 ----
+   단계가 바뀔 때 부드럽게 (처음엔 빠르게, 끝에서 천천히 멈춤). 끄는 동안(.dragging)은 손가락을 바로 따라가게 끈다
+   높이가 아니라 위치(transform)만 움직인다 → 다시 배치·다시 그리기 없이 GPU 로 처리해서 끊기지 않음 */
+.drag-sheet {
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+  will-change: transform;
+}
+.drag-sheet.dragging {
+  transition: none;
+}
+.drag-handle {
+  cursor: grab;
+  touch-action: none; /* 손잡이를 끌 때 화면 전체가 스크롤되지 않게 */
+}
+
 /* ---- 지도 시설 마커 아이콘 배지 (utils/facilityIcon.js 가 만듦) ----
    카카오 지도 위에 직접 붙이는 요소라 화면 scoped style 이 안 닿는다 → 여기 전역으로 한 번만
    바탕색 = 캠핑장 안전점수 등급 (안전 초록 · 주의 주황 · 위험 빨강 · 점수 없음 회색), 아이콘은 흰색 */

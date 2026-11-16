@@ -15,6 +15,8 @@ import RegionSheet from '@/components/explore/RegionSheet.vue'
 import TripSheet from '@/components/explore/TripSheet.vue'
 import LayerSheet from '@/components/nearby/LayerSheet.vue'
 import BottomNav from '@/components/common/BottomNav.vue'
+import MapModeToggle from '@/components/common/MapModeToggle.vue'
+import { useDragSheet, useElementHeight } from '@/utils/dragSheet'
 import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
 import { api } from '@/utils/api'
 import { vHscroll } from '@/utils/hscroll'
@@ -33,7 +35,16 @@ const favorite = useFavoriteStore()
 const trip = useTripStore()
 
 // ---- 화면 상태 ----
-const sheetOpen = ref(true) // true: 목록 / false: 지도
+// 지도 위 시트: 목록(화면 전체) ↔ 지도(검색·필터만). 손잡이를 끌거나 눌러 오간다 (utils/dragSheet.js, 차박 지도와 같은 움직임)
+const stageEl = ref(null)
+const stageH = useElementHeight(stageEl, 700)
+const sheetSnaps = computed(() => ({ map: COLLAPSED, list: stageH.value }))
+const { snap: sheetSnap, dragging: sheetDragging, style: sheetStyle, events: sheetDrag } = useDragSheet(sheetSnaps, 'map') // 처음엔 지도 화면 (진단 안내 팝업도 지도 위에 뜬다)
+// true: 목록 / false: 지도 (다른 곳에서 sheetOpen = true 처럼 바꾸면 그 단계로 움직인다)
+const sheetOpen = computed({
+  get: () => sheetSnap.value === 'list',
+  set: (open) => (sheetSnap.value = open ? 'list' : 'map'),
+})
 const query = ref('') // 검색어 (이름·지역)
 const matchMine = ref(true) // "내 유형 맞춤" 켜짐
 const openSheet = ref(null) // null | 'region' | 'trip' | 'layers' — 열려 있는 아래 시트
@@ -223,14 +234,18 @@ function onMarker(id) {
 
 <template>
   <div class="explore">
-    <div class="stage">
+    <div ref="stageEl" class="stage">
       <CampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="selectedId" :bottom-inset="COLLAPSED"
         @select="onMarker" @layers="openLayers" />
+      <!-- 캠핑장 지도 ↔ 차박 지도 전환 (목록을 펼치면 시트가 덮는다) -->
+      <MapModeToggle active="camp" class="mode-toggle" />
 
       <!-- 지도 위 시트 -->
-      <section class="sheet" :class="{ open: sheetOpen }" :style="{ top: sheetOpen ? '0px' : `calc(100% - ${COLLAPSED}px)` }">
-        <button type="button" class="handle" :aria-label="sheetOpen ? '지도 보기' : '목록 보기'"
-          :aria-expanded="sheetOpen" @click="sheetOpen = !sheetOpen">
+      <section class="sheet drag-sheet" :class="{ open: sheetOpen, dragging: sheetDragging }"
+        :style="sheetStyle">
+        <!-- 손잡이를 끌어서 목록을 올리고 내린다. 누르면 목록 ↔ 지도 -->
+        <button type="button" class="handle drag-handle" :aria-label="sheetOpen ? '지도 보기' : '목록 보기'"
+          :aria-expanded="sheetOpen" v-on="sheetDrag">
           <span />
         </button>
 
@@ -265,7 +280,7 @@ function onMarker(id) {
         </div>
 
         <!-- 목록 (시트를 펼쳤을 때만 보임) -->
-        <div v-show="sheetOpen" class="list-area">
+        <div v-show="sheetOpen || sheetDragging" class="list-area">
           <div class="list-head">
             <div>
               <h1>{{ title }}</h1>
@@ -350,6 +365,12 @@ function onMarker(id) {
   flex: 1;
   overflow: hidden; /* 접힌 시트·지도가 아래 탭을 넘지 않게 */
 }
+.mode-toggle {
+  position: absolute;
+  top: 14px;
+  left: 16px; /* 왼쪽 위. 지도 버튼은 오른쪽 위에 세로로 (CampMap .map-btns) */
+  z-index: 25; /* 지도 버튼(20) 위, 아래 시트(30) 밑 */
+}
 .sheet {
   position: absolute;
   left: 0;
@@ -362,7 +383,7 @@ function onMarker(id) {
   border-radius: 20px 20px 0 0;
   background: var(--color-card);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
-  transition: top 0.25s ease;
+  /* 높이 애니메이션은 전역 .drag-sheet (styles/base.css) */
 }
 .sheet.open {
   box-shadow: none;
@@ -375,7 +396,6 @@ function onMarker(id) {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
 }
 .handle span {
   width: 44px;
