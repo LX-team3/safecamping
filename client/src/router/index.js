@@ -48,6 +48,8 @@ const router = createRouter({
     },
       // 내 주변 (지금 위치 안전점수 · 가까운 시설 · 지도 레이어). 로그인 없이도 볼 수 있다
     { path: '/nearby', name: 'nearby', component: () => import('../views/nearby/NearbyView.vue') },
+    // 재난 대피 3D 지도 (인북천 물빛테마공원 캠핑장, CesiumJS). 이 화면에 들어올 때만 Cesium 을 불러온다
+    { path: '/disaster', name: 'disaster', component: () => import('../views/disaster/DisasterMapView.vue') },
 
   ],
 })
