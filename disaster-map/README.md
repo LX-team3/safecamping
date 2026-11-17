@@ -3,8 +3,8 @@
 캠핑장 주변을 3D로 보여 주고, 강수량에 따라 물이 차오르는 범위와 대피 경로를 안내하는 화면.
 메인 기능 ③(재난 대피)의 지도 부분. 담당: 한준서
 
-> 지금은 혼자 도는 웹페이지(`app/`) 그대로 올려 둔 상태.
-> 다음 단계에서 `client/` 의 Vue 컴포넌트로 옮긴다 (cesium npm 패키지 + `onMounted`).
+> `app/` 은 원본(혼자 도는 웹페이지). 팀 앱에는 Vue 화면으로 옮겨 둠 → `client/` 의 `/disaster`
+> (`views/disaster/DisasterMapView.vue`, `components/disaster/`, `utils/disasterMap.js`, `public/disaster-map/`)
 
 ## 폴더
 ```

@@ -7,6 +7,18 @@
 - 확인: 로컬 서버(`python -m http.server`)로 열어 동작 확인 (어제까지 확인한 상태 그대로)
 - 다음: `client/` 에 Vue 컴포넌트로 옮기기 (cesium npm 패키지 추가 필요 → 라이브러리 추가라 팀 승인 후)
 
+## 2026-11-17 재난 대피 3D 지도를 client Vue 화면으로 옮김 (브랜치 `hjs-disaster-map`)
+- 새 화면 `/disaster` (`views/disaster/DisasterMapView.vue`). 라우터에 한 줄 추가, 다른 화면에서 들어가는 버튼은 아직 없음
+- 부품 `components/disaster/`: `AlertPill`(기상특보, 예시 데이터) · `RainSlider`(강수량 → 침수 단계) · `MapCompass`(돌리기·북쪽) · `EvacSheet`(대피 안내·길안내)
+- 지도 엔진 `utils/disasterMap.js`: `disaster-map/app/index.html` 의 Cesium 코드를 옮김. 화면은 reactive state 를 읽고, 버튼은 엔진 함수를 부름. 화면을 떠나면 `destroy()` 로 정리
+- 데이터 `public/disaster-map/`: `data.json`(QGIS 내보내기, 5.8MB) · `criteria.json` · 캐릭터 그림
+- **라이브러리 추가 (팀 확인 필요)**: `cesium` 1.123.0 (`/disaster` 화면에 들어갈 때만 불러옴, 빌드 크기 약 3.5MB). Cesium 작업 파일은 `scripts/copy-cesium.mjs` 가 `npm run dev/build` 전에 `public/cesium` 으로 복사 (git 제외)
+- `package.json` `overrides`: `@zip.js/zip.js` 를 2.7.x 로 고정 — 최신(2.25)은 Cesium 1.123 이 쓰는 파일이 없어 빌드가 깨짐
+- 색: 야간용 어두운 색을 `DisasterMapView.vue` 안 CSS 변수(`--dm-*`)로 둠. tokens.css 에 아직 없는 색이라 팀에서 정하면 옮김
+- 서버·DB: 바꾼 것 없음. 기상특보는 예시 데이터 그대로(서버 특보 API 연결은 다음)
+- 확인: `npm run build` 통과, `npm run dev` 로 `/disaster` 열어 지도·강수량 단계(60→130mm 높은 곳 경로 전환)·길안내 1→2단계·화면 떠날 때 정리 확인
+- 확인 못 함: 휴대폰 실기기, 서버(8080)를 켠 상태에서 다른 화면과 함께 동작
+
 ## 2026-11-12 DB 정리 3단계: saved_camp.camp_id 숫자 + 캠핑장 외래키 (브랜치 `db-cleanup-2`)
 - 새 파일 `db/schema_04.sql`: ① camp 에 없는 캠핑장을 가리키는 `saved_camp` 줄 삭제 (더미 `c1`~`c3`, 덤프 기준 4줄) ② `saved_camp.camp_id` varchar → bigint ③ 외래키 `saved_camp.camp_id` · `camp_plan.camp_id` → `camp(id)`
 - 왜: `camp.id` 는 숫자인데 저장 칸만 글자라 `c.id::text = sc.camp_id` 로 비교(인덱스 못 씀), 외래키가 없어 없는 캠핑장도 저장됐음
