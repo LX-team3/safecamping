@@ -1,0 +1,12 @@
+{
+  "설명": "강수량 → 침수 단계 기준표. 60·90mm는 기상청 호우특보 기준(3시간 강수량: 주의보 60mm 이상, 경보 90mm 이상). 120·150mm는 기상청 기준이 아니라 범람 범위(80년·100년 빈도)를 보여 주기 위해 팀이 정한 참고 단계. AI 판단이 연결되지 않았을 때 이 표로 판단합니다.",
+  "단위": "3시간 누적 강수량(mm)",
+  "max": 200,
+  "stages": [
+    { "from": 0,   "label": "안전",       "color": "#5FC795", "level": 0, "flood": 0 },
+    { "from": 60,  "label": "주의",       "color": "#F2C14E", "level": 1, "flood": 0, "alert": "주의보" },
+    { "from": 90,  "label": "강가 잠김",  "color": "#F28C3B", "level": 2, "flood": 1, "alert": "경보" },
+    { "from": 120, "label": "많이 잠김",  "color": "#EF5B4C", "level": 2, "flood": 2, "ref": true },
+    { "from": 150, "label": "넓게 잠김",  "color": "#B5172B", "level": 3, "flood": 3, "ref": true }
+  ]
+}

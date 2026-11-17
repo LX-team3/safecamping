@@ -1,5 +1,12 @@
 # 진행 상황
 
+## 2026-11-17 재난 대피 3D 지도 올림 (브랜치 `hjs-disaster-map`)
+- 새 폴더 `disaster-map/`: 인북천 물빛테마공원 캠핑장 재난 대피 3D 지도(CesiumJS) 웹앱을 그대로 올림 + QGIS 스크립트(`flood_depth.py`, `export_data.py`)
+- 기능: 강수량 슬라이더 5단계 침수 표현, 단계별 대피 경로 2종, 4단계 길안내, 캐릭터 경로 따라가기, 오프라인(PWA)
+- `client/`·`server/`·`db/` 는 바꾸지 않음
+- 확인: 로컬 서버(`python -m http.server`)로 열어 동작 확인 (어제까지 확인한 상태 그대로)
+- 다음: `client/` 에 Vue 컴포넌트로 옮기기 (cesium npm 패키지 추가 필요 → 라이브러리 추가라 팀 승인 후)
+
 ## 2026-11-12 DB 정리 3단계: saved_camp.camp_id 숫자 + 캠핑장 외래키 (브랜치 `db-cleanup-2`)
 - 새 파일 `db/schema_04.sql`: ① camp 에 없는 캠핑장을 가리키는 `saved_camp` 줄 삭제 (더미 `c1`~`c3`, 덤프 기준 4줄) ② `saved_camp.camp_id` varchar → bigint ③ 외래키 `saved_camp.camp_id` · `camp_plan.camp_id` → `camp(id)`
 - 왜: `camp.id` 는 숫자인데 저장 칸만 글자라 `c.id::text = sc.camp_id` 로 비교(인덱스 못 씀), 외래키가 없어 없는 캠핑장도 저장됐음
