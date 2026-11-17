@@ -34,6 +34,8 @@
   /* 경로 지도의 길 선 (형광 파랑). 바깥 빛은 같은 색을 옅게 겹쳐 그린다 — 사용자 요청으로 추가 (2026-11-08) */
   --color-route: #1e7bff;        /* 길 선 */
   --color-route-core: #bfe0ff;   /* 고른 길 선 안쪽의 밝은 심 */
+  --color-family-pin: var(--color-route); /* 가족방 위치 탭의 가족 마커·이름표 (길 선과 같은 파랑) */
+  --color-family-me: #16a34a;             /* 가족방의 "나" 표시: 위치 탭 마커 · 구성원 칩 (밝은 초록, 흰 글씨가 읽히는 정도까지만 밝게) */
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */
   --frame-height: 844px;      /* PC 에서 보여 줄 모바일 화면 높이 (설계 파일 크기) */

@@ -1,0 +1,26 @@
+package com.campin.family;
+
+import java.util.List;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+// family_location 테이블 SQL. 테이블 정의는 db/schema_05.sql
+// "이 회원이 이 방 사람인가" 확인은 FamilyService.requireMyRoom 이 먼저 하고, 여기 SQL 은 방 번호로만 찾는다
+@Mapper  // MyBatis: 이 인터페이스의 구현체를 자동으로 만들어 스프링 빈으로 등록한다
+public interface LocationMapper {
+
+    // 이 방 구성원 중 위치가 있는 사람만 (위치 줄이 없는 사람은 JOIN 에서 빠진다)
+    // 방을 나간 사람은 family_member 에 없으므로 위치가 남아 있어도 보이지 않는다
+    // 순서는 구성원 목록과 같게 먼저 들어온 순서
+    @Select("""
+            SELECT m.id AS memberId, m.name, l.lon, l.lat, l.updated_at AS updatedAt
+              FROM family_member fm
+              JOIN member m ON m.id = fm.member_id
+              JOIN family_location l ON l.member_id = fm.member_id
+             WHERE fm.family_room_id = #{roomId}
+             ORDER BY fm.joined_at, fm.id
+            """)
+    List<FamilyLocation> findAll(@Param("roomId") Long roomId);
+}

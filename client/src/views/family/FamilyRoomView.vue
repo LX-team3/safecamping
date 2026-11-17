@@ -7,16 +7,18 @@ import { useFamilyStore } from '@/stores/family'
 import MeetingPlaceTab from '@/components/family/MeetingPlaceTab.vue'
 import ChildCardTab from '@/components/family/ChildCardTab.vue'
 import ScheduleTab from '@/components/family/ScheduleTab.vue'
+import LocationTab from '@/components/family/LocationTab.vue'
 
 const auth = useAuthStore()
 const family = useFamilyStore()
 
-// component 가 null 이면 "준비 중" (위치 공유는 3차)
+// component 가 null 이면 "준비 중"
+// 위치를 맨 앞에 둔다 → 가족방에 들어오면 위치 탭이 먼저 보인다 (tab 기본값 0)
 const TABS = [
+  { label: '위치', component: LocationTab },
   { label: '모일 곳', component: MeetingPlaceTab },
   { label: '아이 카드', component: ChildCardTab },
   { label: '일정', component: ScheduleTab },
-  { label: '위치', component: null },
 ]
 const tab = ref(0)
 const loading = ref(true)
@@ -134,7 +136,10 @@ async function run(fn, errorRef) {
           <button type="button" class="text-btn" @click="leave">나가기</button>
         </div>
         <ul class="members">
-          <li v-for="(m, i) in family.room.members" :key="i">{{ m.name }}<span v-if="m.me"> (나)</span></li>
+          <!-- 나(로그인한 사람)는 위치 탭의 내 마커와 같은 초록 칩으로 구분한다. 글자 대신 색으로 보여 주므로
+               화면 읽기 프로그램에는 aria-label 로 "나"임을 알려 준다 -->
+          <li v-for="(m, i) in family.room.members" :key="i" :class="{ me: m.me }"
+            :title="m.me ? '로그인한 나' : undefined" :aria-label="m.me ? `${m.name}, 나` : undefined">{{ m.name }}</li>
         </ul>
         <div class="code">
           <span>초대코드 <b>{{ family.room.inviteCode }}</b></span>
@@ -227,6 +232,12 @@ h2 {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   font-size: 13px;
+}
+.members li.me {
+  border-color: var(--color-family-me);
+  background: var(--color-family-me);
+  color: var(--color-card);
+  font-weight: 700;
 }
 .code {
   display: flex;

@@ -1,5 +1,20 @@
 # 진행 상황
 
+## 2026-11-16 가족 모임방 3차 위치 탭 — 1단계: 빈 지도 (브랜치 `lyh-location`)
+- 새 파일 `client/src/components/family/LocationTab.vue`: 위치 탭을 누르면 카카오 지도를 띄운다. 가로는 화면 폭, 세로 55vh(최소 280px). 창 크기가 바뀌면 `keepMapSized` 로 다시 맞춤
+- `FamilyRoomView.vue`: `TABS` 의 위치 탭 `component: null` → `LocationTab` ("준비 중이에요" 대신 지도)
+- 마커 수정: 파란 점(흰 테두리 + 흰 빛) 아래에 파란 이름표(흰 글씨, 테두리 없음). 색 변수 `--color-family-pin` 추가(`tokens.css`, 길 선 파랑 재사용). 더미 인물 짱구·맹구, 좌표는 인제군청 부지 안 대략값(확인 필요). 가까운 두 점이 겹치지 않게 `fitPoints` 최소 확대를 3으로
+- 새로고침 버튼(탭 오른쪽 위): 위치를 다시 불러와 마커를 새로 찍고 가족이 모두 보이게 지도를 다시 맞춤. 지도 아래에 "HH:MM 확인" 표시 (확인한 시각이지 위치가 찍힌 시각이 아님). 지금은 더미라 값은 같고, 서버 연결 때 `refresh()` 안의 한 줄만 API 호출로 바꾸면 됨
+- 위치 공유 동의(시연용): 위치 탭에 들어오면 동의 안내창("내 위치가 이 가족방 구성원에게 보여요 · 언제든 끌 수 있어요", [나중에] [동의하고 보기]). 동의 전에는 지도를 만들지 않음. 나중에 → "동의하면 가족 위치를 볼 수 있어요" + [동의하기]. 동의는 이 브라우저 localStorage(`campin.locationConsent.<회원 id>`)에만 저장 → 다음부터 안 물음. 지도 아래 [공유 끄기]로 철회. 실제 서비스에서는 DB(`location_consent` 안)에 저장해야 함. 회원가입 화면은 바꾸지 않음
+- "나" 마커 구분: 나는 밝은 초록 점·이름표(이름만, "(나)" 표시 없음), 겹치면 위에 표시. 색 변수 `--color-family-me: #16a34a` (사용자 요청으로 새 색 추가).
+- 가족방 구성원 목록: "(나)" 글자를 빼고 내 이름 칩을 같은 밝은 초록(`--color-family-me`) + 흰 굵은 글씨로. 마우스를 올리면 "로그인한 나", 화면 읽기 프로그램에는 "이름, 나"
+- 탭 순서: 위치 · 모일 곳 · 아이 카드 · 일정 (가족방에 들어오면 위치 탭이 먼저)
+- 동의 화면 변경: 화면 전체를 어둡게 덮던 안내창 대신, 지도 칸을 회색(`--color-photo`)으로 두고 가운데에 팝업 카드("내 위치가 이 가족방 구성원에게 보여요. 공유는 언제든 끌 수 있어요." [나중에] [동의하기]). 나중에 → 같은 문구 + [동의하기]만 남고 회색 유지. 동의하면 같은 칸에 지도
+- 3단계 DB: `db/schema_05.sql` — `family_location`(member_id UNIQUE · lon · lat · updated_at). 더미 여부 컬럼은 두지 않음(지금은 전부 시드라 구분할 대상이 없음, 시드 주석에 "시연용 가상 좌표"). 시드 INSERT 는 주석으로 넣어 둠(login_id 를 바꿔 따로 실행). **아직 어떤 DB 에도 실행 안 함**
+- 서버: `family/` 에 LocationController · LocationService · LocationMapper · LocationResponse · FamilyLocation. `GET /api/family/locations` → `[{ id, name, lat, lng, me, updatedAt }]`. 방 확인은 `requireMyRoom`, 방 구성원 중 위치가 있는 사람만(JOIN family_member → 나간 사람은 안 보임)
+- 위치 탭 모양 수정 (2026-11-16): 위쪽에 "위치 공유" on/off 스위치(LayerSheet 스위치와 같은 모양, 켜기 = 동의 · 끄기 = 철회, 아래 "공유 끄기" 글자 버튼은 없앰). 새로고침은 지도 오른쪽 위 동그란 버튼으로 옮김.
+
+
 ## 2026-11-12 DB 정리 3단계: saved_camp.camp_id 숫자 + 캠핑장 외래키 (브랜치 `db-cleanup-2`)
 - 새 파일 `db/schema_04.sql`: ① camp 에 없는 캠핑장을 가리키는 `saved_camp` 줄 삭제 (더미 `c1`~`c3`, 덤프 기준 4줄) ② `saved_camp.camp_id` varchar → bigint ③ 외래키 `saved_camp.camp_id` · `camp_plan.camp_id` → `camp(id)`
 - 왜: `camp.id` 는 숫자인데 저장 칸만 글자라 `c.id::text = sc.camp_id` 로 비교(인덱스 못 씀), 외래키가 없어 없는 캠핑장도 저장됐음
