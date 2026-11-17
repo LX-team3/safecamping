@@ -15,6 +15,50 @@ public interface ChabakMapper {
     @Select("SELECT chabak.fn_verdict_json(#{lat}, #{lng})::text")
     String findVerdict(@Param("lat") double lat, @Param("lng") double lng);
 
+    // 찍은 지점의 안전점수 재료: 종류마다 가장 가까운 시설까지 직선거리 + 부분점수
+    // 캠핑장 안전점수와 똑같은 계산 (db/merge_to_public.sql 8 단계) — 기준값은 팀이 넣은 raw.score_weights 그대로
+    //  - 쓰는 시설: 운영 중(is_active)이고 좌표가 있는 것, CCTV 는 방범용(role='safety')만
+    //  - 데이터가 하나도 없는 종류는 빼고 계산 (점수 = 받은 가중치 합 ÷ 있는 종류 가중치 합)
+    //  - 거리: 지구를 공으로 본 직선거리(하버사인, m) — merge 의 pg_temp.dist_m 과 같은 식
+    @Select("""
+            WITH src AS (
+                SELECT type, lat::float8 AS lat, lng::float8 AS lng
+                  FROM raw.facilities
+                 WHERE is_active AND lat IS NOT NULL
+                   AND type IN (SELECT facility_type FROM raw.score_weights)
+                   AND NOT (type = 'cctv' AND role <> 'safety')
+            ),
+            w AS (
+                SELECT sw.* FROM raw.score_weights sw
+                 WHERE EXISTS (SELECT 1 FROM src WHERE src.type = sw.facility_type)
+            ),
+            nearest AS (
+                SELECT w.facility_type AS type, w.weight, w.full_dist_m, w.zero_dist_m,
+                       min(2 * 6371000 * asin(sqrt(
+                             power(sin(radians(s.lat - #{lat}) / 2), 2)
+                           + cos(radians(#{lat})) * cos(radians(s.lat)) * power(sin(radians(s.lng - #{lng}) / 2), 2)))) AS d
+                  FROM w JOIN src s ON s.type = w.facility_type
+                 GROUP BY w.facility_type, w.weight, w.full_dist_m, w.zero_dist_m
+            )
+            SELECT type, weight::float8 AS weight, d AS distM,
+                   CASE WHEN d <= full_dist_m THEN 1
+                        WHEN d >= zero_dist_m THEN 0
+                        ELSE (zero_dist_m - d) / (zero_dist_m - full_dist_m) END::float8 AS part
+              FROM nearest
+             ORDER BY weight DESC, type
+            """)
+    List<ChabakScoreRow> findScoreParts(@Param("lat") double lat, @Param("lng") double lng);
+
+    // 근처 등록 야영장 이름 → camp.id (판정 결과에는 이름만 있어서 캠핑장 상세로 가려면 id 가 필요)
+    // chabak.campsite 는 public.camp 이름 그대로 채운 것이라 이름으로 맞춘다 (06_shared_db_after_restore.sql)
+    @Select("""
+            <script>
+            SELECT id, name FROM camp WHERE name IN
+            <foreach collection="names" item="n" open="(" separator="," close=")">#{n}</foreach>
+            </script>
+            """)
+    List<ChabakLayerRow> findCampsByName(@Param("names") List<String> names);
+
     // 찍은 지점에서 종류별로 가까운 안전 시설 3곳씩 (차박 지도의 "지도에 보일 것" 레이어)
     // 거리는 위도·경도 차이로 어림한다 (경도 1도는 위도가 높을수록 짧아져 cos 를 곱함, 1도 ≈ 111.32km) — NearbyMapper 와 같은 방식
     @Select("""
@@ -68,8 +112,10 @@ public interface ChabakMapper {
 
     // 차박 후보지: 미리 계산해 둔 '제한 없음' 자리 (chabak.open_spot, 국공유 공터 · 차 댈 공간 반지름 5m 이상)
     // 혹시 너무 많아도 지도가 느려지지 않게 넓은 자리부터 1000곳까지
+    // 이름: 지번 끝의 지목 한 글자 "잡"을 "잡종지"로 풀어 쓴다 (후보지는 전부 잡종지 — 05_move_to_chabak_schema.sql 조건)
     @Select("""
-            SELECT o.jibun AS name,
+            SELECT regexp_replace(o.jibun, '[[:space:]]*잡$', '') || ' 잡종지' AS name,
+                   o.owner_nm AS area,
                    extensions.ST_Y(extensions.ST_Transform(o.geom, 4326)) AS lat,
                    extensions.ST_X(extensions.ST_Transform(o.geom, 4326)) AS lng
               FROM chabak.open_spot o
@@ -80,7 +126,8 @@ public interface ChabakMapper {
 
     // 등록 야영장: camp 테이블 (chabak.campsite 도 여기서 채운 것). id 로 캠핑장 상세에 갈 수 있다
     @Select("""
-            SELECT id, name, lat::float8 AS lat, lng::float8 AS lng
+            SELECT id, name, lat::float8 AS lat, lng::float8 AS lng, safety_score AS score,
+                   concat_ws(' ', sigungu, eupmyeon) AS area, image_url AS imageUrl, er_drive_min AS erDriveMin
               FROM camp
              WHERE lat IS NOT NULL AND lng IS NOT NULL
             """)

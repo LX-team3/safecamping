@@ -1,22 +1,27 @@
 <script setup>
-// 캠핑장 지도: 텐트 + 점수 마커(안전·주의·위험 색) + 고른 캠핑장 이름표 + 범례 · 레이어 · 내 위치 버튼
+// 캠핑장 지도: 텐트 + 점수 마커(안전·주의·위험 색) + 고른 캠핑장 이름표 · 지도 설정 · 내 위치 버튼
 // 카카오 키(VITE_KAKAO_MAP_KEY)가 있으면 카카오맵, 없으면 좌표 비율로 마커만 놓은 임시 그림을 보여 준다
 // 텐트 아이콘은 경로 지도 출발지와 같은 것 (utils/facilityIcon.js)
-// 고른 캠핑장의 가까운 시설(facilities)도 종류별 아이콘 배지로 그린다 — 색은 고른 캠핑장의 등급 색 (내 주변 지도와 같은 규칙)
+// 지도 설정에서 켠 안전 시설(facilities, 지도 화면 안)도 종류별 회색 아이콘 배지로 그린다
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
+import { useRouter } from 'vue-router'
+import { facilityBadgeEl, facilityIcon, facilityPopupEl, gradeClass } from '@/utils/facilityIcon'
+import { FACILITY_LABEL } from '@/utils/place'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 import { applyMapType, mapType } from '@/utils/mapType'
 
 const props = defineProps({
   camps: { type: Array, default: () => [] },
-  facilities: { type: Array, default: () => [] }, // 고른 캠핑장의 가까운 시설 [{ no, id, type, name, lat, lng }] — 켜 둔 레이어만
+  facilities: { type: Array, default: () => [] }, // 켜 둔 종류의 시설 (지도 화면 안) [{ id, type, name, lat, lng }]
   selectedId: { type: Number, default: null },
   bottomInset: { type: Number, default: 0 }, // 아래 시트가 가리는 높이(px) → 버튼·마커를 그 위로 올린다
 })
-const emit = defineEmits(['select', 'layers']) // layers: 오른쪽 위 레이어 버튼을 눌렀다 (시트는 부모가 연다)
+// layers: 오른쪽 위 지도 설정 버튼을 눌렀다 (시트는 부모가 연다)
+// bounds: 지도를 움직이고 멈췄다 → 보이는 범위 { swLat, swLng, neLat, neLng } (부모가 켠 시설을 이 범위로 받아 온다)
+const emit = defineEmits(['select', 'layers', 'bounds'])
 
 const GRADE_LABEL = { safe: '안전', caution: '주의', danger: '위험', unknown: '점수 없음' }
+const router = useRouter()
 const DEFAULT_CENTER = { lat: 38.0697, lng: 128.1707 } // 캠핑장이 하나도 없을 때 (인제군청 근처)
 
 const el = ref(null)
@@ -51,6 +56,9 @@ onMounted(async () => {
   })
   stopSizing = keepMapSized(map, el.value)
   applyMapType(kakao, map) // 지도 설정 시트에서 고른 종류 (지도·스카이뷰)
+  // idle = 끌기·확대가 끝나 멈췄을 때 한 번 (움직이는 동안 계속 부르지 않게)
+  kakao.maps.event.addListener(map, 'idle', emitBounds)
+  kakao.maps.event.addListener(map, 'click', closeFacilityPopup) // 빈 곳을 누르면 말풍선 닫기
   draw()
   fit()
 })
@@ -59,7 +67,15 @@ onBeforeUnmount(() => {
   stopSizing?.()
   overlays.forEach((o) => o.setMap(null))
   myOverlay?.setMap(null)
+  closeFacilityPopup()
 })
+
+function emitBounds() {
+  const b = map.getBounds()
+  const sw = b.getSouthWest()
+  const ne = b.getNorthEast()
+  emit('bounds', { swLat: sw.getLat(), swLng: sw.getLng(), neLat: ne.getLat(), neLng: ne.getLng() })
+}
 
 // ---- 카카오 지도 마커 ----
 // 마커는 카카오 CustomOverlay 에 직접 만든 버튼을 붙인다 (모양은 아래 전역 style 의 .camp-marker)
@@ -84,15 +100,39 @@ function markerEl(camp) {
   return btn
 }
 
-// 시설 마커 색 = 고른 캠핑장의 안전점수 등급 (없으면 회색)
-const selectedCamp = computed(() => props.camps.find((c) => c.id === props.selectedId) || null)
-const facilityGrade = computed(() => selectedCamp.value?.grade ?? null)
 
 function facilityEl(f) {
-  const badge = facilityBadgeEl({ type: f.type, grade: facilityGrade.value, no: f.no })
+  return tappableBadge(f, facilityBadgeEl({ type: f.type, no: f.no, plain: true }))
+}
+// ---- 시설 말풍선: 배지를 누르면 위에 "종류 · 이름 · 상세 ›" (한 번에 하나만). 말풍선을 누르면 시설 상세 화면 ----
+let facPopup = null
+let facPopupId = null
+function closeFacilityPopup() {
+  facPopup?.setMap(null)
+  facPopup = null
+  facPopupId = null
+}
+function openFacilityPopup(f) {
+  closeFacilityPopup()
+  const content = facilityPopupEl(f, FACILITY_LABEL[f.type] ?? '시설', () => router.push(`/facilities/${f.id}`))
+  facPopup = new kakao.maps.CustomOverlay({
+    map, position: new kakao.maps.LatLng(f.lat, f.lng), content, yAnchor: 1, zIndex: 30,
+    clickable: true, // 말풍선을 누른 것이 지도 클릭으로 넘어가지 않게
+  })
+  facPopupId = f.id
+}
+// 배지 하나: 누르면 말풍선 (지도 클릭(차박 판정 등)으로 넘어가지 않게 막는다)
+function tappableBadge(f, badge) {
+  badge.classList.add('tappable')
   badge.title = f.name
+  badge.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (facPopupId === f.id) closeFacilityPopup()
+    else openFacilityPopup(f)
+  })
   return badge
 }
+
 
 function draw() {
   if (!map) return
@@ -109,15 +149,9 @@ function draw() {
   )
   // 시설은 캠핑장 마커보다 아래(zIndex 3 < 고른 캠핑장 10) — 고른 캠핑장 이름표를 가리지 않게
   props.facilities.forEach((f) =>
-    overlays.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(f.lat, f.lng), content: facilityEl(f), zIndex: 3 })),
+    overlays.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(f.lat, f.lng), content: facilityEl(f), zIndex: 3, clickable: true })),
   )
-}
-
-// 시설을 받아 오면 고른 캠핑장 + 시설이 한 화면에 들어오게 맞춘다
-function fitSelected() {
-  if (map && selectedCamp.value && props.facilities.length) {
-    fitPoints(kakao, map, [selectedCamp.value, ...props.facilities], [80, 60, props.bottomInset + 60, 60])
-  }
+  if (facPopupId != null && !props.facilities.some((f) => f.id === facPopupId)) closeFacilityPopup() // 그 시설이 꺼졌으면 말풍선도
 }
 
 // 마커가 전부 보이게 지도 범위를 맞춘다 (아래 시트에 가리는 만큼 아래 여백을 더 준다)
@@ -140,14 +174,8 @@ watch(
     if (map && camp) map.panTo(new kakao.maps.LatLng(camp.lat, camp.lng))
   },
 )
-// 시설 목록이 바뀜 = 새 캠핑장의 시설을 받았거나 레이어를 켜고 껐다
-watch(
-  () => props.facilities,
-  (now, before) => {
-    draw()
-    if (now.length && !before.length) fitSelected() // 처음 받아 왔을 때만 범위를 맞춘다 (켜고 끌 때마다 움직이면 어지러움)
-  },
-)
+// 시설 목록이 바뀜 = 레이어를 켜고 껐거나 지도를 움직여 새로 받았다 (지도 범위는 그대로 둔다)
+watch(() => props.facilities, draw)
 
 function locate() {
   message.value = ''
@@ -196,8 +224,8 @@ const fake = computed(() => {
         <span class="fake-note">임시 지도 · {{ message ? '카카오 지도 불러오기 실패' : '카카오 키 없음' }} (위치는 좌표 비율)</span>
         <div class="fake-area" :style="{ bottom: bottomInset + 60 + 'px' }">
           <!-- 시설 (카카오 지도의 facilityEl 과 같은 모양). 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
-          <span v-for="f in fake.facilities" :key="`f-${f.id}`" class="fac-badge camp-fac-pos"
-            :class="gradeClass(facilityGrade)" :title="f.name" :style="{ left: f.left + '%', top: f.top + '%' }">
+          <span v-for="f in fake.facilities" :key="`f-${f.id}`" class="fac-badge plain camp-fac-pos"
+            :title="f.name" :style="{ left: f.left + '%', top: f.top + '%' }">
             <span v-if="facilityIcon(f.type)" class="fac-svg" v-html="facilityIcon(f.type)" />
             <template v-else>{{ f.no }}</template>
             <b v-if="facilityIcon(f.type) && f.no" class="fac-no">{{ f.no }}</b>
@@ -218,8 +246,7 @@ const fake = computed(() => {
       </template>
     </div>
 
-    <!-- 오른쪽 위: 레이어 + 범례 (재난 위험 레이어는 2부 예정) -->
-    <!-- 오른쪽 위에 모은 지도 버튼: 지도 설정 · 내 위치 (모양은 전역 .map-btns · .map-btn, 차박 지도와 같음) + 등급 범례 -->
+    <!-- 오른쪽 위에 모은 지도 버튼: 지도 설정 · 내 위치 (모양은 전역 .map-btns · .map-btn, 차박 지도와 같음). 등급 범례는 뺌 — 마커 색만으로 알 수 있어서 -->
     <div class="map-btns">
       <button type="button" class="map-btn" aria-label="지도 설정" aria-haspopup="dialog" @click="emit('layers')">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
@@ -227,6 +254,7 @@ const fake = computed(() => {
           <path d="M12 3l9 5-9 5-9-5z" />
           <path d="M3 13l9 5 9-5" />
         </svg>
+        <small aria-hidden="true">지도</small>
       </button>
       <!-- 내 위치 (카카오 지도일 때만) — 지도 앱에서 흔히 쓰는 조준점 모양 -->
       <button v-if="mode === 'kakao'" type="button" class="map-btn" aria-label="내 위치로" @click="locate">
@@ -236,12 +264,8 @@ const fake = computed(() => {
           <circle cx="12" cy="12" r="2.5" fill="currentColor" />
           <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
         </svg>
+        <small aria-hidden="true">내 위치</small>
       </button>
-      <ul class="legend">
-        <li><i class="safe" />안전</li>
-        <li><i class="caution" />주의</li>
-        <li><i class="danger" />위험</li>
-      </ul>
     </div>
 
     <p v-if="message" class="message" role="status" :style="{ bottom: bottomInset + 80 + 'px' }">{{ message }}</p>
@@ -274,36 +298,6 @@ const fake = computed(() => {
   top: 120px;
   left: 56px;
   right: 56px;
-}
-.legend {
-  margin: 0;
-  padding: 10px 12px;
-  list-style: none;
-  border-radius: 10px;
-  background: var(--color-card);
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.legend li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.legend .safe {
-  background: var(--color-green);
-}
-.legend .caution {
-  background: var(--color-caution);
-}
-.legend .danger {
-  background: var(--color-danger);
 }
 .message {
   position: absolute;

@@ -10,4 +10,8 @@ public class ChabakLayerRow {
     private Double lat;
     private Double lng;
     private String geojson;   // 구역 경계 GeoJSON 글 (점 레이어는 null)
+    private Integer score;    // 안전점수 (야영장은 camp.safety_score, 후보지는 서비스가 계산해 넣음)
+    private String area;      // 목록 둘째 줄: 야영장은 "인제군 북면", 후보지는 소유 구분 (군유지 · 국유지)
+    private String imageUrl;  // 야영장 사진 (camp.image_url). 후보지는 null → 화면이 스카이뷰로 대신
+    private Integer erDriveMin; // 응급실까지 차로 몇 분: 야영장은 camp.er_drive_min, 후보지는 직선거리 어림 (서비스가 넣음)
 }

@@ -48,7 +48,23 @@ class ChabakServiceTest {
         @Override public ChabakLayerRow findCautionZone() {
             return new ChabakLayerRow(); // 주의 구역이 하나도 없을 때 (geojson null)
         }
-        @Override public List<ChabakLayerRow> findOpenSpots() { return List.of(); }
+        @Override public List<ChabakLayerRow> findCampsByName(List<String> names) {
+            ChabakLayerRow camp = new ChabakLayerRow();
+            camp.setId(3383L);
+            camp.setName("돌배야영장");
+            return names.contains("돌배야영장") ? List.of(camp) : List.of();
+        }
+        @Override public List<ChabakScoreRow> findScoreParts(double lat, double lng) {
+            // 응급실: 가중치 25, 3,000m, 부분점수 1 (만점) / 지구대: 가중치 30, 20,000m, 부분점수 0.5
+            return List.of(scoreRow("police", 30, 20000, 0.5), scoreRow("er", 25, 3000, 1.0));
+        }
+        @Override public List<ChabakLayerRow> findOpenSpots() {
+            ChabakLayerRow spot = new ChabakLayerRow();
+            spot.setName("398-2");
+            spot.setLat(38.078);
+            spot.setLng(128.324);
+            return List.of(spot);
+        }
         @Override public List<ChabakLayerRow> findCamps() { return List.of(); }
     });
 
@@ -70,6 +86,37 @@ class ChabakServiceTest {
         assertEquals("er", service.facilities(38.07, 128.32).get(0).getType());
     }
 
+    private static ChabakScoreRow scoreRow(String type, double weight, double distM, double part) {
+        ChabakScoreRow r = new ChabakScoreRow();
+        r.setType(type);
+        r.setWeight(weight);
+        r.setDistM(distM);
+        r.setPart(part);
+        return r;
+    }
+
+    @Test
+    void 안전점수는_캠핑장과_같은_가중평균_응급실_시간은_추정식() {
+        ChabakScoreResponse s = service.score(38.07, 128.32);
+        // (30 × 0.5 + 25 × 1) ÷ (30 + 25) × 100 = 72.7 → 73점, 70 이상이라 safe
+        assertEquals(73, s.score());
+        assertEquals("safe", s.grade());
+        assertEquals("밤에도 비교적 안심할 수 있어요", s.headline()); // 캠핑장 상세와 같은 문구
+        // 3,000m × 1.4 ÷ 시속 45km = 5.6분 → 올려서 6분
+        assertEquals(6, s.erDriveMin());
+        assertEquals(50, s.items().get(0).part());
+        assertThrows(InvalidRequestException.class, () -> service.score(null, 128.32));
+    }
+
+    @Test
+    void 차박_후보지에는_자리마다_안전점수와_등급이_붙는다() {
+        ChabakLayerItem spot = service.layer("open").get(0);
+        assertEquals(73, spot.score()); // 찍은 지점 점수와 같은 계산 (가짜 데이터 기준 73점)
+        assertEquals("safe", spot.grade());
+        // 응급실 3,000m → 차로 약 6분 (직선 × 1.4 ÷ 45km/h, /score 의 erDriveMin 과 같은 어림) — 목록 "응급실 약 N분"
+        assertEquals(6, spot.erDriveMin());
+    }
+
     @Test
     void 위치가_빠지거나_범위를_벗어나면_400() {
         assertThrows(InvalidRequestException.class, () -> service.verdict(null, 128.32));
@@ -89,8 +136,9 @@ class ChabakServiceTest {
         assertEquals("398-2", result.jibun());
         assertEquals(List.of("필지 경계 3m 이내"), result.reasons());
         assertTrue(result.nearBoundary());
-        // dist_m → distM 으로 이름이 맞춰진다
+        // dist_m → distM 으로 이름이 맞춰지고, 이름으로 찾은 camp.id 가 붙는다 (캠핑장 상세로 가기)
         assertEquals(850, result.nearbyCamps().get(0).distM());
+        assertEquals(3383L, result.nearbyCamps().get(0).id());
         assertEquals(6.5, result.alternatives().get(0).radiusM());
         assertEquals("MultiPolygon", result.parcel().path("type").asString());
     }

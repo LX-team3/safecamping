@@ -62,9 +62,9 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- 판정 표시 (차박 지도만): 여러 개를 같이 켤 수 있다. 색 점은 판정 색 (styles/tokens.css --color-verdict-*) -->
+    <!-- 갈 수 있는 곳 (차박 지도만: 차박 후보지 · 등록 야영장): 여러 개를 같이 켤 수 있다. 색 점은 판정 색 (styles/tokens.css --color-verdict-*) -->
     <template v-if="verdictLayers">
-      <h3 class="sub">판정 표시</h3>
+      <h3 class="sub">갈 수 있는 곳</h3>
       <ul class="rows">
         <li v-for="v in verdictLayers" :key="v.type" class="row">
           <span class="icon" aria-hidden="true"><i class="dot" :style="{ background: `var(${v.colorVar})` }" /></span>

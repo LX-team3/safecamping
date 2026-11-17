@@ -5,19 +5,23 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 import { applyMapType, mapType } from '@/utils/mapType'
 import { DEMO_POINTS, INJE_CENTER, verdictColor } from '@/utils/chabak'
-import { facilityBadgeEl } from '@/utils/facilityIcon'
+import { useRouter } from 'vue-router'
+import { facilityBadgeEl, facilityPopupEl } from '@/utils/facilityIcon'
+import { FACILITY_LABEL } from '@/utils/place'
 
 const props = defineProps({
   picked: { type: Object, default: null }, // 누른 지점 { lat, lng }
-  facilities: { type: Array, default: () => [] }, // 켜 둔 레이어의 가까운 안전 시설 [{ id, type, name, lat, lng }]
+  facilities: { type: Array, default: () => [] }, // 지도 설정에서 켠 종류의 시설 (지도 화면 안) [{ id, type, name, lat, lng }]
   parcel: { type: Object, default: null }, // 필지 경계 GeoJSON (Polygon · MultiPolygon)
   verdict: { type: String, default: null }, // 불가 · 주의 · 제한 없음 · 야영 가능
   // 판정 표시로 켠 레이어들 [{ type, verdict, items: [{ name, lat, lng, geometry }] }] (여러 개 가능)
   // 구역(불가·주의)은 geometry 면, 후보지·야영장은 lat·lng 점
   layers: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['pick'])
+// pick: 지도를 누름 (lat, lng, 점을 눌렀으면 그 item) / bounds: 지도를 움직이고 멈춤 → 보이는 범위 { swLat, swLng, neLat, neLng } (켠 시설을 이 범위로 받음)
+const emit = defineEmits(['pick', 'bounds'])
 
+const router = useRouter()
 const el = ref(null)
 const mode = ref('loading') // loading → kakao | fake
 
@@ -48,7 +52,17 @@ onMounted(async () => {
   stopSizing = keepMapSized(map, el.value)
   applyMapType(kakao, map) // 지도 설정 시트에서 고른 종류 (지도·스카이뷰)
   // 지도를 누른 곳의 위도·경도를 화면에 알린다 → 화면이 판정 API 를 부른다
-  kakao.maps.event.addListener(map, 'click', (e) => emit('pick', e.latLng.getLat(), e.latLng.getLng()))
+  kakao.maps.event.addListener(map, 'click', (e) => {
+    closeFacilityPopup()
+    emit('pick', e.latLng.getLat(), e.latLng.getLng())
+  })
+  // idle = 끌기·확대가 끝나 멈췄을 때 한 번 (움직이는 동안 계속 부르지 않게)
+  kakao.maps.event.addListener(map, 'idle', () => {
+    const b = map.getBounds()
+    const sw = b.getSouthWest()
+    const ne = b.getNorthEast()
+    emit('bounds', { swLat: sw.getLat(), swLng: sw.getLng(), neLat: ne.getLat(), neLng: ne.getLng() })
+  })
   draw()
   syncLayers()
 })
@@ -57,11 +71,42 @@ onBeforeUnmount(() => {
   stopSizing?.()
   drawn.forEach((o) => o.setMap(null))
   Object.values(layerDrawn).forEach((list) => list.forEach((o) => o.setMap(null)))
+  closeFacilityPopup()
 })
+// ---- 시설 말풍선: 배지를 누르면 위에 "종류 · 이름 · 상세 ›" (한 번에 하나만). 말풍선을 누르면 시설 상세 화면 ----
+let facPopup = null
+let facPopupId = null
+function closeFacilityPopup() {
+  facPopup?.setMap(null)
+  facPopup = null
+  facPopupId = null
+}
+function openFacilityPopup(f) {
+  closeFacilityPopup()
+  const content = facilityPopupEl(f, FACILITY_LABEL[f.type] ?? '시설', () => router.push(`/facilities/${f.id}`))
+  facPopup = new kakao.maps.CustomOverlay({
+    map, position: new kakao.maps.LatLng(f.lat, f.lng), content, yAnchor: 1, zIndex: 30,
+    clickable: true, // 말풍선을 누른 것이 지도 클릭으로 넘어가지 않게
+  })
+  facPopupId = f.id
+}
+// 배지 하나: 누르면 말풍선 (지도 클릭(차박 판정 등)으로 넘어가지 않게 막는다)
+function tappableBadge(f, badge) {
+  badge.classList.add('tappable')
+  badge.title = f.name
+  badge.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (facPopupId === f.id) closeFacilityPopup()
+    else openFacilityPopup(f)
+  })
+  return badge
+}
+
 
 // ---- 판정 표시 레이어 (불가 구역 · 주의 구역 · 차박 후보지 · 등록 야영장, 여러 개 같이) ----
 // 판정 핀·필지와 따로, 레이어마다 따로 그린다 → 하나를 켜고 끌 때 나머지(구역 수백 개)는 다시 그리지 않게
 const layerDrawn = {} // type → 지도에 올린 것들
+const layerBounds = {} // type → 그 레이어가 다 보이는 범위
 // 겹칠 때 위에 오는 순서: 점(후보지·야영장) > 불가 구역 > 주의 구역
 const LAYER_Z = { caution: 1, no: 2, open: 3, camp: 3 }
 
@@ -69,13 +114,13 @@ function layerDotEl(item, color) {
   const dot = document.createElement('button')
   dot.type = 'button'
   dot.className = 'chabak-dot'
-  dot.style.background = color
+  dot.style.setProperty('--dot', color) // 보이는 점 색 (누르는 범위는 투명하게 더 넓음)
   dot.title = item.name
   dot.setAttribute('aria-label', `${item.name} 판정 보기`)
   // 점을 누르면 그 자리를 판정한다 (지도 클릭과 같은 흐름)
   dot.addEventListener('click', (e) => {
     e.stopPropagation()
-    emit('pick', item.lat, item.lng)
+    emit('pick', item.lat, item.lng, item) // 어느 점인지도 같이 (등록 야영장이면 판정 카드에 "내 캠핑에 등록")
   })
   return dot
 }
@@ -107,23 +152,44 @@ function drawOneLayer(layer) {
   return list.length ? bounds : null
 }
 
-// 켠 레이어 목록이 바뀌면: 꺼진 것만 지우고, 새로 켠 것만 그린다
-// 새로 켠 레이어가 다 보이게 범위를 맞춘다 (위쪽 토글·버튼 · 아래 작게 내려간 시트에 가리지 않게 여백)
+// 켠 레이어 목록이 바뀌면: 꺼진 것은 지우고, 새로 켠 것은 그리고, 목록이 바뀐 것(주변 안전 필터)은 다시 그린다
+// 새로 켠 레이어가 있으면 다 보이게 범위를 맞춘다 (필터만 바꿨을 때는 지도를 움직이지 않음 — 덜 어지럽게)
+const layerItemsOf = {} // type → 그릴 때 쓴 목록 (같은 목록이면 다시 그리지 않음)
+function removeLayer(type) {
+  layerDrawn[type].forEach((o) => o.setMap(null))
+  delete layerDrawn[type]
+  delete layerBounds[type]
+  delete layerItemsOf[type]
+}
 function syncLayers() {
   if (!map) return
   const now = new Set(props.layers.map((l) => l.type))
   Object.keys(layerDrawn).forEach((type) => {
-    if (!now.has(type)) {
-      layerDrawn[type].forEach((o) => o.setMap(null))
-      delete layerDrawn[type]
-    }
+    if (!now.has(type)) removeLayer(type)
   })
-  let lastBounds = null
+  let added = false
   props.layers.forEach((layer) => {
-    if (layerDrawn[layer.type]) return // 이미 그려 둔 것
-    lastBounds = drawOneLayer(layer) ?? lastBounds
+    if (layerDrawn[layer.type]) {
+      if (layerItemsOf[layer.type] === layer.items) return // 이미 그려 둔 그대로
+      removeLayer(layer.type) // 필터로 목록이 바뀜 → 다시 그림 (범위는 그대로)
+    } else {
+      added = true
+    }
+    layerBounds[layer.type] = drawOneLayer(layer)
+    layerItemsOf[layer.type] = layer.items
   })
-  if (lastBounds) map.setBounds(lastBounds, 70, 70, 110, 20)
+  // 새로 켠 것이 있으면, 지금 켜 있는 레이어 전부가 보이게 범위를 맞춘다 (후보지 + 야영장이 같이 보이게)
+  if (!added) return
+  const all = new kakao.maps.LatLngBounds()
+  let any = false
+  props.layers.forEach((layer) => {
+    const b = layerBounds[layer.type]
+    if (!b) return
+    all.extend(b.getSouthWest())
+    all.extend(b.getNorthEast())
+    any = true
+  })
+  if (any) map.setBounds(all, 70, 70, 110, 20)
 }
 
 watch(() => props.layers, syncLayers)
@@ -152,12 +218,12 @@ function draw() {
       map, path, strokeWeight: 3, strokeColor: color, strokeOpacity: 1, fillColor: color, fillOpacity: 0.3,
     })),
   )
-  // 안전 시설: 탐색·내 주변 지도와 같은 아이콘 배지. 차박 지도에는 안전점수 등급이 없어 회색 바탕
+  // 안전 시설: 탐색 지도와 같은 흰 바탕 아이콘 배지 (plain)
   props.facilities.forEach((f) => {
-    const badge = facilityBadgeEl({ type: f.type, grade: null })
-    badge.title = f.name
-    drawn.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(f.lat, f.lng), content: badge, zIndex: 3 }))
+    const badge = tappableBadge(f, facilityBadgeEl({ type: f.type, plain: true }))
+    drawn.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(f.lat, f.lng), content: badge, zIndex: 3, clickable: true }))
   })
+  if (facPopupId != null && !props.facilities.some((f) => f.id === facPopupId)) closeFacilityPopup() // 그 시설이 꺼졌으면 말풍선도
   if (props.picked) {
     const position = new kakao.maps.LatLng(props.picked.lat, props.picked.lng)
     drawn.push(new kakao.maps.CustomOverlay({ map, position, content: pinEl(), yAnchor: 1, zIndex: 5 }))
@@ -165,6 +231,19 @@ function draw() {
 }
 
 watch(() => [props.picked, props.parcel, props.verdict, props.facilities], draw)
+
+// 판정 결과(필지)가 오면, 지도가 멀리 축소돼 있을 때만 그 필지가 보이게 확대한다
+// (차박 후보지 점처럼 축소된 지도에서 누르면 칠한 필지가 점·핀에 가려 안 보여서)
+// 이미 충분히 확대돼 있으면(레벨 5 이하) 지도를 움직이지 않는다 — 덜 어지럽게
+const FIT_LEVEL = 5
+watch(() => props.parcel, (parcel) => {
+  if (!map || !parcel || map.getLevel() <= FIT_LEVEL) return
+  const bounds = new kakao.maps.LatLngBounds()
+  toPolygons(parcel).forEach((path) => path.forEach((ring) => ring.forEach((p) => bounds.extend(p))))
+  // 아래 판정 카드(화면 아래쪽 절반쯤)에 가리지 않게 아래 여백을 크게
+  map.setBounds(bounds, 90, 60, 320, 60)
+  if (map.getLevel() < 3) map.setLevel(3) // 아주 작은 필지는 너무 확대되지 않게
+})
 
 // 화면에서 지도를 옮길 때 (인제군으로 이동 · 근처 후보 누르기)
 function moveTo(lat, lng, level) {
@@ -259,15 +338,28 @@ defineExpose({ moveTo, showMe })
   pointer-events: none; /* 핀 위를 눌러도 지도 클릭으로 전달 */
 }
 /* 칩 레이어 점 (차박 후보지 · 등록 야영장). 바탕색은 판정 색으로 스크립트가 넣는다 */
+/* 누르는 범위는 44px(손가락으로 누르기 충분한 크기), 보이는 점은 가운데 16px
+   → 지도는 깔끔하게, 누르기는 쉽게 (옆 땅이 잘못 눌려 엉뚱한 판정이 나오지 않게) */
 .chabak-dot {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.chabak-dot::after {
+  content: '';
   width: 16px;
   height: 16px;
-  padding: 0;
+  box-sizing: border-box;
   border: 2px solid var(--color-card);
   border-radius: 50%;
+  background: var(--dot);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
 }
 /* 내 위치 점 (탐색 지도 CampMap 의 .my-location 과 같은 모양) */
 .chabak-me {

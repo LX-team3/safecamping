@@ -25,7 +25,14 @@ public record ChabakVerdictResponse(
         JsonNode parcel) {              // 필지 경계 GeoJSON (모양이 복잡해서 그대로 전달 → 지도에 판정 색으로 칠함)
 
     // DB 함수는 dist_m 으로 보내지만 다른 필드와 맞춰 distM 으로 내보낸다
-    public record Camp(String name, @JsonAlias("dist_m") Integer distM) { }
+    // id: camp.id (캠핑장 상세로 갈 때). DB 함수에는 없어서 서버가 이름으로 camp 테이블에서 찾아 붙인다 (못 찾으면 null)
+    public record Camp(Long id, String name, @JsonAlias("dist_m") Integer distM) { }
+
+    // 근처 야영장 목록만 바꾼 새 응답 (record 는 값을 바꿀 수 없어서 새로 만든다)
+    public ChabakVerdictResponse withNearbyCamps(List<Camp> camps) {
+        return new ChabakVerdictResponse(pnu, jibun, jimok, owner, landUse, terrain, roadSide, verdict,
+                reasons, zones, nearBoundary, camps, alternatives, parcel);
+    }
 
     // radiusM: 차를 댈 수 있는 공간 크기 (필지 안 가장 큰 원의 반지름, m)
     public record Alternative(String jibun, String owner, Double radiusM, Integer distM,

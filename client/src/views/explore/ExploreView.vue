@@ -4,9 +4,9 @@
 //  - 손잡이(가로 줄)·"지도" 버튼을 누르면 시트가 접혀 지도가 보인다
 //  - 목록 한 줄을 누르면 캠핑장 상세. 지도 마커는 한 번 누르면 이름표, 이름표를 다시 누르면 상세
 //  - 지역 칩 → RegionSheet(어디로), 날짜 칩 → TripSheet(누구와·언제). 고른 값은 trip store
-//  - 지도 레이어 버튼 → 내 주변과 같은 LayerSheet(안전 시설 켜고 끄기). 고른 캠핑장의 가까운 시설을 지도에 보여 준다
+//  - 지도 레이어 버튼 → 내 주변과 같은 LayerSheet(안전 시설 켜고 끄기). 처음엔 전부 꺼짐, 켠 종류는 지도 화면 안의 시설을 보여 준다
 // 데이터: GET /api/camps (지도 마커·전체 목록), /api/camps/recommend (추천),
-//         /api/nearby/layers (레이어 줄 목록), /api/camps/{id} (고른 캠핑장의 가까운 시설)
+//         /api/nearby/layers (레이어 줄 목록), /api/facilities?types=&swLat=… (지도 화면 안의 켠 시설)
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CampMap from '@/components/map/CampMap.vue'
@@ -19,6 +19,7 @@ import MapModeToggle from '@/components/common/MapModeToggle.vue'
 import { useDragSheet, useElementHeight } from '@/utils/dragSheet'
 import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
 import { api } from '@/utils/api'
+import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { vHscroll } from '@/utils/hscroll'
 import { shortLabel } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
@@ -145,16 +146,18 @@ const mapCamps = computed(() => allCamps.value.filter(matches))
 // ---- 지도 레이어 (안전 시설) ----
 // 줄 목록은 내 주변과 같은 서버 목록(GET /api/nearby/layers)을 쓴다 → 두 화면의 시트가 늘 같다
 const layers = ref([]) // [{ code, icon, label, desc, ready, on }]
-const facilityOn = ref({}) // { er: true, ... } 켜짐 여부
-const campFacilities = ref([]) // 고른 캠핑장의 가까운 시설 [{ no, id, type, name, lat, lng }]
+// 켠 종류(facilityOn)는 utils/facilityLayers.js — 시설 상세에 갔다 와도 유지 (처음엔 전부 꺼짐)
+const mapFacilities = ref([]) // 켠 종류의 시설 중 지도 화면 안에 있는 것 [{ id, type, name, lat, lng }]
+let mapBounds = null // 지도가 알려 준 보이는 범위 { swLat, swLng, neLat, neLng }
+let facilityReq = 0 // 늦게 온 앞 응답이 새 결과를 덮지 않게 요청 번호를 센다
 
 async function loadLayers() {
   try {
     const list = await api('/api/nearby/layers')
     layers.value = list
-    facilityOn.value = Object.fromEntries(list.map((l) => [l.code, l.on]))
+    initFacilityOn(list)
   } catch {
-    // 못 불러오면 레이어 버튼을 눌렀을 때 다시 시도한다 (그동안 시설은 전부 보인다)
+    // 못 불러오면 지도 설정 버튼을 눌렀을 때 다시 시도한다
   }
 }
 
@@ -164,25 +167,30 @@ async function openLayers() {
 }
 
 function toggleFacility(code) {
-  facilityOn.value = { ...facilityOn.value, [code]: !facilityOn.value[code] }
+  toggleFacilityOn(code)
+  loadFacilities()
 }
 
-// 캠핑장 마커를 고르면 그 캠핑장의 가까운 시설을 받아 온다 (캠핑장 상세 API 를 그대로 씀)
-// 빠르게 다른 캠핑장을 누르면 앞 응답이 늦게 와도 덮어쓰지 않게, 마지막으로 고른 id 인지 확인한다
-watch(selectedId, async (id) => {
-  campFacilities.value = []
-  if (id == null) return
-  try {
-    const detail = await api(`/api/camps/${id}`)
-    if (selectedId.value !== id) return
-    campFacilities.value = detail.facilities.map((f, i) => ({ ...f, no: i + 1 }))
-  } catch {
-    // 시설을 못 받아도 캠핑장 마커는 그대로 쓸 수 있다
-  }
-})
+// 지도를 움직이고 멈출 때마다 (CampMap 의 bounds) 켠 종류를 그 범위로 다시 받아 온다
+function onBounds(b) {
+  mapBounds = b
+  loadFacilities()
+}
 
-// 켜 둔 종류만 지도에. 레이어 목록을 아직 못 받았으면(undefined) 보여 준다 (안전 정보라 기본은 숨기지 않음)
-const mapFacilities = computed(() => campFacilities.value.filter((f) => facilityOn.value[f.type] !== false))
+async function loadFacilities() {
+  const no = ++facilityReq
+  const types = onTypes()
+  if (!types.length || !mapBounds) {
+    mapFacilities.value = []
+    return
+  }
+  try {
+    const list = await api('/api/facilities', { params: { types: types.join(','), ...mapBounds } })
+    if (no === facilityReq) mapFacilities.value = list
+  } catch {
+    // 못 받으면 시설 없이 캠핑장 마커만 보인다
+  }
+}
 
 const isRanked = computed(() => matchMine.value && !showExcluded.value)
 const title = computed(() => {
@@ -236,7 +244,7 @@ function onMarker(id) {
   <div class="explore">
     <div ref="stageEl" class="stage">
       <CampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="selectedId" :bottom-inset="COLLAPSED"
-        @select="onMarker" @layers="openLayers" />
+        @select="onMarker" @layers="openLayers" @bounds="onBounds" />
       <!-- 캠핑장 지도 ↔ 차박 지도 전환 (목록을 펼치면 시트가 덮는다) -->
       <MapModeToggle active="camp" class="mode-toggle" />
 
