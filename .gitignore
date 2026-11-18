@@ -52,3 +52,10 @@ bin/
 # ===========================
 .DS_Store
 Thumbs.db
+# ===========================
+# 차박 DB 파이프라인 (db/chabak_pipeline)
+# ===========================
+# 덤프는 데이터 파일(수십 MB)이라 올리지 않는다. 품질 리포트(reports/*.md·json)는 올린다
+db/chabak_pipeline/*.dump
+db/chabak_pipeline/*.sql
+db/chabak_pipeline/__pycache__/

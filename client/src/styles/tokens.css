@@ -34,6 +34,12 @@
   /* 경로 지도의 길 선 (형광 파랑). 바깥 빛은 같은 색을 옅게 겹쳐 그린다 — 사용자 요청으로 추가 (2026-11-08) */
   --color-route: #1e7bff;        /* 길 선 */
   --color-route-core: #bfe0ff;   /* 고른 길 선 안쪽의 밝은 심 */
+  /* 차박 판정 4단계 색 (불가·주의·제한 없음·야영 가능) — 사용자 승인 (2026-11-16, 나중에 바꿀 수 있음)
+     카드 배지와 지도 위 필지 칠하기에 같이 쓴다 (지도는 utils/chabak.js 가 이 변수를 읽음) */
+  --color-verdict-no: #a8402f;
+  --color-verdict-caution: #8a6410;
+  --color-verdict-open: #4a6b33;
+  --color-verdict-camp: #3f5a80;
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */
   --frame-height: 844px;      /* PC 에서 보여 줄 모바일 화면 높이 (설계 파일 크기) */

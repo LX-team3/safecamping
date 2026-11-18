@@ -5,6 +5,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
+import { applyMapType, mapType } from '@/utils/mapType'
 
 const props = defineProps({
   me: { type: Object, default: null }, // { lat, lng }
@@ -20,6 +21,9 @@ let kakao = null
 let map = null
 let drawn = [] // 지도에 올린 마커 (다시 그릴 때 지운다)
 let stopSizing = null
+
+// 지도 종류를 바꾸면 바로 적용 (세 지도가 같은 값을 봄)
+watch(mapType, () => applyMapType(kakao, map))
 
 onMounted(async () => {
   try {
@@ -38,6 +42,7 @@ onMounted(async () => {
     level: 7,
   })
   stopSizing = keepMapSized(map, el.value)
+  applyMapType(kakao, map) // 지도 설정 시트에서 고른 종류 (지도·스카이뷰)
   draw()
 })
 
