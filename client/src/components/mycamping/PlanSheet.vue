@@ -2,7 +2,8 @@
 // "내 캠핑에 일정 등록" 시트 — 캠핑장 상세와 차박 판정 카드(등록 야영장)가 같이 쓴다
 // 등록하면 내 캠핑 탭에 카드로 뜬다 (서버 저장 POST /api/member/camp-plans, stores/myCamping.js). 회원 전용
 // 단계: login(로그인 필요) → form(날짜 입력) → done(저장 끝, "내 캠핑에서 보기")
-// 서버가 camp.id 를 꼭 받아서(CampPlanRequest @NotNull) 등록된 캠핑장만 등록할 수 있다
+// 등록 대상 두 가지: 등록 캠핑장(campId) 또는 캠핑장이 아닌 자리(차박 후보지 · 찍은 자리 = lat·lng, campId 없음)
+// 둘 중 하나는 있어야 한다 (서버·DB 가 한 번 더 검사)
 import { ref } from 'vue'
 import BottomSheet from '@/components/common/BottomSheet.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -11,9 +12,11 @@ import { useTripStore } from '@/stores/trip'
 import { todayIso, nightsBetween } from '@/utils/date'
 
 const props = defineProps({
-  campId: { type: Number, required: true },
-  campName: { type: String, required: true },
+  campId: { type: Number, default: null }, // 캠핑장이 아닌 자리면 null
+  campName: { type: String, required: true }, // 캠핑장 이름 또는 자리 이름 ("475-3 잡종지")
   place: { type: String, default: '' }, // 내 캠핑 카드에 보일 지역 ("강원 인제군 북면")
+  lat: { type: Number, default: null }, // 자리일 때의 위치
+  lng: { type: Number, default: null },
 })
 const emit = defineEmits(['close'])
 
@@ -48,6 +51,8 @@ async function save() {
   try {
     await myCamping.add({
       campId: props.campId,
+      lat: props.campId == null ? props.lat : null, // 캠핑장 등록이면 좌표는 안 보낸다
+      lng: props.campId == null ? props.lng : null,
       campName: props.campName,
       place: props.place,
       checkIn: checkIn.value,

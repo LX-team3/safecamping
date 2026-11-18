@@ -6,6 +6,7 @@
 //  - 둘러보기(아직 안 누름): 검색 · 칩(필터 · 차박 후보지 · 등록 야영장 · 주변 안전) · 차박지 목록
 //  - 판정 카드(지도나 목록에서 고름): 차박 규제 · 주변 안전 · 자세히 보기 · (등록 야영장이면) 내 캠핑에 등록
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import ChabakMap from '@/components/chabak/ChabakMap.vue'
 import LayerSheet from '@/components/nearby/LayerSheet.vue'
 import FilterSheet from '@/components/chabak/FilterSheet.vue'
@@ -318,10 +319,34 @@ function onMapPick(lat, lng, item) {
   pick(lat, lng)
 }
 
-// ---- 내 캠핑에 등록 (등록 야영장을 골랐을 때만) ----
-// 서버가 camp.id 를 꼭 받아서 차박 후보지는 아직 등록할 수 없다. 시트는 캠핑장 상세와 같은 PlanSheet
+// ---- 내 캠핑에 등록 (판정 결과가 나온 모든 자리) ----
+// 등록 야영장이면 camp.id 로, 그 밖(차박 후보지 · 지도에서 찍은 자리)은 지번 이름 + 좌표로 등록한다 (불가·주의 자리도 — 고르는 건 사람 마음)
+// 시트는 캠핑장 상세와 같은 PlanSheet. 내 캠핑 카드에서 누르면 /chabak?lat=&lng= 로 이 자리가 다시 열린다
 const selectedCamp = ref(null) // 고른 등록 야영장 { id, name, area, ... }
 const planOpen = ref(false)
+const PLACE = '강원 인제군' // 판정 범위가 인제군뿐이라 (읍·면은 데이터에 없음)
+const planTarget = computed(() => {
+  if (!result.value || !picked.value) return null
+  if (selectedCamp.value) {
+    return { campId: selectedCamp.value.id, name: selectedCamp.value.name, place: selectedCamp.value.area ?? '' }
+  }
+  // "475-3 잡" → "475-3 잡종지" (지번 끝 지목 한 글자를 빼고 지목 이름을 붙임)
+  const base = (result.value.jibun ?? '').replace(/\s*[가-힣]$/, '')
+  const name = [base, result.value.jimok].filter(Boolean).join(' ') || '차박지'
+  return { campId: null, name, place: PLACE, lat: picked.value.lat, lng: picked.value.lng }
+})
+
+// 내 캠핑 카드에서 들어온 경우 (/chabak?lat=&lng=): 지도가 준비되면 그 자리로 가서 판정
+const route = useRoute()
+function onMapReady() {
+  const lat = Number(route.query.lat)
+  const lng = Number(route.query.lng)
+  if (route.query.lat == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return
+  fromList.value = false
+  selectedCamp.value = null
+  mapRef.value?.moveTo(lat, lng, 4)
+  pick(lat, lng)
+}
 
 // 근처 차박 후보를 누르면 그 자리로 지도를 옮기고 바로 판정한다
 function openAlternative(a) {
@@ -346,7 +371,7 @@ const parcelLine = computed(() =>
   <div class="chabak">
     <div ref="stageEl" class="stage">
       <ChabakMap ref="mapRef" :picked="picked" :facilities="mapFacilities" :parcel="result?.parcel"
-        :verdict="result?.verdict" :layers="mapLayers" @pick="onMapPick" @bounds="onBounds" />
+        :verdict="result?.verdict" :layers="mapLayers" @pick="onMapPick" @bounds="onBounds" @ready="onMapReady" />
       <MapModeToggle active="chabak" class="toggle" />
 
 
@@ -557,8 +582,8 @@ const parcelLine = computed(() =>
             </template>
 
             <button v-if="!expanded" type="button" class="outline" @click="snap = 'full'">자세히 보기</button>
-            <!-- 등록 야영장을 골랐을 때만: 내 캠핑에 일정 등록 (캠핑장 상세와 같은 시트) -->
-            <button v-if="selectedCamp" type="button" class="primary" aria-haspopup="dialog" @click="planOpen = true">
+            <!-- 내 캠핑에 일정 등록 (캠핑장 상세와 같은 시트). 등록 야영장도 후보지도 찍은 자리도 가능 -->
+            <button v-if="planTarget" type="button" class="primary" aria-haspopup="dialog" @click="planOpen = true">
               내 캠핑에 등록하기
             </button>
           </template>
@@ -590,8 +615,8 @@ const parcelLine = computed(() =>
     <FilterSheet v-if="filterOpen" :only="filterOpen" :spots="verdictLayers" :on="layerOn" :counts="filterCounts"
       :safety="safetyFilter" @close="filterOpen = null" @toggle="toggleLayer" @safety="safetyFilter = $event" />
     <!-- 내 캠핑에 일정 등록 (등록 야영장) -->
-    <PlanSheet v-if="planOpen && selectedCamp" :camp-id="selectedCamp.id" :camp-name="selectedCamp.name"
-      :place="selectedCamp.area ?? ''" @close="planOpen = false" />
+    <PlanSheet v-if="planOpen && planTarget" :camp-id="planTarget.campId" :camp-name="planTarget.name"
+      :place="planTarget.place" :lat="planTarget.lat ?? null" :lng="planTarget.lng ?? null" @close="planOpen = false" />
   </div>
 </template>
 

@@ -1,11 +1,12 @@
 <script setup>
 // 내 캠핑 탭 첫 화면. 원래 목적은 예약한 캠핑 정보(일정·날씨·위험 알림·재난지도)를 보여 주는 것
 // 지금은 캠핑장 상세에서 "내 캠핑에 일정 등록"한 캠핑을 카드로 보여 준다 (서버 저장, stores/myCamping.js)
-// 날씨·위험 알림은 데이터가 아직 없어 비워 둔다 (수치를 지어내지 않기 위해)
+// 카드 아래 "출발 준비" 줄: 눌러서 체크리스트(ChecklistView)로. 특보는 출발 3일 전부터 서버가 확인해 알려 준다
+// 예보(기온·강수) 값은 아직 없다 — 수치를 지어내지 않기 위해 비워 둔다
 import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
-import { labelWithDay, nightsBetween, todayIso } from '@/utils/date'
+import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
 import BottomNav from '@/components/common/BottomNav.vue'
 
 const auth = useAuthStore()
@@ -20,9 +21,25 @@ async function load() {
     await myCamping.load()
   } catch (e) {
     error.value = e.message
+    return
   }
+  // 끝나지 않은 일정마다 출발 준비 요약(특보·안전점수)을 받는다. 못 받아도 카드는 그대로 (줄에 글자만 빠짐)
+  myCamping.plans.filter((p) => p.checkOut >= todayIso()).forEach((p) => myCamping.loadChecklist(p.id).catch(() => {}))
 }
 onMounted(load)
+
+// 출발 준비 줄에 보일 작은 글: 특보 > 특보 없음/받지 못함(가까울 때) > 특보가 보이는 날짜 + 안전점수(먼 일정)
+function prepLine(c) {
+  if (!c) return { text: '', warn: false } // 아직 못 받음: 줄은 보이되 작은 글자는 비움
+  if (c.warnings.length) {
+    const more = c.warnings.length > 1 ? ` 외 ${c.warnings.length - 1}건` : ''
+    return { text: `${c.warnings[0].category}${more} 발효 중`, warn: true }
+  }
+  if (c.near) return { text: c.warningsAvailable ? '발효 중인 특보 없음' : '특보 정보를 받지 못했어요', warn: false }
+  const d = fromIso(c.openDate)
+  const score = c.safety?.score != null ? ` · 안전 ${c.safety.score}` : ''
+  return { text: `특보는 ${d.getMonth() + 1}월 ${d.getDate()}일부터${score}`, warn: false }
+}
 
 // 카드에 보일 글: 날짜 범위 · 몇 박, 그리고 D-day
 const cards = computed(() => {
@@ -37,6 +54,7 @@ const cards = computed(() => {
       ...p,
       badge,
       past: p.checkOut < today,
+      prep: p.checkOut < today ? null : prepLine(myCamping.checklists[p.id]), // 지난 캠핑은 줄 없음
       range: `${labelWithDay(p.checkIn)} – ${labelWithDay(p.checkOut)} · ${nights}박`,
     }
   })
@@ -70,17 +88,32 @@ async function remove(p) {
         <ul v-else-if="cards.length" class="plans">
           <li v-for="p in cards" :key="p.id" class="plan" :class="{ past: p.past }">
             <div class="plan-head">
-              <span class="badge">{{ p.badge }}</span>
+              <span class="tags">
+                <span class="badge">{{ p.badge }}</span>
+                <span v-if="p.campId == null" class="kind">차박지</span>
+              </span>
               <button type="button" class="del" :aria-label="`${p.campName} 일정 지우기`" @click="remove(p)">삭제</button>
             </div>
-            <RouterLink :to="`/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
+            <!-- 등록 캠핑장은 캠핑장 상세로, 차박 자리(campId 없음)는 차박 지도에서 그 자리로 -->
+            <RouterLink v-if="p.campId != null" :to="`/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
+            <RouterLink v-else :to="{ path: '/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
+              {{ p.campName }}
+            </RouterLink>
             <p class="plan-place">{{ p.place }}</p>
             <p class="plan-range">{{ p.range }}</p>
             <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
+            <RouterLink v-if="p.prep" :to="`/my-camping/${p.id}/checklist`" class="prep">
+              <span v-if="p.prep.warn" class="warn-dot" aria-label="특보 발효 중" />
+              <span class="prep-text">
+                <b>출발 준비</b>
+                <small v-if="p.prep.text">{{ p.prep.text }}</small>
+              </span>
+              <span class="arrow" aria-hidden="true">›</span>
+            </RouterLink>
           </li>
         </ul>
         <p v-else class="placeholder">
-          등록한 캠핑이 없어요.<br />캠핑장 상세에서 '내 캠핑에 일정 등록'을 눌러 보세요.
+          등록한 캠핑이 없어요.<br />캠핑장 상세나 차박 지도에서 '내 캠핑에 일정 등록'을 눌러 보세요.
         </p>
 
         <RouterLink to="/my-camping/family" class="family-btn">
@@ -189,6 +222,20 @@ h1 {
   justify-content: space-between;
   align-items: center;
 }
+.tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* 캠핑장이 아닌 차박 자리 표시 */
+.kind {
+  padding: 2px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+}
 .badge {
   padding: 3px 10px;
   border-radius: 12px;
@@ -221,6 +268,39 @@ h1 {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
+}
+.prep {
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--color-bg-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prep-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.prep-text b {
+  font-size: 14px;
+}
+.prep-text small {
+  font-size: 12px;
+  color: var(--color-text-sub);
+}
+.warn-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+.prep .arrow {
+  font-size: 18px;
+  color: var(--color-arrow);
 }
 .family-btn {
   display: flex;

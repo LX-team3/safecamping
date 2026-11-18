@@ -15,3 +15,4 @@ public record ChabakLayerItem(
         Integer erDriveMin, // 응급실까지 차로 몇 분 (후보지는 직선거리 어림). 모르면 null
         JsonNode geometry) { // 구역 경계 GeoJSON (점이면 null)
 }
+        

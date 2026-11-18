@@ -15,6 +15,8 @@ const router = createRouter({
     { path: '/saved/lists/:id', name: 'saved-compare', component: () => import('../views/saved/CompareView.vue') },
     // 내 캠핑 (예약 후 정보) → 가족 모임방 버튼. 회원 전용 — 로그인 안 했으면 화면 안에서 로그인 안내
     { path: '/my-camping', name: 'my-camping', component: () => import('../views/mycamping/MyCampingView.vue') },
+    // 내 캠핑 카드 → 출발 준비 체크리스트 (계절 · 공통 준비물 + 출발 3일 전부터 지역 특보)
+    { path: '/my-camping/:planId(\\d+)/checklist', name: 'my-camping-checklist', component: () => import('../views/mycamping/ChecklistView.vue') },
     { path: '/my-camping/family', name: 'family-room', component: () => import('../views/family/FamilyRoomView.vue') },
     // 내 정보 (1차: 진단 전 모양). 로그인 여부에 따라 메뉴가 달라진다
     // 1분 진단 (3단계 5문항). 누구나 할 수 있고, 로그인했으면 서버에 저장

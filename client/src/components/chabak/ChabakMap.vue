@@ -19,7 +19,8 @@ const props = defineProps({
   layers: { type: Array, default: () => [] },
 })
 // pick: 지도를 누름 (lat, lng, 점을 눌렀으면 그 item) / bounds: 지도를 움직이고 멈춤 → 보이는 범위 { swLat, swLng, neLat, neLng } (켠 시설을 이 범위로 받음)
-const emit = defineEmits(['pick', 'bounds'])
+// ready: 지도를 쓸 수 있게 됨 (카카오 지도 또는 임시 화면) — 화면이 "내 캠핑에서 온 자리"를 열 때 기다린다
+const emit = defineEmits(['pick', 'bounds', 'ready'])
 
 const router = useRouter()
 const el = ref(null)
@@ -42,6 +43,7 @@ onMounted(async () => {
   if (!el.value) return // 불러오는 사이 다른 화면으로 나갔으면 그리지 않는다
   if (!kakao) {
     mode.value = 'fake'
+    emit('ready')
     return
   }
   mode.value = 'kakao'
@@ -65,6 +67,7 @@ onMounted(async () => {
   })
   draw()
   syncLayers()
+  emit('ready')
 })
 
 onBeforeUnmount(() => {
