@@ -3,6 +3,8 @@ package com.campin.mycamping;
 import java.util.List;
 import java.util.Optional;
 
+import com.campin.weather.DayForecast;
+
 // 체크리스트를 만들 때 바깥에서 가져오는 것 (캠핑장 정보 · 차박 안전점수 · 기상특보)
 // 인터페이스로 둔 이유: 테스트에서 DB·기상청 없이 가짜 값을 넣기 위해 (alert/WarningSource 와 같은 방식)
 public interface ChecklistSource {
@@ -20,4 +22,7 @@ public interface ChecklistSource {
     // 그 위치 시·도에 지금 발효 중인 기상특보. 실제로 받았으면 그 목록(없으면 빈 목록),
     // 못 받았거나(키 없음·호출 실패) 예시(더미)뿐이면 empty
     Optional<List<ChecklistResponse.Warning>> warnings(double lat, double lng);
+
+    // 그 위치의 날씨 예보(단기예보). 받았으면 기상청이 주는 날만 담긴 목록, 못 받았으면(키 없음·호출 실패) empty
+    Optional<List<DayForecast>> forecast(double lat, double lng);
 }

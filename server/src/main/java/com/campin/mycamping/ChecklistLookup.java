@@ -13,10 +13,12 @@ import com.campin.camp.CampMapper;
 import com.campin.camp.CampService;
 import com.campin.chabak.ChabakScoreResponse;
 import com.campin.chabak.ChabakService;
+import com.campin.weather.DayForecast;
+import com.campin.weather.ForecastSource;
 
 import lombok.RequiredArgsConstructor;
 
-// ChecklistSource 의 진짜 구현: camp 표 · 차박 안전점수 · 기상청 특보(10분 캐시된 WarningSource)
+// ChecklistSource 의 진짜 구현: camp 표 · 차박 안전점수 · 기상청 특보(10분 캐시된 WarningSource) · 기상청 단기예보(ForecastSource)
 @Component
 @RequiredArgsConstructor
 public class ChecklistLookup implements ChecklistSource {
@@ -24,6 +26,7 @@ public class ChecklistLookup implements ChecklistSource {
     private final CampMapper campMapper;
     private final ChabakService chabakService;
     private final WarningSource warningSource;
+    private final ForecastSource forecastSource;
 
     @Override
     public Optional<Target> ofCamp(Long campId) {
@@ -55,5 +58,13 @@ public class ChecklistLookup implements ChecklistSource {
                 .filter(a -> region.equals(a.sido()))
                 .map(a -> new ChecklistResponse.Warning(a.category(), a.area(), a.message()))
                 .toList());
+    }
+
+    @Override
+    public Optional<List<DayForecast>> forecast(double lat, double lng) {
+        if (lat < 32 || lat > 39.5 || lng < 124 || lng > 132) {
+            return Optional.empty();
+        }
+        return forecastSource.daily(lat, lng);
     }
 }

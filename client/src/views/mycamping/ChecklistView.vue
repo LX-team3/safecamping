@@ -1,9 +1,10 @@
 <script setup>
 // 출발 준비 체크리스트 (내 캠핑 카드 → "출발 준비"). 서버 GET /api/member/camp-plans/{planId}/checklist
-//  - 이 곳의 안전 정보 · (출발 3일 전부터) 지금 발효 중인 기상특보 · 항목 묶음(특보 대응 · 차박 준비 · 계절 · 공통)
-//  - 묶음 제목을 누르면 접고 펼친다 (처음엔 공통 준비물만 접힘)
+//  - 이 곳의 안전 정보 · (출발 3일 전부터) 지금 발효 중인 기상특보 · 캠핑 기간 날씨 예보 · 항목 묶음(특보 대응 · 차박 준비 · 계절 · 공통)
+//  - 묶음 제목을 누르면 접고 펼친다 (처음엔 공통 준비물만 접힘). "날씨 대응" 묶음은 예보(최저 -12°·0° 이하·비/눈)에 따라 서버가 만든다
 //  - 체크한 항목은 이 브라우저(localStorage)에만 저장한다 — 서버·DB 에 저장하지 않는다 (항목 id 는 서버가 고정값으로 줌)
-// 안전 수치(몇 도 이하 등)는 화면에도 없다: 특보는 기상청이 발표한 이름 그대로, 침낭은 "내 침낭의 쾌적온도 확인"으로 안내
+// 안전 판단 수치(몇 도 이하 등)는 화면에도 없다: 특보는 기상청이 발표한 이름 그대로, 침낭은 "내 침낭의 쾌적온도 확인"으로 안내
+// 날씨 카드의 기온·강수확률·풍속은 기상청 예보를 그대로 보여 줄 뿐, 우리가 기준을 정해 항목을 바꾸지 않는다 (침낭 항목에만 예보 최저기온을 덧붙임)
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BottomNav from '@/components/common/BottomNav.vue'
@@ -60,9 +61,10 @@ function toggle(id) {
 }
 
 // ---- 묶음 접기·펼치기 ----
-const open = ref({ 특보: true, 차박: true, 계절: true, 공통: false })
-const GROUPS = ['특보', '차박', '계절', '공통']
-const groupTitle = (g) => ({ 특보: '특보 대응', 차박: '차박 준비', 계절: `${data.value?.season ?? ''} 준비물`, 공통: '공통 준비물' })[g]
+const open = ref({ 특보: true, 날씨: true, 차박: true, 계절: true, 공통: false })
+const GROUPS = ['특보', '날씨', '차박', '계절', '공통']
+const groupTitle = (g) =>
+  ({ 특보: '특보 대응', 날씨: '날씨 대응', 차박: '차박 준비', 계절: `${data.value?.season ?? ''} 준비물`, 공통: '공통 준비물' })[g]
 const groups = computed(() =>
   GROUPS.map((g) => ({ key: g, title: groupTitle(g), items: (data.value?.items ?? []).filter((i) => i.group === g) }))
     .filter((g) => g.items.length),
@@ -85,6 +87,11 @@ const safetyLink = computed(() =>
     ? { to: { path: '/chabak', query: { lat: plan.value.lat, lng: plan.value.lng } }, text: '차박 판정 보기 ›' }
     : { to: `/camps/${plan.value.campId}`, text: '캠핑장 상세 ›' },
 )
+// ---- 날씨 예보 (서버 forecast.days: { date, minTemp, maxTemp, pop, maxWind, sky, precip }) ----
+const hasForecast = (d) => [d.minTemp, d.maxTemp, d.pop, d.maxWind, d.sky].some((v) => v != null)
+const temp = (v) => (v == null ? '-' : `${Math.round(v)}°`)
+// 하늘 상태 + (비·눈이 있으면) 강수 형태: "구름많음 · 눈"
+const skyText = (d) => [d.sky, d.precip && d.precip !== '없음' ? d.precip : null].filter(Boolean).join(' · ') || '-'
 // 경보는 빨강, 주의보·그 밖은 주황 (기상청 특보 이름에 "경보"가 들어 있으면)
 const warnClass = (category) => (category.includes('경보') ? 'danger' : 'caution')
 </script>
@@ -137,10 +144,33 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
             <b>지금 이 지역에 발효 중인 특보가 없어요</b>
             시·도 단위 기상청 특보 현황 기준이에요.
           </div>
+
+          <!-- 날씨 예보: 캠핑 기간(오늘 이후) 하루씩. 기상청이 주지 않는 날은 "예보 없음" -->
+          <section v-if="data.forecast" class="wx" aria-label="캠핑 기간 날씨">
+            <h2 class="wx-title">캠핑 기간 날씨</h2>
+            <p v-if="!data.forecast.available" class="wx-empty">
+              날씨 예보를 지금 받지 못했어요. 출발 전에 기상청 날씨누리에서 직접 확인해 주세요.
+            </p>
+            <ul v-else class="wx-days">
+              <li v-for="d in data.forecast.days" :key="d.date" class="wx-day">
+                <span class="wx-date">{{ labelWithDay(d.date) }}</span>
+                <template v-if="hasForecast(d)">
+                  <span class="wx-sky">{{ skyText(d) }}</span>
+                  <span class="wx-temp">{{ temp(d.minTemp) }}<small> / {{ temp(d.maxTemp) }}</small></span>
+                  <span class="wx-meta">
+                    <template v-if="d.pop != null">강수확률 {{ d.pop }}%</template>
+                    <template v-if="d.maxWind != null"><br />바람 {{ d.maxWind }}m/s</template>
+                  </span>
+                </template>
+                <span v-else class="wx-none">예보 없음</span>
+              </li>
+            </ul>
+            <p v-if="data.forecast.available" class="wx-foot">기상청 단기예보 · 캠핑장 위치 기준 · 아침 최저 / 낮 최고</p>
+          </section>
         </template>
         <div v-else class="notice">
-          <b>특보는 {{ openText }}부터 보여요</b>
-          출발 3일 전부터 그 지역의 기상특보를 알려 드려요. 그때까지는 준비물을 미리 챙겨 두세요.
+          <b>특보와 날씨는 {{ openText }}부터 보여요</b>
+          출발 3일 전부터 그 지역의 기상특보와 날씨 예보를 알려 드려요. 그때까지는 준비물을 미리 챙겨 두세요.
         </div>
 
         <!-- 항목 묶음 (제목을 누르면 접고 펼침) -->
@@ -319,6 +349,69 @@ h1 {
 }
 .notice b {
   color: var(--color-text);
+}
+/* 캠핑 기간 날씨 (색은 기존 변수만) */
+.wx {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.wx-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.wx-empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-sub);
+}
+.wx-days {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+.wx-day {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-bg-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wx-date,
+.wx-meta,
+.wx-none {
+  font-size: 12px;
+  color: var(--color-text-sub);
+}
+.wx-sky {
+  font-size: 13px;
+}
+.wx-temp {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.wx-temp small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-sub);
+}
+.wx-meta {
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.wx-foot {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--color-text-sub);
 }
 /* 묶음 제목 = 접고 펼치는 버튼 */
 .grp {
