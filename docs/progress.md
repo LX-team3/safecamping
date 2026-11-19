@@ -1,5 +1,44 @@
 # 진행 상황
 
+## 2026-11-19 재난 대피 3D 지도 → 최신 main 위로 합침 (브랜치 `hjs-disaster-map-v2`)
+- `hjs-disaster-map` 를 main(b0b8272) 에서 새로 판 브랜치에 merge. 충돌 3곳(tokens.css 색 변수 · router 경로 · 이 파일)은 양쪽을 모두 남김. 차박·가족방 위치·메타버스 작업은 그대로
+- 확인: `npm run build` 통과. 확인 못 함: 합친 뒤 `npm run dev` 로 화면 열어 보기
+
+## 2026-11-19 재난 대피 3D 지도 고도화 + 대피 기준 교체 (브랜치 `hjs-disaster-map`)
+- 대피 기준(`public/disaster-map/criteria.json`): 출처 없던 120·150mm 단계 삭제 → **60 준비(호우주의보) · 90 대피(호우경보) · 114 즉시 대피(서화 50년에 한 번 큰비, WAMIS 3시간)**. 114mm 부터 50년 홍수 범위에 물. 80·100년은 할 일이 같아 단계 없음. 12·24시간 조건은 설명에만 적음 (화면 슬라이더는 3시간)
+- 지도(`utils/disasterMap.js`):
+  - 홍수 물을 땅에 칠하던 방식 → 범위 가장자리 땅 높이로 만든 **파란 3D 물**이 아래에서 차오름
+  - 물이 차면 대피로를 **물 위에** 그림 (가려져도 보이게)
+  - **등고선**: 10m DEM 에서 직접 계산(10m·50m), 강 위·평지는 뺌, 3km 안에서만 보임
+  - **해 낮추기 · 산 그림자 · 앰비언트 오클루전**으로 산의 굴곡이 보이게
+  - 자전거길·보행로·강을 가로지르는 선 숨김 (강 위 하얀 줄), 캐릭터 작게
+  - **나침반 삭제**: 오른쪽 끌기·Ctrl+끌기·두 손가락으로 360도 돌리기, ← → 키
+- 새 부품 `components/disaster/RouteProfile.vue`: **대피 길의 높낮이 그래프**(실제 땅 단면 + 홍수 물 높이 + 다리). 안내 시트 안. `MapCompass.vue` 삭제
+- 색: `tokens.css` 에 재난지도 색 변수 추가(`--color-dm-*`, `--color-stage-0~3`, 물·강·건물·대피로·등고선, 사용자 승인). 재난지도 화면·부품·엔진의 hex 를 모두 변수로 바꿈 (엔진은 `getComputedStyle` 로 읽어 Cesium 에 넘김)
+- 문구: "3시간 강수량" → "최근 3시간 비", 단계 이름 준비·대피·즉시 대피 (RAG 단계 문서의 "판단"과 같게)
+- RAG 문서(`disaster-map/rag`): 02·03 에 12시간 조건 추가, 04 를 50년 단일 기준으로, README 표 갱신
+- 확인: `npm run build` 통과. `npm run dev` 로 `/disaster` 열어 60mm(준비 · 대피소 길 · 높이 그래프) → 120mm(즉시 대피 · 다리 길 막힘 · 파란 물 · 높은 곳 길 291→330m) 확인
+- 확인 못 함: 휴대폰에서 속도(산 그림자·오클루전이 무거움 — 느리면 `disasterMap.js` "해와 그림자"에서 끔), 오른쪽 끌기·두 손가락 돌리기를 실제 기기로
+
+## 2026-11-17 재난 대피 3D 지도 올림 (브랜치 `hjs-disaster-map`)
+- 새 폴더 `disaster-map/`: 인북천 물빛테마공원 캠핑장 재난 대피 3D 지도(CesiumJS) 웹앱을 그대로 올림 + QGIS 스크립트(`flood_depth.py`, `export_data.py`)
+- 기능: 강수량 슬라이더 5단계 침수 표현, 단계별 대피 경로 2종, 4단계 길안내, 캐릭터 경로 따라가기, 오프라인(PWA)
+- `client/`·`server/`·`db/` 는 바꾸지 않음
+- 확인: 로컬 서버(`python -m http.server`)로 열어 동작 확인 (어제까지 확인한 상태 그대로)
+- 다음: `client/` 에 Vue 컴포넌트로 옮기기 (cesium npm 패키지 추가 필요 → 라이브러리 추가라 팀 승인 후)
+
+## 2026-11-17 재난 대피 3D 지도를 client Vue 화면으로 옮김 (브랜치 `hjs-disaster-map`)
+- 새 화면 `/disaster` (`views/disaster/DisasterMapView.vue`). 라우터에 한 줄 추가, 다른 화면에서 들어가는 버튼은 아직 없음
+- 부품 `components/disaster/`: `AlertPill`(기상특보, 예시 데이터) · `RainSlider`(강수량 → 침수 단계) · `MapCompass`(돌리기·북쪽) · `EvacSheet`(대피 안내·길안내)
+- 지도 엔진 `utils/disasterMap.js`: `disaster-map/app/index.html` 의 Cesium 코드를 옮김. 화면은 reactive state 를 읽고, 버튼은 엔진 함수를 부름. 화면을 떠나면 `destroy()` 로 정리
+- 데이터 `public/disaster-map/`: `data.json`(QGIS 내보내기, 5.8MB) · `criteria.json` · 캐릭터 그림
+- **라이브러리 추가 (팀 확인 필요)**: `cesium` 1.123.0 (`/disaster` 화면에 들어갈 때만 불러옴, 빌드 크기 약 3.5MB). Cesium 작업 파일은 `scripts/copy-cesium.mjs` 가 `npm run dev/build` 전에 `public/cesium` 으로 복사 (git 제외)
+- `package.json` `overrides`: `@zip.js/zip.js` 를 2.7.x 로 고정 — 최신(2.25)은 Cesium 1.123 이 쓰는 파일이 없어 빌드가 깨짐
+- 색: 야간용 어두운 색을 `DisasterMapView.vue` 안 CSS 변수(`--dm-*`)로 둠. tokens.css 에 아직 없는 색이라 팀에서 정하면 옮김
+- 서버·DB: 바꾼 것 없음. 기상특보는 예시 데이터 그대로(서버 특보 API 연결은 다음)
+- 확인: `npm run build` 통과, `npm run dev` 로 `/disaster` 열어 지도·강수량 단계(60→130mm 높은 곳 경로 전환)·길안내 1→2단계·화면 떠날 때 정리 확인
+- 확인 못 함: 휴대폰 실기기, 서버(8080)를 켠 상태에서 다른 화면과 함께 동작
+
 ## 2026-11-18 가족 모임방 위치 탭 서버+DB(family_location) 연결 (브랜치 `lyh-location`)
 - 더미 배열 `client/src/data/familyLocationDummy.js` 삭제. 위치 탭은 `GET /api/family/locations` 결과만 찍는다
 - 동의 = DB 에 내 줄이 있음. localStorage 동의 저장은 없앰 (다른 기기에서도 같은 상태)
