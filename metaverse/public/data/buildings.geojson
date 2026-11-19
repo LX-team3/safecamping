@@ -1,0 +1,18 @@
+{
+"type": "FeatureCollection",
+"name": "buildings",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::5179" } },
+"features": [
+{ "type": "Feature", "properties": { "fid": 1, "type": "water" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061750.1, 2025287.0 ], [ 1061758.2, 2025289.0 ], [ 1061759.1, 2025285.3 ], [ 1061751.1, 2025283.4 ], [ 1061750.1, 2025287.0 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 2, "type": "shower" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061760.2, 2025293.8 ], [ 1061797.3, 2025302.6 ], [ 1061799.8, 2025293.7 ], [ 1061762.5, 2025285.1 ], [ 1061760.2, 2025293.8 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 3, "type": "office" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061799.9, 2025303.2 ], [ 1061813.8, 2025306.5 ], [ 1061816.6, 2025295.7 ], [ 1061803.0, 2025292.5 ], [ 1061799.9, 2025303.2 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 4, "type": "recicle" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061781.2, 2025164.3 ], [ 1061785.7, 2025165.2 ], [ 1061788.4, 2025155.5 ], [ 1061783.7, 2025154.4 ], [ 1061781.2, 2025164.3 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 5, "type": "recicle_toilet" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061784.8, 2025151.8 ], [ 1061789.2, 2025152.7 ], [ 1061791.9, 2025141.9 ], [ 1061787.3, 2025141.0 ], [ 1061784.8, 2025151.8 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 6, "type": "car" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061795.0, 2025114.6 ], [ 1061799.0, 2025115.6 ], [ 1061799.5, 2025113.7 ], [ 1061795.5, 2025112.7 ], [ 1061795.0, 2025114.6 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 7, "type": "car" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061794.0, 2025118.1 ], [ 1061798.0, 2025119.1 ], [ 1061798.5, 2025117.2 ], [ 1061794.5, 2025116.3 ], [ 1061794.0, 2025118.1 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 8, "type": "car" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061816.8, 2025297.8 ], [ 1061820.7, 2025298.9 ], [ 1061821.2, 2025296.9 ], [ 1061817.2, 2025296.0 ], [ 1061816.8, 2025297.8 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 9, "type": "car" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061815.9, 2025301.2 ], [ 1061819.9, 2025302.3 ], [ 1061820.4, 2025300.4 ], [ 1061816.4, 2025299.4 ], [ 1061815.9, 2025301.2 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 10, "type": "car" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061834.7, 2025196.7 ], [ 1061838.7, 2025196.0 ], [ 1061838.3, 2025194.0 ], [ 1061834.3, 2025194.8 ], [ 1061834.7, 2025196.7 ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 11, "type": "car" }, "geometry": { "type": "Polygon", "coordinates": [ [ [ 1061837.6, 2025246.1 ], [ 1061841.6, 2025246.6 ], [ 1061841.9, 2025244.7 ], [ 1061837.8, 2025244.2 ], [ 1061837.6, 2025246.1 ] ] ] } }
+]
+}
