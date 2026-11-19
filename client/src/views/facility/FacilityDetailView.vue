@@ -1,6 +1,8 @@
 <script setup>
 // 시설 상세 (응급실·소방서 등). 캠핑장 상세 안전점수 탭에서 들어온다 (?camp=캠핑장id)
 // 데이터: GET /api/facilities/{id}?campId=
+// 경로: GET /api/camps/{campId}/routes (캠핑장 상세와 같은 API, 서버가 24시간 저장해 둬서 카카오를 다시 부르지 않는다)
+//       이 시설의 도로 경로를 받으면 그 길을 따라 그리고, 못 받으면 점선 직선 (도로가 아니라는 표시)
 // 전화·주소는 지어내지 않는다 → 없으면 "확인 필요"
 import { computed, ref, watch } from 'vue'
 import RouteMap from '@/components/map/RouteMap.vue'
@@ -18,6 +20,8 @@ const props = defineProps({
 const facility = ref(null)
 const error = ref('')
 const copied = ref('')
+const route = ref(null) // 이 시설까지 카카오 경로 { path, durationMin, distanceKm } (못 받으면 null)
+const routeState = ref('none') // none(캠핑장 없이 들어옴) · loading · ok · fail
 
 async function load() {
   error.value = ''
@@ -30,6 +34,26 @@ async function load() {
 }
 watch(() => [props.id, props.campId], load, { immediate: true })
 
+// 경로는 상세와 따로 부른다: 카카오가 느리거나 실패해도 시설 정보는 먼저 보여야 하므로
+async function loadRoute() {
+  route.value = null
+  if (!props.campId) {
+    routeState.value = 'none'
+    return
+  }
+  const key = `${props.campId}-${props.id}`
+  routeState.value = 'loading'
+  try {
+    const res = await api(`/api/camps/${props.campId}/routes`)
+    if (key !== `${props.campId}-${props.id}`) return // 기다리는 사이 다른 시설로 바뀌었으면 버린다
+    route.value = res.routes.find((r) => r.facilityId === props.id && r.ok) ?? null
+    routeState.value = route.value ? 'ok' : 'fail'
+  } catch {
+    if (key === `${props.campId}-${props.id}`) routeState.value = 'fail'
+  }
+}
+watch(() => [props.id, props.campId], loadRoute, { immediate: true })
+
 const origin = computed(() => {
   const from = facility.value?.from
   return from ? { name: from.campName, lat: from.lat, lng: from.lng } : null
@@ -37,9 +61,21 @@ const origin = computed(() => {
 const targets = computed(() =>
   facility.value
     // 지도에는 아이콘만 (종류 이름은 화면 위 태그에 이미 있음). name 은 화면 읽기 프로그램용
-    ? [{ id: facility.value.id, type: facility.value.type, name: FACILITY_LABEL[facility.value.type], lat: facility.value.lat, lng: facility.value.lng }]
+    ? [{ id: facility.value.id, type: facility.value.type, name: FACILITY_LABEL[facility.value.type],
+        lat: facility.value.lat, lng: facility.value.lng, path: route.value?.path }]
     : [],
 )
+// 도로 경로가 없을 때만 점선 (직선이라는 표시)
+const dotted = computed(() => !route.value?.path?.length)
+// 시간·거리: 카카오 경로를 받았으면 그 값, 아니면 DB 값 (캠핑장 상세 경로 지도와 같은 규칙)
+const driveMin = computed(() => route.value?.durationMin ?? facility.value?.from?.driveMin)
+const distanceKm = computed(() => route.value?.distanceKm ?? facility.value?.from?.distanceKm)
+const routeNote = computed(() => {
+  if (routeState.value === 'loading') return '경로를 불러오는 중...'
+  if (routeState.value === 'fail') return '실제 경로를 불러오지 못해 직선(점선)으로 보여 드려요'
+  if (routeState.value === 'ok') return '카카오 길찾기 예상 시간 · 교통 상황에 따라 달라질 수 있어요'
+  return ''
+})
 const place = computed(() => {
   const f = facility.value
   return f ? `${shortSido(f.sido)} ${f.sigungu} ${f.eupmyeon || ''}`.trim() : ''
@@ -70,7 +106,7 @@ async function copyPhone() {
     <template v-else>
       <div class="map">
         <!-- 마커 색 = 출발 캠핑장의 안전점수 등급 (캠핑장 없이 들어오면 회색) -->
-        <RouteMap :origin="origin" :targets="targets" :grade="facility.from?.grade" :selected-id="facility.id" dotted />
+        <RouteMap :origin="origin" :targets="targets" :grade="facility.from?.grade" :selected-id="facility.id" :dotted="dotted" />
       </div>
 
       <main class="body">
@@ -81,14 +117,15 @@ async function copyPhone() {
         <div class="cards">
           <div v-if="facility.from" class="card time" :class="facility.from.tone">
             <small>{{ toneLabel }} · {{ facility.from.campName }}에서</small>
-            <b>차로 {{ facility.from.driveMin }}분</b>
-            <span>{{ facility.from.distanceKm.toFixed(1) }}km</span>
+            <b>차로 {{ driveMin }}분</b>
+            <span>{{ distanceKm.toFixed(1) }}km</span>
           </div>
           <div class="card">
             <small>운영 시간</small>
             <b class="hours">{{ facility.hours || '공공데이터 연동 시 표시' }}</b>
           </div>
         </div>
+        <p v-if="routeNote" class="route-note">{{ routeNote }}</p>
         <p v-if="facility.dummy" class="dummy">거리·시간·위치는 더미 데이터예요. 실제 정보가 아니에요.</p>
 
         <InfoRows :infos="facility.infos">
@@ -195,6 +232,11 @@ h1 {
 }
 .card.time.caution small {
   color: var(--color-caution);
+}
+.route-note {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-text-sub);
 }
 .dummy {
   margin: 8px 0 4px;

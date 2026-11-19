@@ -35,7 +35,7 @@ nearby/   # 내 주변 탭 (내 위치 → 가장 가까운 캠핑장 기준 안
 mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개. 출발 준비 체크리스트 Checklist* (ChecklistItems 문구 · ChecklistService 3일 규칙 · ChecklistSource 인터페이스=테스트용, 구현 ChecklistLookup)
 weather/  # 날씨 예보 (화면 없음, 체크리스트가 씀). 기상청 단기예보 KmaForecastClient(getVilageFcst, 격자별 3시간 캐시, 환경변수 KMA_SERVICE_KEY) + KmaGrid(위·경도 → 5km 격자) + ForecastParser(시간별 → 하루치 DayForecast). 못 받으면 empty (예시 값 없음). ForecastSource = 테스트용 인터페이스. 4~7일 앞 중기예보는 아직 없음
 chabak/   # 차박 판정 (지도에서 찍은 지점 → 불가·주의·제한 없음·야영 가능). 판정 규칙은 전부 DB chabak 스키마 함수(fn_verdict → fn_verdict_json)에 있고 서버는 그 JSON 을 ChabakVerdictResponse 로 옮겨 전달. 범위 인제군
-score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 분 기준은 ScoreRules.TIME 한곳 (없는 종류 보안등·CCTV 는 public.score_weights 거리 기준). 실행: 서버를 --score 인자로 켤 때 한 번
+score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 기준은 ScoreRules 한곳: 등급(TIERS) → ROC 배점, 분 기준(TIME). 직선거리·score_weights·보안등·CCTV 는 쓰지 않음. 실행: 서버를 --score 인자로 켤 때 한 번
 ```
 
 ## 상세 의존성 목록
@@ -46,6 +46,11 @@ score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(�
 - Maven 설치 없이 Maven Wrapper 를 쓴다 (`backend/` 에서 실행)
 - 실행: `.\mvnw.cmd spring-boot:run` → http://localhost:8080
 - 테스트: `.\mvnw.cmd test` — 코드를 고친 뒤 반드시 통과 확인
+- 안전점수 다시 계산: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--score"` (`server/` 에서)
+  - 하는 일: 캠핑장 23곳 → 시설(응급실·소방서·경찰·약국·편의점)까지 카카오 차 소요시간을 받아 `camp.safety_score`·`er_drive_min`, `camp_facility.drive_min` 을 고친다. 기준은 `score/ScoreRules`
+  - 필요한 것: 환경변수 `KAKAO_REST_KEY`, DB 연결
+  - 언제: `db/merge_to_public.sql` 을 다시 실행한 뒤(점수가 직선 추정값으로 돌아가므로), 캠핑장·시설 데이터나 `ScoreRules` 를 바꾼 뒤
+  - 왜 인자로만 켜나: 한 번에 카카오를 100번 넘게 불러 하루 한도를 쓴다. API 로 열면 아무나 부를 수 있고, 평소 실행마다 돌면 한도가 낭비된다.
 - DB 연결 자동 설정은 `application.properties` 에서 꺼 둠 (DB 연결할 때 그 줄을 지운다)
 
 ## API 목록
