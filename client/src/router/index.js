@@ -1,11 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { webRoutes } from './webRoutes'
+
+// 화면 폭이 이 값 이상이면 웹(PC)으로 본다
+const WEB_MIN_WIDTH = 768
+const isWideScreen = () => window.matchMedia(`(min-width: ${WEB_MIN_WIDTH}px)`).matches
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/', redirect: '/explore'
+      // 처음 들어올 때 화면 폭을 보고 웹(PC)이면 /web, 모바일이면 /explore 로 보낸다
+      path: '/', redirect: () => (isWideScreen() ? '/web' : '/explore')
     },
     // ①-3 로그인, ①-4 회원가입
     { path: '/login', name: 'login', component: () => import('../views/member/LoginView.vue') },
@@ -55,7 +61,15 @@ const router = createRouter({
     // 재난 대피 3D 지도 (인북천 물빛테마공원 캠핑장, CesiumJS). 이 화면에 들어올 때만 Cesium 을 불러온다
     { path: '/disaster', name: 'disaster', component: () => import('../views/disaster/DisasterMapView.vue') },
 
+    ...webRoutes, // 웹(PC) 전용 주소 (/web/...)
   ],
+})
+
+// 좁은 화면(휴대폰)에서 /web/... 주소로 들어오면 같은 화면의 모바일 주소로 보낸다 (공유된 링크 대비)
+router.beforeEach((to) => {
+  if (/^\/web(\/|$)/.test(to.path) && !isWideScreen()) {
+    return to.path.replace(/^\/web/, '') || '/explore'
+  }
 })
 
 export default router
