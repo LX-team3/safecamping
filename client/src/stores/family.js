@@ -10,12 +10,14 @@ export const useFamilyStore = defineStore('family', () => {
   const places = ref([]) // [{ id, name, description, lon, lat, createdByName }]
   const children = ref([]) // [{ id, name, birthDate, bloodType, allergy, disease, medicine, memo, updatedByName, updatedAt }]
   const schedules = ref([]) // [{ id, title, startAt, memo, createdByName }] 시간 순
+  const locations = ref([]) // [{ id: 회원 id, name, lat, lng, me, updatedAt }] 위치 공유에 동의한 사람만
 
   // 방이 바뀌면(만들기·들어가기·나가기) 이전 방의 목록이 남지 않게 비운다
   function clearLists() {
     places.value = []
     children.value = []
     schedules.value = []
+    locations.value = []
   }
 
   async function fetchRoom() {
@@ -79,11 +81,26 @@ export const useFamilyStore = defineStore('family', () => {
     schedules.value = schedules.value.filter((s) => s.id !== id)
   }
 
+  // 가족 위치 (family_location 테이블). 공유에 동의한 사람만 목록에 있다 → 목록에 "나"(me)가 있으면 동의한 것
+  async function fetchLocations() {
+    locations.value = await api('/api/family/locations')
+  }
+  // 내 위치 저장. { lat, lng } 는 브라우저 GPS 값 — 지금은 화면에서 부르지 않는다 (DB 좌표만 씀, 2026-11-19)
+  async function saveMyLocation({ lat, lng }) {
+    await api('/api/family/locations/me', { method: 'put', body: { lat, lng } })
+  }
+  // 위치 공유 끄기: 서버에서 내 줄을 지우고, 화면 목록에서도 나를 뺀다
+  async function deleteMyLocation() {
+    await api('/api/family/locations/me', { method: 'delete' })
+    locations.value = locations.value.filter((l) => !l.me)
+  }
+
   return {
     room, places, children, schedules,
     fetchRoom, createRoom, join, leave,
     fetchPlaces, addPlace, deletePlace,
     fetchChildren, addChild, updateChild, deleteChild,
     fetchSchedules, addSchedule, deleteSchedule,
+    locations, fetchLocations, saveMyLocation, deleteMyLocation,
   }
 })

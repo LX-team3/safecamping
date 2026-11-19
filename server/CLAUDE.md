@@ -27,7 +27,7 @@ region/   # ③ 지역 찾기
 map/      # ④ 캠핑지도
 saved/    # 저장(목록 탭)·하트(관심 캠핑장 기본 목록)·관심 캠핑장 비교 (saved_list·saved_camp 테이블, 비교 값은 camp·camp_facility·원본 raw.camps)
 alert/    # 내 정보 · 알림 (기상특보 + 재난문자). 기상특보 = KmaWarningClient(기상청 특보현황, 10분 캐시, 환경변수 KMA_SERVICE_KEY) + KmaWarningParser(t6 글 → 시·도별 Alert), 재난문자 = SafetyDataDisasterClient(행정안전부 긴급재난문자 DSSP-IF-00247, 20분 캐시·하루 99회 한도, 환경변수 SAFETY_DATA_KEY, 등록한 IP 에서만 호출됨) + DisasterMessageParser(응답 → 시·도별 Alert, 전국 문자는 모든 지역에 보임). 못 받으면 AlertDummyData. 지역은 Sido(임시 가장 가까운 시·도)
-family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치도 여기에
+family/   # 내 캠핑 탭 · 가족 모임방 (family_room·family_member·meeting_place 테이블). 아이 카드·일정·위치(Location*, family_location 테이블)도 여기에
 tour/     # 관광지 상세 + 관광지 탭 여행 취향 TourPreference* (member_tour_preference 테이블. 선택지는 TourPreferenceOptions)
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
 route/    # 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (카카오모빌리티 길찾기, 키는 환경변수 KAKAO_REST_KEY). DirectionsSource = 테스트용 인터페이스
@@ -86,6 +86,8 @@ score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(�
 | `GET`·`POST /api/family/places` · `DELETE /api/family/places/{id}` | 모일 장소 목록·추가 `{ name, description?, lon?, lat? }`·삭제 (다른 방 장소 id 는 404) |
 | `GET`·`POST /api/family/children` · `PUT`·`DELETE /api/family/children/{id}` | 아이 건강 응급 카드 목록·추가·수정·삭제 `{ name, birthDate?, bloodType?, allergy?, disease?, medicine?, memo? }` |
 | `GET`·`POST /api/family/schedules` · `DELETE /api/family/schedules/{id}` | 가족 일정 목록(시간 순)·추가 `{ title, startAt: "2026-11-14T06:00:00+09:00", memo? }`·삭제 |
+| `GET /api/family/locations` | 우리 가족방 구성원의 마지막 위치 (위치가 있는 사람만, 들어온 순서) `[{ id: 회원 id, name, lat, lng, me, updatedAt }]`. `me` = 로그인한 나. 줄이 있는 사람 = 위치 공유에 동의한 사람 |
+| `PUT`·`DELETE /api/family/locations/me` | 내 위치 저장 `{ lat, lng }` (브라우저 GPS, 있으면 덮어씀 · 범위 밖 400) / 위치 공유 끄기 (내 줄 삭제). 가족방 없으면 404. 방을 나가면(`DELETE /api/family/room/me`) 내 위치도 지움 |
 | `GET /api/camps/{id}/routes` | 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (화장실 뺌) (카카오모빌리티, 시설마다 1번씩 동시 호출, 전부 성공하면 24시간 메모리 저장). `{ source: kakao·straight, routes: [{ facilityId, type, name, ok, dummy, distanceKm, durationMin, path: [[위도, 경도], ...] }] }`. 키 없음·실패면 `ok: false` + 직선 두 점 + DB 시간. 없는 캠핑장 400. 로그인 없이 됨 |
 | `GET /api/nearby?lat=&lng=` | 내 주변 (**더미**). 시설 데이터가 있는 가장 가까운 캠핑장 기준 → `{ dummy, basis: { campId, campName, sido, sigungu, eupmyeon, lat, lng, distanceKm, far }, safetyScore, grade, facilities: [{ no, id, type, name, lat, lng, distanceKm, driveMin, tone, dummy }] }`. `far` 는 10km 초과(임시). 없으면 `basis: null`. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
 | `GET`·`POST /api/member/camp-plans` · `DELETE /api/member/camp-plans/{id}` | 내 캠핑 (캠핑장 상세·차박 판정 카드 "내 캠핑에 일정 등록"). GET → 체크인 빠른 순 `[{ id, campId, campName, place, lat, lng, checkIn, checkOut, memo }]` (`campId` 가 null 이면 캠핑장이 아닌 차박 자리 — `lat`·`lng` 가 있음). POST 두 가지: 캠핑장 `{ campId, campName, place?, checkIn: "2026-11-14", checkOut, memo? }` / 자리 `{ campName(지번 등 이름), place?, lat, lng, checkIn, checkOut, memo? }` (campId 없이 좌표, 소수 6자리로 맞춰 저장) → 201. 둘 다 없음·위치 범위 밖·지난 체크인·체크아웃 ≤ 체크인·같은 캠핑장(같은 자리)+체크인 중복 400. 남의 id 삭제 404. 로그인 필요. **DB `schema_05.sql` 실행 후** 동작 |

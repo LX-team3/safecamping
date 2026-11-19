@@ -1,5 +1,17 @@
 # 진행 상황
 
+## 2026-11-18 가족 모임방 위치 탭 서버+DB(family_location) 연결 (브랜치 `lyh-location`)
+- 더미 배열 `client/src/data/familyLocationDummy.js` 삭제. 위치 탭은 `GET /api/family/locations` 결과만 찍는다
+- 동의 = DB 에 내 줄이 있음. localStorage 동의 저장은 없앰 (다른 기기에서도 같은 상태)
+  - 동의하기·스위치 켜기 → 브라우저 GPS 를 받아 `PUT /api/family/locations/me` (UPSERT) → 목록 다시 불러와 지도에 찍음. GPS 를 못 받으면 저장하지 않고 문구만 보임 (가짜 좌표 안 넣음)
+  - 스위치 끄기 → `DELETE /api/family/locations/me` (내 줄 삭제 → 가족에게 안 보임)
+  - (같은 날 변경) 위쪽 "가족 위치 확인" 문구·위치 공유 스위치 삭제. 안내창은 "위치 공유에 동의하시겠습니까?" + [동의 안 함] [동의합니다]. "언제든 끌 수 있어요" 문구도 뺌 → **화면에서 공유를 끄는 방법이 없음** (방 나가기로만 삭제, API `DELETE /api/family/locations/me` 는 남겨 둠)
+  - 새로고침 → 내 GPS 다시 저장(못 받으면 건너뜀) + 목록 다시 불러오기
+  - (2026-11-19 변경) **브라우저 GPS 저장은 일단 뺌.** 위치 탭은 `family_location` 에 SQL 로 넣은 좌표만 찍는다. [동의합니다]는 서버에 저장하지 않고 이번 화면에서만 지도를 보여 줌 (내 줄이 있으면 묻지 않음). 새로고침 = DB 다시 읽기. 서버 PUT API·store `saveMyLocation` 은 남겨 둠
+  - 방 나가기(`DELETE /api/family/room/me`) 때도 내 위치 삭제 (11-06 합의 "끄거나 나가면 삭제")
+- 백엔드: `LocationRequest` 추가, `LocationMapper.upsert·delete`, `LocationService.saveMine·deleteMine`, `FamilyMapper.deleteLocation`. DB 구조는 그대로 (`schema_05.sql` 주석만 갱신)
+— 화면이 열려 있는 동안 자동 갱신은 아직 없음
+
 ## 2026-11-18 출발 준비 체크리스트 2단계: 캠핑 기간 날씨 예보 (기상청 단기예보, DB 변경 없음)
 - 출발 3일 전부터(캠핑 중 포함) 체크리스트 화면에 **"캠핑 기간 날씨"** 카드: 캠핑 날짜(오늘 이후, 최대 7일)마다 하늘 · 최저/최고기온 · 강수확률 · 풍속. 기상청이 주지 않는 날은 "예보 없음". 못 받으면 "날씨 예보를 지금 받지 못했어요" (예시 값 없음)
 - 새 패키지 `server/.../weather/`: `KmaGrid`(위·경도 → 기상청 5km 격자, 기상청 공개 공식) · `KmaForecastClient`(getVilageFcst, 격자별 3시간 캐시, 1분 실패 대기, 환경변수 `KMA_SERVICE_KEY` 특보와 같은 키) · `ForecastParser`(시간별 → 하루치) · `ForecastSource`(테스트용 인터페이스) · `DayForecast`
@@ -143,6 +155,20 @@
 - 확인: `npm run build` 통과
 - 확인 못 함: 브라우저에서 실제로 눌러 보기 (카카오 지도 클릭 · 필지 칠하기 · 시트 올리고 내리기)
 - 남은 것: 인제군 경계선 표시(경계 데이터 없음), 차박 지도 위 등록 야영장 마커, 근처 야영장 줄을 캠핑장 상세로 잇기(응답에 id 없음)
+
+## 2026-11-16 가족 모임방 3차 위치 탭 — 1단계: 빈 지도 (브랜치 `lyh-location`)
+- 새 파일 `client/src/components/family/LocationTab.vue`: 위치 탭을 누르면 카카오 지도를 띄운다. 가로는 화면 폭, 세로 55vh(최소 280px). 창 크기가 바뀌면 `keepMapSized` 로 다시 맞춤
+- `FamilyRoomView.vue`: `TABS` 의 위치 탭 `component: null` → `LocationTab` ("준비 중이에요" 대신 지도)
+- 마커 수정: 파란 점(흰 테두리 + 흰 빛) 아래에 파란 이름표(흰 글씨, 테두리 없음). 색 변수 `--color-family-pin` 추가(`tokens.css`, 길 선 파랑 재사용). 더미 인물 짱구·맹구, 좌표는 인제군청 부지 안 대략값(확인 필요). 가까운 두 점이 겹치지 않게 `fitPoints` 최소 확대를 3으로
+- 새로고침 버튼(탭 오른쪽 위): 위치를 다시 불러와 마커를 새로 찍고 가족이 모두 보이게 지도를 다시 맞춤. 지도 아래에 "HH:MM 확인" 표시 (확인한 시각이지 위치가 찍힌 시각이 아님). 지금은 더미라 값은 같고, 서버 연결 때 `refresh()` 안의 한 줄만 API 호출로 바꾸면 됨
+- 위치 공유 동의(시연용): 위치 탭에 들어오면 동의 안내창("내 위치가 이 가족방 구성원에게 보여요 · 언제든 끌 수 있어요", [나중에] [동의하고 보기]). 동의 전에는 지도를 만들지 않음. 나중에 → "동의하면 가족 위치를 볼 수 있어요" + [동의하기]. 동의는 이 브라우저 localStorage(`campin.locationConsent.<회원 id>`)에만 저장 → 다음부터 안 물음. 지도 아래 [공유 끄기]로 철회. 실제 서비스에서는 DB(`location_consent` 안)에 저장해야 함. 회원가입 화면은 바꾸지 않음
+- "나" 마커 구분: 나는 밝은 초록 점·이름표(이름만, "(나)" 표시 없음), 겹치면 위에 표시. 색 변수 `--color-family-me: #16a34a` (사용자 요청으로 새 색 추가).
+- 가족방 구성원 목록: "(나)" 글자를 빼고 내 이름 칩을 같은 밝은 초록(`--color-family-me`) + 흰 굵은 글씨로. 마우스를 올리면 "로그인한 나", 화면 읽기 프로그램에는 "이름, 나"
+- 탭 순서: 위치 · 모일 곳 · 아이 카드 · 일정 (가족방에 들어오면 위치 탭이 먼저)
+- 동의 화면 변경: 화면 전체를 어둡게 덮던 안내창 대신, 지도 칸을 회색(`--color-photo`)으로 두고 가운데에 팝업 카드("내 위치가 이 가족방 구성원에게 보여요. 공유는 언제든 끌 수 있어요." [나중에] [동의하기]). 나중에 → 같은 문구 + [동의하기]만 남고 회색 유지. 동의하면 같은 칸에 지도
+- 3단계 DB: `db/schema_05.sql` — `family_location`(member_id UNIQUE · lon · lat · updated_at). 더미 여부 컬럼은 두지 않음(지금은 전부 시드라 구분할 대상이 없음, 시드 주석에 "시연용 가상 좌표"). 시드 INSERT 는 주석으로 넣어 둠(login_id 를 바꿔 따로 실행). **아직 어떤 DB 에도 실행 안 함**
+- 서버: `family/` 에 LocationController · LocationService · LocationMapper · LocationResponse · FamilyLocation. `GET /api/family/locations` → `[{ id, name, lat, lng, me, updatedAt }]`. 방 확인은 `requireMyRoom`, 방 구성원 중 위치가 있는 사람만(JOIN family_member → 나간 사람은 안 보임)
+- 위치 탭 모양 수정 (2026-11-16): 위쪽에 "위치 공유" on/off 스위치(LayerSheet 스위치와 같은 모양, 켜기 = 동의 · 끄기 = 철회, 아래 "공유 끄기" 글자 버튼은 없앰). 새로고침은 지도 오른쪽 위 동그란 버튼으로 옮김.
 
 ## 2026-11-12 DB 정리 3단계: saved_camp.camp_id 숫자 + 캠핑장 외래키 (브랜치 `db-cleanup-2`)
 - 새 파일 `db/schema_04.sql`: ① camp 에 없는 캠핑장을 가리키는 `saved_camp` 줄 삭제 (더미 `c1`~`c3`, 덤프 기준 4줄) ② `saved_camp.camp_id` varchar → bigint ③ 외래키 `saved_camp.camp_id` · `camp_plan.camp_id` → `camp(id)`
