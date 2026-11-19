@@ -1,6 +1,6 @@
 <script setup>
-// 3시간 강수량 슬라이더: 밀면 물이 차오르는 범위가 바뀜
-// 눈금: 60·90mm 는 기상청 호우특보(주의보·경보) 기준, 120·150mm 는 범람 범위를 보여 주는 참고 단계(흐리게)
+// 최근 3시간 동안 내린 비 슬라이더: 밀면 단계와 물이 차오르는 범위가 바뀜
+// 눈금: 60·90mm = 기상청 호우주의보·경보 기준, 114mm = 이 지역에 50년에 한 번 올 큰비 (criteria.json)
 import { computed } from 'vue'
 
 const props = defineProps({ state: { type: Object, required: true } })
@@ -18,12 +18,12 @@ const ticks = computed(() => props.state.stages.slice(1))
 <template>
   <section class="flood" aria-label="강수량에 따라 잠기는 범위">
     <div class="top">
-      <span class="k">3시간 강수량</span>
+      <span class="k">최근 3시간 비</span>
       <span class="v"><b>{{ state.rain }}</b>mm</span>
       <span class="stage"><i :style="{ background: state.stage.color }"></i>{{ state.stage.label }}</span>
       <span class="src" :class="{ ai: state.stage.ai }">{{ state.stage.ai ? 'AI 판단' : '기준표' }}</span>
     </div>
-    <input type="range" min="0" :max="state.maxRain" step="5" :value="state.rain" aria-label="3시간 강수량"
+    <input type="range" min="0" :max="state.maxRain" step="5" :value="state.rain" aria-label="최근 3시간 동안 내린 비"
       :style="{ '--track': track }" @input="emit('change', +$event.target.value)">
     <div class="ticks" aria-hidden="true">
       <span v-for="s in ticks" :key="s.from" :class="{ ref: s.ref }" :style="{ left: pct(s.from) + '%' }">
@@ -37,7 +37,7 @@ const ticks = computed(() => props.state.stages.slice(1))
 <style scoped>
 .flood {
   position: absolute; z-index: 6; left: 12px; right: 12px; top: calc(80px + env(safe-area-inset-top, 0px));
-  background: rgba(20, 27, 33, 0.9); border: 1px solid var(--dm-line); border-radius: 12px;
+  background: var(--color-dm-shade); border: 1px solid var(--dm-line); border-radius: 12px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); padding: 6px 10px 4px; display: flex; flex-direction: column; backdrop-filter: blur(8px);
 }
 .top { display: flex; align-items: center; gap: 6px; }
@@ -51,8 +51,8 @@ const ticks = computed(() => props.state.stages.slice(1))
 input { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; background: transparent; margin: 0; touch-action: pan-x; cursor: pointer; }
 input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--track); }
 input::-moz-range-track { height: 6px; border-radius: 3px; background: var(--track); }
-input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: #fff; border: 3px solid var(--dm-ground); box-shadow: 0 2px 6px rgba(0, 0, 0, .5); }
-input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid var(--dm-ground); }
+input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--color-map-line); border: 3px solid var(--dm-ground); box-shadow: 0 2px 6px rgba(0, 0, 0, .5); }
+input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--color-map-line); border: 3px solid var(--dm-ground); }
 input:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; border-radius: 6px; }
 .ticks { position: relative; height: 12px; margin: -5px 10px 0; font-family: var(--dm-font-num); font-size: 9.5px; color: var(--dm-muted); }
 .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }

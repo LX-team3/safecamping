@@ -26,15 +26,15 @@ const open = ref(false)
 .alert { pointer-events: auto; max-width: 62%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .pill {
   font: inherit; display: flex; align-items: center; gap: 8px; border: 0; cursor: pointer; text-align: left;
-  background: var(--dm-caution); color: #2A1E00; border-radius: 12px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  background: var(--dm-caution); color: var(--color-dm-on-light); border-radius: 12px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
-.pill.warn { background: var(--dm-severe); color: #fff; }
+.pill.warn { background: var(--dm-severe); color: var(--color-dm-on-light); }
 .pill:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
 .ico { width: 18px; height: 18px; flex: none; }
 .pill b { font-size: 14px; display: block; }
 .pill small { font-size: 11px; opacity: 0.85; display: block; }
 .card {
-  background: rgba(20, 27, 33, 0.97); border: 1px solid var(--dm-line); border-radius: 12px; padding: 12px 14px;
+  background: var(--dm-sheet); border: 1px solid var(--dm-line); border-radius: 12px; padding: 12px 14px;
   font-size: 13px; line-height: 1.6; color: var(--dm-text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 .card p { margin: 0 0 6px; }

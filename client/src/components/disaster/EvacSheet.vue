@@ -1,6 +1,8 @@
 <script setup>
 // 아래 대피 안내 시트: 기본(대피 장소·경로 고르기·행동요령) / 길안내(단계별) 두 모양
 // 지도를 만지면 접히고(지도가 가려지지 않게), 손잡이를 누르면 펼쳐진다
+import RouteProfile from '@/components/disaster/RouteProfile.vue'
+
 defineProps({
   state: { type: Object, required: true },
   map: { type: Object, default: null },   // utils/disasterMap.js 가 돌려준 동작들
@@ -43,6 +45,8 @@ defineProps({
         <button type="button" class="btn ghost" @click="map?.toggleTour()">{{ state.tourOn ? '■ 미리 보기 멈추기' : '▶ 대피 경로 따라가기' }}</button>
       </div>
 
+      <RouteProfile :state="state" />
+
       <div class="sec small">
         <h3>침수 시 행동요령</h3>
         <ul class="todo">
@@ -84,7 +88,7 @@ defineProps({
 }
 .sheet.min { max-height: 168px; }
 .grab { font: inherit; align-self: center; width: 64px; height: 22px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; flex: none; }
-.grab::before { content: ""; width: 40px; height: 5px; border-radius: 3px; background: #3A4752; }
+.grab::before { content: ""; width: 40px; height: 5px; border-radius: 3px; background: var(--color-dm-grab); }
 .grab:focus-visible { outline: 2px solid var(--dm-water); border-radius: 6px; }
 
 .sec { display: flex; flex-direction: column; gap: 14px; }
@@ -92,7 +96,7 @@ defineProps({
 .sec h3 { margin: 0; font-size: 13px; color: var(--dm-muted); font-weight: 500; }
 
 .state-row { display: flex; gap: 12px; align-items: center; }
-.badge { flex: none; font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 8px; background: var(--lv); color: #120A02; }
+.badge { flex: none; font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 8px; background: var(--lv); color: var(--color-dm-on-light); }
 .state-row h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 700; text-wrap: balance; }
 .state-row p { margin: 4px 0 0; font-size: 13px; color: var(--dm-muted); line-height: 1.5; }
 
@@ -106,7 +110,7 @@ defineProps({
 .shelter .where { font: inherit; justify-self: start; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 
 .btn { font: inherit; font-weight: 700; border: 0; border-radius: 14px; cursor: pointer; min-height: 52px; font-size: 16px; }
-.btn.primary { background: var(--lv); color: #120A02; }
+.btn.primary { background: var(--lv); color: var(--color-dm-on-light); }
 .btn.ghost { background: transparent; color: var(--dm-text); border: 1px solid var(--dm-line); min-height: 46px; font-size: 14px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn:focus-visible, .seg button:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
