@@ -1,0 +1,19 @@
+{
+"type": "FeatureCollection",
+"name": "facilities",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::5179" } },
+"features": [
+{ "type": "Feature", "properties": { "fid": 1, "name": "관리동", "type": "office" }, "geometry": { "type": "Point", "coordinates": [ 1061810.0, 2025296.9 ] } },
+{ "type": "Feature", "properties": { "fid": 2, "name": "샤워장", "type": "shower" }, "geometry": { "type": "Point", "coordinates": [ 1061782.6, 2025290.5 ] } },
+{ "type": "Feature", "properties": { "fid": 3, "name": "샤워장 화장실", "type": "shower_toilet" }, "geometry": { "type": "Point", "coordinates": [ 1061796.2, 2025293.6 ] } },
+{ "type": "Feature", "properties": { "fid": 4, "name": "개수대", "type": "water" }, "geometry": { "type": "Point", "coordinates": [ 1061766.1, 2025287.1 ] } },
+{ "type": "Feature", "properties": { "fid": 5, "name": "분수대", "type": "fountain" }, "geometry": { "type": "Point", "coordinates": [ 1061822.5, 2025270.3 ] } },
+{ "type": "Feature", "properties": { "fid": 6, "name": "분리수거장", "type": "recicle" }, "geometry": { "type": "Point", "coordinates": [ 1061786.0, 2025159.7 ] } },
+{ "type": "Feature", "properties": { "fid": 7, "name": "분리수거장 화장실", "type": "recicle_toilet" }, "geometry": { "type": "Point", "coordinates": [ 1061790.0, 2025146.1 ] } },
+{ "type": "Feature", "properties": { "fid": 8, "name": "데크", "type": "deck" }, "geometry": { "type": "Point", "coordinates": [ 1061801.5, 2025253.0 ] } },
+{ "type": "Feature", "properties": { "fid": 9, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061773.2, 2025274.3 ] } },
+{ "type": "Feature", "properties": { "fid": 10, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061788.0, 2025277.8 ] } },
+{ "type": "Feature", "properties": { "fid": 11, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061801.2, 2025280.9 ] } },
+{ "type": "Feature", "properties": { "fid": 12, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061815.1, 2025284.1 ] } }
+]
+}

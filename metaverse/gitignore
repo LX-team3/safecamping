@@ -1,0 +1,26 @@
+# --- Vue / Node ---
+node_modules/
+dist/
+.vite/
+*.log
+
+# --- 환경 변수 (비밀번호, API 주소) ---
+.env
+.env.*
+!.env.example
+
+# --- QGIS가 작업 중에 만드는 임시·보조 파일 ---
+gis/*.gpkg-shm
+gis/*.gpkg-wal
+*.aux.xml
+*.qmd
+gis/clip.tif
+
+# --- 파이썬 ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- 편집기·OS ---
+.DS_Store
+Thumbs.db

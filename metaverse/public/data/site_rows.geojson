@@ -1,0 +1,13 @@
+{
+"type": "FeatureCollection",
+"name": "site_rows",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::5179" } },
+"features": [
+{ "type": "Feature", "properties": { "fid": 1, "name": "A", "count": 4 }, "geometry": { "type": "LineString", "coordinates": [ [ 1061764.8, 2025236.1 ], [ 1061775.2, 2025196.2 ] ] } },
+{ "type": "Feature", "properties": { "fid": 2, "name": "B", "count": 8 }, "geometry": { "type": "LineString", "coordinates": [ [ 1061775.6, 2025261.7 ], [ 1061775.6, 2025251.3 ], [ 1061794.7, 2025177.2 ] ] } },
+{ "type": "Feature", "properties": { "fid": 3, "name": "C", "count": 6 }, "geometry": { "type": "LineString", "coordinates": [ [ 1061792.0, 2025242.5 ], [ 1061808.0, 2025181.4 ] ] } },
+{ "type": "Feature", "properties": { "fid": 4, "name": "D", "count": 3 }, "geometry": { "type": "LineString", "coordinates": [ [ 1061811.2, 2025243.2 ], [ 1061817.2, 2025218.5 ] ] } },
+{ "type": "Feature", "properties": { "fid": 5, "name": "F", "count": 13 }, "geometry": { "type": "LineString", "coordinates": [ [ 1061838.6, 2025258.9 ], [ 1061841.1, 2025231.1 ], [ 1061834.1, 2025182.7 ], [ 1061811.6, 2025121.5 ] ] } },
+{ "type": "Feature", "properties": { "fid": 6, "name": "P", "count": 10 }, "geometry": { "type": "LineString", "coordinates": [ [ 1061791.0, 2025138.6 ], [ 1061799.2, 2025107.4 ] ] } }
+]
+}
