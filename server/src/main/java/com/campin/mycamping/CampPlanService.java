@@ -14,7 +14,8 @@ import com.campin.member.MemberMapper;
 
 import lombok.RequiredArgsConstructor;
 
-// 내 캠핑 (캠핑장 상세 → "내 캠핑에 일정 등록" → 내 캠핑 탭 카드). 회원 개인 것이라 가족방과 상관없다
+// 내 캠핑 (캠핑장 상세 · 차박 판정 카드 → "내 캠핑에 일정 등록" → 내 캠핑 탭 카드). 회원 개인 것이라 가족방과 상관없다
+// 등록 대상: 등록 캠핑장(campId) 또는 캠핑장이 아닌 자리(차박 후보지·찍은 자리, lat·lng)
 // 프론트에서도 같은 검사를 하지만 서버에서 한 번 더 한다
 @Service
 @RequiredArgsConstructor
@@ -39,13 +40,34 @@ public class CampPlanService {
         if (ChronoUnit.DAYS.between(req.checkIn(), req.checkOut()) < 1) {
             throw new InvalidRequestException("체크아웃은 체크인 다음 날부터 고를 수 있습니다.");
         }
-        if (campPlanMapper.exists(memberId, req.campId(), req.checkIn())) {
-            throw new InvalidRequestException("이미 같은 날짜로 등록한 캠핑입니다.");
+
+        // 등록 캠핑장(campId) 또는 캠핑장이 아닌 자리(lat·lng) 중 하나
+        // 소수 6자리(약 10cm)로 맞춘다 → 같은 자리가 부동소수점 끝자리 때문에 다른 자리로 저장되지 않게
+        Double lat = null;
+        Double lng = null;
+        if (req.campId() != null) {
+            if (campPlanMapper.exists(memberId, req.campId(), req.checkIn())) {
+                throw new InvalidRequestException("이미 같은 날짜로 등록한 캠핑입니다.");
+            }
+        } else {
+            if (req.lat() == null || req.lng() == null) {
+                throw new InvalidRequestException("캠핑장이나 자리를 골라 주세요.");
+            }
+            if (req.lat() < -90 || req.lat() > 90 || req.lng() < -180 || req.lng() > 180) {
+                throw new InvalidRequestException("위치 값이 올바르지 않습니다.");
+            }
+            lat = round6(req.lat());
+            lng = round6(req.lng());
+            if (campPlanMapper.existsSpot(memberId, lat, lng, req.checkIn())) {
+                throw new InvalidRequestException("이미 같은 날짜로 등록한 자리입니다.");
+            }
         }
 
         CampPlan plan = new CampPlan();
         plan.setMemberId(memberId);
         plan.setCampId(req.campId());
+        plan.setLat(lat);   // 캠핑장 등록이면 둘 다 null
+        plan.setLng(lng);
         plan.setCampName(req.campName().trim());
         plan.setPlace(blankToNull(req.place()));
         plan.setCheckIn(req.checkIn());
@@ -61,6 +83,10 @@ public class CampPlanService {
         if (campPlanMapper.delete(memberId, planId) == 0) {
             throw new NotFoundException("등록한 캠핑을 찾을 수 없습니다.");
         }
+    }
+
+    private static double round6(double v) {
+        return Math.round(v * 1_000_000d) / 1_000_000d;
     }
 
     private static String blankToNull(String s) {

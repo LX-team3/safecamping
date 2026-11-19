@@ -32,8 +32,10 @@ tour/     # 관광지 상세 + 관광지 탭 여행 취향 TourPreference* (memb
 dbtest/   TestController, TestMapper   # DB 연결 확인용 임시 코드 (본보기 아님)
 route/    # 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (카카오모빌리티 길찾기, 키는 환경변수 KAKAO_REST_KEY). DirectionsSource = 테스트용 인터페이스
 nearby/   # 내 주변 탭 (내 위치 → 가장 가까운 캠핑장 기준 안전점수·시설). 레이어 목록은 NearbyLayer 한곳
-mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개
-score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 분 기준은 ScoreRules.TIME 한곳 (없는 종류 보안등·CCTV 는 public.score_weights 거리 기준). 실행: 서버를 --score 인자로 켤 때 한 번
+mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개. 출발 준비 체크리스트 Checklist* (ChecklistItems 문구 · ChecklistService 3일 규칙 · ChecklistSource 인터페이스=테스트용, 구현 ChecklistLookup)
+weather/  # 날씨 예보 (화면 없음, 체크리스트가 씀). 기상청 단기예보 KmaForecastClient(getVilageFcst, 격자별 3시간 캐시, 환경변수 KMA_SERVICE_KEY) + KmaGrid(위·경도 → 5km 격자) + ForecastParser(시간별 → 하루치 DayForecast). 못 받으면 empty (예시 값 없음). ForecastSource = 테스트용 인터페이스. 4~7일 앞 중기예보는 아직 없음
+chabak/   # 차박 판정 (지도에서 찍은 지점 → 불가·주의·제한 없음·야영 가능). 판정 규칙은 전부 DB chabak 스키마 함수(fn_verdict → fn_verdict_json)에 있고 서버는 그 JSON 을 ChabakVerdictResponse 로 옮겨 전달. 범위 인제군
+score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 기준은 ScoreRules 한곳: 등급(TIERS) → ROC 배점, 분 기준(TIME). 직선거리·score_weights·보안등·CCTV 는 쓰지 않음. 실행: 서버를 --score 인자로 켤 때 한 번
 ```
 
 ## 상세 의존성 목록
@@ -44,6 +46,11 @@ score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(�
 - Maven 설치 없이 Maven Wrapper 를 쓴다 (`backend/` 에서 실행)
 - 실행: `.\mvnw.cmd spring-boot:run` → http://localhost:8080
 - 테스트: `.\mvnw.cmd test` — 코드를 고친 뒤 반드시 통과 확인
+- 안전점수 다시 계산: `.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--score"` (`server/` 에서)
+  - 하는 일: 캠핑장 23곳 → 시설(응급실·소방서·경찰·약국·편의점)까지 카카오 차 소요시간을 받아 `camp.safety_score`·`er_drive_min`, `camp_facility.drive_min` 을 고친다. 기준은 `score/ScoreRules`
+  - 필요한 것: 환경변수 `KAKAO_REST_KEY`, DB 연결
+  - 언제: `db/merge_to_public.sql` 을 다시 실행한 뒤(점수가 직선 추정값으로 돌아가므로), 캠핑장·시설 데이터나 `ScoreRules` 를 바꾼 뒤
+  - 왜 인자로만 켜나: 한 번에 카카오를 100번 넘게 불러 하루 한도를 쓴다. API 로 열면 아무나 부를 수 있고, 평소 실행마다 돌면 한도가 낭비된다.
 - DB 연결 자동 설정은 `application.properties` 에서 꺼 둠 (DB 연결할 때 그 줄을 지운다)
 
 ## API 목록
@@ -83,7 +90,13 @@ score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(�
 | `PUT`·`DELETE /api/family/locations/me` | 내 위치 저장 `{ lat, lng }` (브라우저 GPS, 있으면 덮어씀 · 범위 밖 400) / 위치 공유 끄기 (내 줄 삭제). 가족방 없으면 404. 방을 나가면(`DELETE /api/family/room/me`) 내 위치도 지움 |
 | `GET /api/camps/{id}/routes` | 캠핑장 → 응급실·소방서·경찰서·편의점·약국 자동차 경로 (화장실 뺌) (카카오모빌리티, 시설마다 1번씩 동시 호출, 전부 성공하면 24시간 메모리 저장). `{ source: kakao·straight, routes: [{ facilityId, type, name, ok, dummy, distanceKm, durationMin, path: [[위도, 경도], ...] }] }`. 키 없음·실패면 `ok: false` + 직선 두 점 + DB 시간. 없는 캠핑장 400. 로그인 없이 됨 |
 | `GET /api/nearby?lat=&lng=` | 내 주변 (**더미**). 시설 데이터가 있는 가장 가까운 캠핑장 기준 → `{ dummy, basis: { campId, campName, sido, sigungu, eupmyeon, lat, lng, distanceKm, far }, safetyScore, grade, facilities: [{ no, id, type, name, lat, lng, distanceKm, driveMin, tone, dummy }] }`. `far` 는 10km 초과(임시). 없으면 `basis: null`. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
-| `GET`·`POST /api/member/camp-plans` · `DELETE /api/member/camp-plans/{id}` | 내 캠핑 (캠핑장 상세 "내 캠핑에 일정 등록"). GET → 체크인 빠른 순 `[{ id, campId, campName, place, checkIn, checkOut, memo }]`. POST `{ campId, campName, place?, checkIn: "2026-11-14", checkOut, memo? }` → 201. 지난 체크인·체크아웃 ≤ 체크인·같은 캠핑장+체크인 중복 400. 남의 id 삭제 404. 로그인 필요 |
+| `GET`·`POST /api/member/camp-plans` · `DELETE /api/member/camp-plans/{id}` | 내 캠핑 (캠핑장 상세·차박 판정 카드 "내 캠핑에 일정 등록"). GET → 체크인 빠른 순 `[{ id, campId, campName, place, lat, lng, checkIn, checkOut, memo }]` (`campId` 가 null 이면 캠핑장이 아닌 차박 자리 — `lat`·`lng` 가 있음). POST 두 가지: 캠핑장 `{ campId, campName, place?, checkIn: "2026-11-14", checkOut, memo? }` / 자리 `{ campName(지번 등 이름), place?, lat, lng, checkIn, checkOut, memo? }` (campId 없이 좌표, 소수 6자리로 맞춰 저장) → 201. 둘 다 없음·위치 범위 밖·지난 체크인·체크아웃 ≤ 체크인·같은 캠핑장(같은 자리)+체크인 중복 400. 남의 id 삭제 404. 로그인 필요. **DB `schema_05.sql` 실행 후** 동작 |
+| `GET /api/member/camp-plans/{planId}/checklist` | 출발 준비 체크리스트 (내 캠핑 카드 → 출발 준비). `{ plan: { id, campId, name, lat, lng, checkIn, checkOut }, season: 봄·여름·가을·겨울(체크인 월 기준 3~5·6~8·9~11·12~2), past, near, openDate, warningsAvailable, warnings: [{ category, area, message }], safety: { score, grade, erDriveMin, erApprox } | null, items: [{ id, group: 특보·차박·계절·공통, text, why, level: warn·normal }] }`. `near` = 출발 **3일 전**부터 캠핑이 끝날 때까지(캠핑 중 포함) → 이때만 그 지역(가장 가까운 시·도)의 **지금 발효 중인 기상특보**(WarningSource, 10분 캐시)를 확인해 항목에 붙임. 먼 일정은 기상청을 부르지 않고 `openDate`(체크인 3일 전)만 알려 줌. 특보를 못 받았거나 예시(더미)뿐이면 `warningsAvailable: false` + `warnings: []` (예시를 진짜처럼 쓰지 않음). `safety`: 캠핑장은 `camp` 값, 차박 자리(`campId` 없음)는 `/api/chabak/score` 계산(응급실 분은 어림 `erApprox: true`). 항목 문구는 `ChecklistItems` 한 곳 — **수치 기준을 두지 않음**(특보는 기상청 이름에 연결, 침낭은 "내 침낭의 쾌적온도 확인"). `forecast`: `near` 일 때만 `{ available, days: [{ date, minTemp, maxTemp, pop, maxWind, sky, precip }] }` (기상청 단기예보, 캠핑 기간 중 오늘 이후 최대 7일, 기상청이 주지 않는 날은 값이 전부 null). 못 받으면 `available: false` + 빈 `days`(예시 값 없음), 먼 일정은 null. 예보 최저기온이 있으면 침낭 항목 `why` 에 "예보 최저 ○°와 침낭 쾌적온도를 비교하세요". 예보로 `group: "날씨"` 항목이 특보 묶음 뒤에 붙음 — 출처 있는 기준만: 최저 -12° 이하(기상청 한파주의보 발표 기준 온도) · 0° 이하(물 어는 온도, 동파) · 비·눈 예보 유무. 풍속·폭염·우리만의 구간은 근거가 없어 쓰지 않음(`ChecklistItems` 주석). 체크 상태는 화면이 브라우저에 저장(서버 저장 없음). 남의 일정 id 404. 로그인 필요 |
+| `GET /api/chabak/verdict?lat=&lng=` | 차박 판정 (DB 함수 `chabak.fn_verdict_json` 결과를 `ChabakVerdictResponse` 로 옮김). `{ pnu, jibun, jimok, owner, landUse, terrain, roadSide, verdict: 불가·주의·제한 없음·야영 가능, reasons[], zones[], nearBoundary, nearbyCamps: [{ name, distM }], alternatives: [{ jibun, owner, radiusM, distM, lat, lng }], parcel: GeoJSON }`. 위치 빠짐·범위 밖 400, 인제군 밖 404. 로그인 없이 됨. 공공데이터 기준 참고용 판정 |
+| `GET /api/chabak/layer?type=` | 차박 지도 위쪽 칩 레이어. `no` 불가 구역 · `caution` 주의 구역 (`chabak.regulation` 을 판정별로 **한 덩어리로 합침**(ST_Union, 20m 단순화), 주의 구역은 불가 구역과 겹친 부분을 뺌 → `geometry` GeoJSON 1개. 처음 한 번만 계산해 서버가 기억 — 규제 데이터를 바꾸면 서버 재시작) / `open` 차박 후보지 (`chabak.open_spot`, 넓은 순 1000곳까지, 자리마다 안전점수를 `/score` 와 같은 계산으로 붙임 — 처음 한 번만 계산해 기억) · `camp` 등록 야영장 (`camp`, `id` 로 상세, 점수는 `camp.safety_score`) → `[{ id, name, lat, lng, score, grade, area, imageUrl, erDriveMin, geometry }]` (화면 "주변 안전" 필터 · 차박지 목록용. 후보지 name 은 "475-3 잡종지", area 는 소유(군유지 등), erDriveMin 은 직선 어림 / 야영장 area 는 "인제군 북면", 사진·응급실 분은 camp 값). 그 밖의 type 400. PostGIS 함수는 `extensions.` 를 붙여 부른다 (공유 DB 설치 위치). 로그인 없이 됨 |
+| `GET /api/chabak/score?lat=&lng=` | 찍은 지점의 안전점수. **캠핑장 안전점수와 같은 계산**(`merge_to_public.sql` 8단계: 종류별 가장 가까운 `raw.facilities` 까지 직선거리 → `raw.score_weights` 만점·0점 거리로 부분점수 → 가중 평균 ×100). `{ score, grade: safe·caution·danger·unknown, erDriveMin(추정: 직선×1.4÷45km/h), items: [{ type, distM, weight, part }] }`. 카카오 호출 없음. 위치 빠짐·범위 밖 400 |
+| `GET /api/chabak/facilities?lat=&lng=` | 차박 지도 "지도에 보일 것" 레이어: 찍은 지점에서 종류별(er·fire·police·store·pharmacy) 가까운 3곳 `[{ id, type, name, lat, lng, distanceKm, dummy }]` 가까운 순. 거리는 위도·경도 어림. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
+| `GET /api/facilities?types=er,pharmacy&swLat=&swLng=&neLat=&neLng=` | 탐색 지도 "지도 설정"에서 켠 종류의 시설 중 지도 화면 안에 있는 것 `[{ id, type, name, lat, lng, dummy }]`. 화면 가운데에서 가까운 순 최대 300곳. 종류는 `NearbyLayer` 중 ready 인 것만 (그 밖은 무시, 비면 빈 목록). 범위 빠짐·남서>북동 400. 로그인 없이 됨 |
 | `GET /api/nearby/layers` | "지도에 보일 것" 안전 시설 목록 `[{ code, icon, label, desc, ready, on }]` (응급실·소방서·경찰서·편의점·약국·대피소, 공중화장실 뺌). 대피소는 `ready: false` (데이터 없음). 약국은 더미 데이터가 있어 `ready: true` |
 
 - 로그인은 Spring Security **세션 방식**. remember-me 서명 키는 환경변수 `REMEMBER_ME_KEY` (없으면 실행마다 임시 키)

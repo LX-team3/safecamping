@@ -5,7 +5,8 @@ import { api } from '@/utils/api'
 // 내 캠핑: 캠핑장 상세에서 "일정 등록"한 캠핑 목록 (내 캠핑 탭에 카드로 보인다)
 // 서버(camp_plan 테이블, /api/member/camp-plans)가 정본이라 다른 기기에서 로그인해도 보인다. 회원 전용
 export const useMyCampingStore = defineStore('myCamping', () => {
-  const plans = ref([]) // [{ id, campId, campName, place, checkIn, checkOut, memo }] 체크인 빠른 순
+  const plans = ref([]) // [{ id, campId, campName, place, lat, lng, checkIn, checkOut, memo }] 체크인 빠른 순 (campId 가 null 이면 차박 자리)
+  const checklists = ref({}) // 일정 id → 출발 준비 응답 (GET /api/member/camp-plans/{id}/checklist) — 카드 줄과 체크리스트 화면이 같이 씀
 
   async function load() {
     plans.value = await api('/api/member/camp-plans')
@@ -22,10 +23,18 @@ export const useMyCampingStore = defineStore('myCamping', () => {
     plans.value = plans.value.filter((p) => p.id !== id)
   }
 
+  // 출발 준비: 계절·공통 준비물 + (출발 3일 전부터) 그 지역 특보. 응답은 일정 id 로 기억해 둔다
+  async function loadChecklist(planId) {
+    const data = await api(`/api/member/camp-plans/${planId}/checklist`)
+    checklists.value = { ...checklists.value, [planId]: data }
+    return data
+  }
+
   // 로그아웃할 때: 다음 사람에게 이전 사람의 목록이 보이지 않게
   function reset() {
     plans.value = []
+    checklists.value = {}
   }
 
-  return { plans, load, add, remove, reset }
+  return { plans, checklists, load, add, remove, loadChecklist, reset }
 })

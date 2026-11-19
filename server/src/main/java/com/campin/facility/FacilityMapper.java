@@ -1,5 +1,7 @@
 package com.campin.facility;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -26,4 +28,24 @@ public interface FacilityMapper {
              WHERE cf.facility_id = #{facilityId} AND cf.camp_id = #{campId}
             """)
     FacilityFrom findFrom(@Param("facilityId") Long facilityId, @Param("campId") Long campId);
+
+    // 지도 화면 안(남서·북동 모서리 사이)에 있는 시설 — 고른 종류만
+    // 넓게 보면 점이 너무 많아지므로 화면 가운데에서 가까운 순으로 limit 곳까지만 (멀리 있는 점부터 빠짐)
+    @Select("""
+            <script>
+            SELECT id, type, name, lat, lng, is_dummy AS dummy
+              FROM facility
+             WHERE type IN
+                   <foreach collection="types" item="t" open="(" separator="," close=")">#{t}</foreach>
+               AND lat BETWEEN #{swLat} AND #{neLat}
+               AND lng BETWEEN #{swLng} AND #{neLng}
+             ORDER BY power(lat::float8 - (#{swLat} + #{neLat}) / 2, 2)
+                    + power(lng::float8 - (#{swLng} + #{neLng}) / 2, 2)
+             LIMIT #{limit}
+            </script>
+            """)
+    List<FacilityPin> findInBounds(@Param("types") List<String> types,
+                                   @Param("swLat") double swLat, @Param("swLng") double swLng,
+                                   @Param("neLat") double neLat, @Param("neLng") double neLng,
+                                   @Param("limit") int limit);
 }

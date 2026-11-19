@@ -93,7 +93,8 @@ public class CampService {
     }
 
     // 점수 옆 한 줄. 안전은 스크린샷 문구, 나머지는 임시 문구
-    private static String headlineOf(String grade) {
+    // 차박 지도 안전점수 카드도 같은 문구를 쓴다 (chabak/ChabakService) → 한곳에서만 고치면 둘 다 바뀜
+    public static String headlineOf(String grade) {
         return switch (grade) {
             case "safe" -> "밤에도 비교적 안심할 수 있어요";
             case "caution" -> "밤에는 주변 시설을 먼저 확인하세요";

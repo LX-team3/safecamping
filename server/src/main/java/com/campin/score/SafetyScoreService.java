@@ -1,9 +1,9 @@
 package com.campin.score;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,12 +12,13 @@ import org.springframework.stereotype.Service;
 
 import com.campin.route.DirectionsSource;
 
-// 안전점수 일괄 계산: 카카오 길찾기의 "소요시간(분)"으로 점수를 매긴다 (예전 SQL 은 직선거리로 매겼다)
-// 1) 캠핑장에 연결된 시설(camp_facility, 종류마다 직선으로 가장 가까운 1곳)까지 카카오 소요시간을 받는다
-// 2) ScoreRules.TIME 에 있는 종류는 그 분으로 부분점수, 없는 종류(보안등·CCTV 등)는 예전처럼 직선거리로 부분점수
-// 3) 점수 = Σ(가중치 × 부분점수) ÷ Σ(데이터가 있는 종류의 가중치) × 100  — merge_to_public.sql 8 단계와 같은 모양
-// 4) 화면의 분(camp_facility.drive_min, camp.er_drive_min)도 카카오 값으로 고친다. km(distance_km)는 직선거리 그대로
-// 한 캠핑장에서 하나라도 길을 못 찾으면 그 캠핑장은 아무것도 고치지 않는다 (추정 값과 카카오 값이 섞이지 않게)
+// 안전점수 일괄 계산: 카카오 길찾기 차 "소요시간(분)"만으로 점수를 매긴다 (직선거리·score_weights 는 쓰지 않는다)
+// 1) 모든 캠핑장에서 연결 시설(camp_facility, 종류마다 1곳)까지 카카오 소요시간을 받는다
+// 2) 기준이 "가장 빠른·가장 먼 캠핑장"인 종류(경찰·약국·편의점)는 1) 이 다 끝나야 그 값을 알 수 있다
+// 3) 점수 = Σ(배점 × 시간 비율) ÷ Σ(계산한 종류의 배점) × 100  — 배점은 ScoreRules 의 ROC 가중치
+// 4) 화면의 분(camp_facility.drive_min, camp.er_drive_min)도 카카오 값으로 고친다. km(distance_km)는 그대로
+// 한 캠핑장에서 하나라도 길을 못 찾으면 그 캠핑장은 건너뛴다 (추정 값과 카카오 값이 섞이지 않게)
+// 카카오를 아예 부를 수 없게 되면 아무것도 쓰지 않고 멈춘다 (가장 먼 곳 기준이 틀어지지 않게)
 @Service
 public class SafetyScoreService {
 
@@ -26,6 +27,7 @@ public class SafetyScoreService {
 
     private final ScoreMapper mapper;
     private final DirectionsSource directions;
+    private final Map<String, Double> points;               // 종류 → 배점 (ROC)
     private final Map<String, ScoreRules.TimeRule> timeRules;
     private final long callIntervalMs;
 
@@ -33,14 +35,15 @@ public class SafetyScoreService {
     // @Autowired: 생성자가 둘이라 스프링에게 어느 것을 쓸지 알려 준다
     @Autowired
     public SafetyScoreService(ScoreMapper mapper, DirectionsSource directions) {
-        this(mapper, directions, ScoreRules.TIME, ScoreRules.CALL_INTERVAL_MS);
+        this(mapper, directions, ScoreRules.points(ScoreRules.TIERS), ScoreRules.TIME, ScoreRules.CALL_INTERVAL_MS);
     }
 
     // 테스트용: 기준을 바꿔 넣는다
-    SafetyScoreService(ScoreMapper mapper, DirectionsSource directions,
+    SafetyScoreService(ScoreMapper mapper, DirectionsSource directions, Map<String, Double> points,
                        Map<String, ScoreRules.TimeRule> timeRules, long callIntervalMs) {
         this.mapper = mapper;
         this.directions = directions;
+        this.points = points;
         this.timeRules = timeRules;
         this.callIntervalMs = callIntervalMs;
     }
@@ -54,79 +57,113 @@ public class SafetyScoreService {
     static class KakaoUnavailable extends RuntimeException {
     }
 
+    // 캠핑장 하나의 카카오 소요시간 (1단계 결과)
+    private record CampTimes(ScoreCamp camp, Map<Long, Double> byFacility, Map<String, Double> byType) {
+    }
+
     public Summary recalculateAll() {
-        // 분 기준이 없거나 잘못됐으면 시작하지 않는다 (기준값은 팀이 정한 값만 쓴다)
-        if (timeRules.isEmpty()) {
-            log.error("안전점수: ScoreRules.TIME 분 기준이 비어 있어 계산하지 않습니다.");
-            return new Summary(0, 0, 0, false);
-        }
+        // 기준이 잘못됐으면 시작하지 않는다 (기준값은 팀이 정한 값만 쓴다)
         for (var e : timeRules.entrySet()) {
-            if (!e.getValue().valid()) {
-                log.error("안전점수: {} 의 분 기준이 잘못돼 계산하지 않습니다 (만점 분 < 0점 분 이어야 함).", e.getKey());
+            if (!e.getValue().valid() || !points.containsKey(e.getKey())) {
+                log.error("안전점수: {} 의 기준이 잘못돼 계산하지 않습니다 (만점 분 < 0점 분, 배점이 있어야 함).", e.getKey());
                 return new Summary(0, 0, 0, false);
             }
         }
+        List<String> noRule = points.keySet().stream().filter(t -> !timeRules.containsKey(t)).toList();
+        if (noRule.size() == points.size()) {
+            log.error("안전점수: ScoreRules.TIME 분 기준이 비어 있어 계산하지 않습니다.");
+            return new Summary(0, 0, 0, false);
+        }
+        if (!noRule.isEmpty()) {
+            log.warn("안전점수: 분 기준이 없어 빼고 계산합니다 (남은 배점으로 100점 환산): {}", noRule);
+        }
+        log.info("안전점수: 배점 {}", points);
 
-        List<ScoreWeight> weights = mapper.findWeights();
-        log.info("안전점수: 소요시간 기준 {} / 직선거리 기준 {}", timeRules.keySet(),
-                weights.stream().map(ScoreWeight::getType).filter(t -> !timeRules.containsKey(t)).toList());
-
+        // 1) 카카오 소요시간 모으기
         List<ScoreCamp> camps = mapper.findCamps();
-        int updated = 0;
+        List<CampTimes> times = new ArrayList<>();
         int skipped = 0;
         for (ScoreCamp camp : camps) {
             try {
-                if (scoreCamp(camp, weights)) updated++;
-                else skipped++;
+                CampTimes t = collect(camp);
+                if (t == null) skipped++;
+                else times.add(t);
             } catch (KakaoUnavailable e) {
-                log.error("안전점수: 카카오 길찾기를 부를 수 없어 멈춥니다 ({} / {} 곳 계산함). 키·한도를 확인하고 다시 실행하세요.",
-                        updated, camps.size());
-                return new Summary(camps.size(), updated, skipped, true);
+                log.error("안전점수: 카카오 길찾기를 부를 수 없어 멈춥니다 ({} / {} 곳 받음, 아무것도 저장 안 함). 키·한도를 확인하고 다시 실행하세요.",
+                        times.size(), camps.size());
+                return new Summary(camps.size(), 0, skipped, true);
             }
+        }
+
+        // 2) 정해진 숫자가 없는 기준은 모은 시간 중 가장 짧은(만점)·가장 긴(0점) 값
+        Map<String, Double> fullMin = limits(times, true);
+        Map<String, Double> zeroMin = limits(times, false);
+        log.info("안전점수: 만점 분 기준 {} / 0점 분 기준 {}", fullMin, zeroMin);
+
+        // 3) 점수 매기고 저장
+        int updated = 0;
+        for (CampTimes t : times) {
+            Double score = score(t.byType(), fullMin, zeroMin);
+            if (score == null) {
+                skipped++;
+                continue;
+            }
+            t.byFacility().forEach((id, min) -> mapper.updateDriveMin(t.camp().getId(), id, toMin(min)));
+            Double er = t.byType().get("er");
+            mapper.updateCampScore(t.camp().getId(), (int) Math.round(score), er == null ? null : toMin(er));
+            updated++;
         }
         log.info("안전점수: {} 곳 중 {} 곳 계산, {} 곳 건너뜀", camps.size(), updated, skipped);
         return new Summary(camps.size(), updated, skipped, false);
     }
 
-    // 캠핑장 하나. 고쳤으면 true
-    boolean scoreCamp(ScoreCamp camp, List<ScoreWeight> weights) {
-        // 1) 연결 시설마다 카카오 소요시간(분)
-        List<ScoreCampFacility> facilities = mapper.findCampFacilities(camp.getId());
-        Map<Long, Double> minutesById = new HashMap<>();
-        Map<String, Double> minutesByType = new HashMap<>();  // 종류별로 가장 빠른 분
-        for (ScoreCampFacility f : facilities) {
+    // 캠핑장 하나의 시설별 카카오 소요시간. 하나라도 길을 못 찾으면 null
+    private CampTimes collect(ScoreCamp camp) {
+        Map<Long, Double> byFacility = new HashMap<>();
+        Map<String, Double> byType = new HashMap<>();  // 종류별로 가장 빠른 분
+        for (ScoreCampFacility f : mapper.findCampFacilities(camp.getId())) {
             Double min = minutes(camp, f);
             if (min == null) {
                 log.warn("안전점수: {}({}) 시설 {} 길을 찾지 못해 건너뜁니다.", camp.getName(), camp.getId(), f.getFacilityId());
-                return false;
+                return null;
             }
-            minutesById.put(f.getFacilityId(), min);
-            minutesByType.merge(f.getType(), min, Math::min);
+            byFacility.put(f.getFacilityId(), min);
+            byType.merge(f.getType(), min, Math::min);
         }
+        return new CampTimes(camp, byFacility, byType);
+    }
 
-        // 2) 거리 기준 종류용 직선거리
-        Map<String, Double> distByType = mapper.findNearest(camp.getLat(), camp.getLng()).stream()
-                .collect(Collectors.toMap(ScoreNearest::getType, ScoreNearest::getDistM));
+    // 종류 → 만점 분(full=true) 또는 0점 분(full=false)
+    // 정해진 값이 있으면 그 값, 없으면(null) 캠핑장들 중 가장 짧은(만점)·가장 긴(0점) 시간
+    private Map<String, Double> limits(List<CampTimes> times, boolean full) {
+        Map<String, Double> result = new HashMap<>();
+        timeRules.forEach((type, rule) -> {
+            Double fixed = full ? rule.fullMin() : rule.zeroMin();
+            if (fixed != null) {
+                result.put(type, fixed);
+                return;
+            }
+            var values = times.stream().map(t -> t.byType().get(type)).filter(v -> v != null);
+            (full ? values.min(Double::compare) : values.max(Double::compare))
+                    .ifPresent(v -> result.put(type, v));
+        });
+        return result;
+    }
 
-        // 3) 부분점수 합
+    // 100점 만점 점수. 계산할 수 있는 종류가 하나도 없으면 null
+    Double score(Map<String, Double> minutesByType, Map<String, Double> fullMin, Map<String, Double> zeroMin) {
         double got = 0;
         double total = 0;
-        for (ScoreWeight w : weights) {
-            ScoreRules.TimeRule rule = timeRules.get(w.getType());
-            Double v = rule != null ? minutesByType.get(w.getType()) : distByType.get(w.getType());
-            if (v == null) continue;  // 데이터가 없는 종류는 빼고 100점으로 환산
-            total += w.getWeight();
-            got += w.getWeight() * (rule != null
-                    ? part(v, rule.fullMin(), rule.zeroMin())
-                    : part(v, w.getFullDistM(), w.getZeroDistM()));
+        for (var e : points.entrySet()) {
+            String type = e.getKey();
+            Double v = minutesByType.get(type);
+            Double full = fullMin.get(type);
+            Double zero = zeroMin.get(type);
+            if (v == null || full == null || zero == null) continue;  // 기준·데이터가 없는 종류는 빼고 100점 환산
+            total += e.getValue();
+            got += e.getValue() * part(v, full, zero);
         }
-        if (total == 0) return false;  // 주변 시설 데이터가 하나도 없음
-
-        // 4) 계산이 다 끝난 뒤에만 쓴다
-        minutesById.forEach((id, min) -> mapper.updateDriveMin(camp.getId(), id, toMin(min)));
-        Double er = minutesByType.get("er");
-        mapper.updateCampScore(camp.getId(), (int) Math.round(got / total * 100), er == null ? null : toMin(er));
-        return true;
+        return total == 0 ? null : got / total * 100;
     }
 
     // 카카오 소요시간(분). 길을 못 찾으면 null, 카카오를 아예 부를 수 없으면 KakaoUnavailable
@@ -149,14 +186,15 @@ public class SafetyScoreService {
         }
     }
 
-    // v 가 full 이하면 1, zero 이상이면 0, 그 사이는 비례 (작을수록 좋은 값: 분 또는 m)
+    // 시간 비율: full 분 이하면 1, zero 분 이상이면 0, 그 사이는 시간에 비례
+    // (캠핑장끼리 비교하는데 모두 같은 시간이거나 모두 만점 분 안이면 zero ≤ full → 전부 1)
     static double part(double v, double full, double zero) {
         if (v <= full) return 1;
         if (v >= zero) return 0;
         return (zero - v) / (zero - full);
     }
 
-    // 화면에 보일 분: 반올림, 최소 1분 (예전 SQL 의 drive_min 과 같이 0분으로 보이지 않게)
+    // 화면에 보일 분: 반올림, 최소 1분 (0분으로 보이지 않게)
     static int toMin(double minutes) {
         return Math.max(1, (int) Math.round(minutes));
     }
