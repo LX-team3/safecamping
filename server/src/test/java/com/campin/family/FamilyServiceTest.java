@@ -25,6 +25,7 @@ class FamilyServiceTest {
     private final List<FamilyRoom> rooms = new ArrayList<>();
     private final Map<Long, Long> roomOf = new HashMap<>();  // 회원 번호 → 방 번호 (family_member)
     private final List<MeetingPlace> places = new ArrayList<>();
+    private final List<Long> deletedLocations = new ArrayList<>();  // 위치를 지운 회원 번호 (family_location 대신)
     private FamilyService service;
 
     @BeforeEach
@@ -64,6 +65,10 @@ class FamilyServiceTest {
             }
             @Override public int deleteMember(Long memberId) {
                 return roomOf.remove(memberId) == null ? 0 : 1;
+            }
+            @Override public int deleteLocation(Long memberId) {
+                deletedLocations.add(memberId);
+                return 1;
             }
             @Override public int deleteRoomIfEmpty(Long roomId) {
                 if (roomOf.containsValue(roomId)) return 0;
@@ -170,6 +175,15 @@ class FamilyServiceTest {
         service.createRoom("mom", "우리 가족");
         assertThrows(InvalidRequestException.class,
                 () -> service.addPlace("mom", new MeetingPlaceRequest("주차장", null, 127.5, null)));
+    }
+
+    @Test
+    void 방을_나가면_내_위치도_지워진다() {
+        String code = service.createRoom("mom", "우리 가족").inviteCode();
+        service.join("dad", code);
+
+        service.leave("dad");
+        assertEquals(List.of(2L), deletedLocations);  // 아빠(2) 위치만 지운다
     }
 
     @Test

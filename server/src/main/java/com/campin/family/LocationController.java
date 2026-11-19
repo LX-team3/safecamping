@@ -3,12 +3,16 @@ package com.campin.family;
 import java.util.List;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.campin.common.ApiResponse;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 // 가족방 · 위치 공유 API. 회원 전용 (SecurityConfig 의 /api/family/**)
@@ -24,5 +28,20 @@ public class LocationController {
     @GetMapping
     public ApiResponse<List<LocationResponse>> list(Authentication auth) {
         return ApiResponse.ok(locationService.findAll(auth.getName()));
+    }
+
+    // 내 위치 저장(동의하기 · 새로고침): PUT /api/family/locations/me  {"lat": 38.0699, "lng": 128.17}
+    // 주소에 회원 번호 대신 me 를 쓴다 → 로그인한 본인 위치만 바꿀 수 있다
+    @PutMapping("/me")
+    public ApiResponse<Void> saveMine(Authentication auth, @Valid @RequestBody LocationRequest body) {
+        locationService.saveMine(auth.getName(), body);
+        return ApiResponse.ok(null);
+    }
+
+    // 위치 공유 끄기: DELETE /api/family/locations/me
+    @DeleteMapping("/me")
+    public ApiResponse<Void> deleteMine(Authentication auth) {
+        locationService.deleteMine(auth.getName());
+        return ApiResponse.ok(null);
     }
 }

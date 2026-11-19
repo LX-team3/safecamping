@@ -2,6 +2,8 @@ package com.campin.family;
 
 import java.util.List;
 
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -23,4 +25,15 @@ public interface LocationMapper {
              ORDER BY fm.joined_at, fm.id
             """)
     List<FamilyLocation> findAll(@Param("roomId") Long roomId);
+
+    // 내 위치 저장. 회원당 한 줄(member_id UNIQUE)이라 이미 있으면 좌표·시각만 바꾼다
+    @Insert("""
+            INSERT INTO family_location (member_id, lon, lat) VALUES (#{memberId}, #{lon}, #{lat})
+            ON CONFLICT (member_id) DO UPDATE SET lon = EXCLUDED.lon, lat = EXCLUDED.lat, updated_at = now()
+            """)
+    int upsert(@Param("memberId") Long memberId, @Param("lon") Double lon, @Param("lat") Double lat);
+
+    // 위치 공유 끄기: 내 줄을 지운다 → 가족에게 더 이상 보이지 않고, 마지막 위치도 남기지 않는다
+    @Delete("DELETE FROM family_location WHERE member_id = #{memberId}")
+    int delete(@Param("memberId") Long memberId);
 }

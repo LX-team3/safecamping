@@ -13,7 +13,8 @@ BEGIN;
 -- 가족방 위치 공유. 회원마다 "마지막 위치" 한 줄만 둔다 (이동 기록은 남기지 않음)
 -- 가족방 번호는 따로 저장하지 않는다 → family_member 와 이어서 "내 방 사람들" 위치만 읽는다
 --   (방을 나가면 family_member 에서 빠지므로 자연스럽게 안 보인다)
--- 지금(시연)은 아래 시드처럼 SQL 로 넣은 좌표를 읽기만 한다. 실제 GPS 로 갱신하는 기능은 아직 없다
+-- 위치 탭에서 공유에 동의하면 서버(PUT /api/family/locations/me)가 브라우저 GPS 값을 넣고, 끄거나 방을 나가면 지운다
+-- (테이블 정의는 그대로. 이 주석만 2026-11-18 에 바꿈)
 CREATE TABLE IF NOT EXISTS family_location (
     id          bigserial         PRIMARY KEY,
     member_id   bigint            NOT NULL UNIQUE REFERENCES member (id) ON DELETE CASCADE,  -- 한 회원당 한 줄. 탈퇴하면 같이 지운다
@@ -28,7 +29,7 @@ COMMIT;
 -- 시연용 가상 좌표 넣기 (따로 실행) — 실제 GPS 위치가 아니다
 -- 먼저 가상 회원이 가입하고 같은 가족방에 들어가 있어야 한다. 아래 '아이디' 를 실제 login_id 로 바꿔서 실행
 -- ON CONFLICT: 이미 그 회원 줄이 있으면 좌표만 바꾼다 → 여러 번 실행해도 된다
--- 좌표: 인제군청(강원 인제군 인제읍) 근처 대략값 (client/src/data/familyLocationDummy.js 와 같은 값)
+-- 좌표: 인제군청(강원 인제군 인제읍) 근처 대략값. 앱에서 동의하기·새로고침을 누르면 그 사람의 실제 GPS 로 덮어써진다
 -- =====================================================================
 -- INSERT INTO family_location (member_id, lon, lat)
 -- SELECT m.id, v.lon, v.lat

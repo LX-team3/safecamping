@@ -1,5 +1,17 @@
 # 진행 상황
 
+## 2026-11-18 가족 모임방 위치 탭 서버+DB(family_location) 연결 (브랜치 `lyh-location`)
+- 더미 배열 `client/src/data/familyLocationDummy.js` 삭제. 위치 탭은 `GET /api/family/locations` 결과만 찍는다
+- 동의 = DB 에 내 줄이 있음. localStorage 동의 저장은 없앰 (다른 기기에서도 같은 상태)
+  - 동의하기·스위치 켜기 → 브라우저 GPS 를 받아 `PUT /api/family/locations/me` (UPSERT) → 목록 다시 불러와 지도에 찍음. GPS 를 못 받으면 저장하지 않고 문구만 보임 (가짜 좌표 안 넣음)
+  - 스위치 끄기 → `DELETE /api/family/locations/me` (내 줄 삭제 → 가족에게 안 보임)
+  - (같은 날 변경) 위쪽 "가족 위치 확인" 문구·위치 공유 스위치 삭제. 안내창은 "위치 공유에 동의하시겠습니까?" + [동의 안 함] [동의합니다]. "언제든 끌 수 있어요" 문구도 뺌 → **화면에서 공유를 끄는 방법이 없음** (방 나가기로만 삭제, API `DELETE /api/family/locations/me` 는 남겨 둠)
+  - 새로고침 → 내 GPS 다시 저장(못 받으면 건너뜀) + 목록 다시 불러오기
+  - (2026-11-19 변경) **브라우저 GPS 저장은 일단 뺌.** 위치 탭은 `family_location` 에 SQL 로 넣은 좌표만 찍는다. [동의합니다]는 서버에 저장하지 않고 이번 화면에서만 지도를 보여 줌 (내 줄이 있으면 묻지 않음). 새로고침 = DB 다시 읽기. 서버 PUT API·store `saveMyLocation` 은 남겨 둠
+  - 방 나가기(`DELETE /api/family/room/me`) 때도 내 위치 삭제 (11-06 합의 "끄거나 나가면 삭제")
+- 백엔드: `LocationRequest` 추가, `LocationMapper.upsert·delete`, `LocationService.saveMine·deleteMine`, `FamilyMapper.deleteLocation`. DB 구조는 그대로 (`schema_05.sql` 주석만 갱신)
+— 화면이 열려 있는 동안 자동 갱신은 아직 없음
+
 ## 2026-11-16 가족 모임방 3차 위치 탭 — 1단계: 빈 지도 (브랜치 `lyh-location`)
 - 새 파일 `client/src/components/family/LocationTab.vue`: 위치 탭을 누르면 카카오 지도를 띄운다. 가로는 화면 폭, 세로 55vh(최소 280px). 창 크기가 바뀌면 `keepMapSized` 로 다시 맞춤
 - `FamilyRoomView.vue`: `TABS` 의 위치 탭 `component: null` → `LocationTab` ("준비 중이에요" 대신 지도)

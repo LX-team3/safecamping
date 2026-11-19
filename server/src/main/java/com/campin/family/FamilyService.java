@@ -73,6 +73,7 @@ public class FamilyService {
         Long memberId = memberId(loginId);
         FamilyRoom room = myRoom(memberId);
         familyMapper.deleteMember(memberId);
+        familyMapper.deleteLocation(memberId);  // 위치 공유도 같이 끈다
         familyMapper.deleteRoomIfEmpty(room.getId());
     }
 

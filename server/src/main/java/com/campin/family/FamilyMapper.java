@@ -61,6 +61,11 @@ public interface FamilyMapper {
     @Delete("DELETE FROM family_member WHERE member_id = #{memberId}")
     int deleteMember(@Param("memberId") Long memberId);
 
+    // 방을 나갈 때 내 위치도 지운다 (위치 공유 합의: "끄거나 나가면 삭제" → 다음 방에 옛 위치가 따라가지 않게)
+    // 위치 줄이 없으면(공유 안 함) 0줄이고 문제없다. 테이블 정의는 db/schema_05.sql
+    @Delete("DELETE FROM family_location WHERE member_id = #{memberId}")
+    int deleteLocation(@Param("memberId") Long memberId);
+
     // 아무도 없는 방만 지운다 (나가는 순간 다른 사람이 들어왔으면 지우지 않음). 모일 장소는 ON DELETE CASCADE
     @Delete("""
             DELETE FROM family_room r
