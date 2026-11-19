@@ -13,9 +13,11 @@ import lombok.Setter;
 public class CampPlan {
     private Long id;
     private Long memberId;
-    private Long campId;
+    private Long campId;        // 캠핑장이 아닌 자리면 null (그때는 lat·lng 가 있다)
     private String campName;
     private String place;        // 선택
+    private Double lat;          // 캠핑장이 아닌 자리(차박 후보지 등)일 때만. 캠핑장 등록이면 null
+    private Double lng;
     private LocalDate checkIn;
     private LocalDate checkOut;
     private String memo;         // 선택

@@ -17,7 +17,7 @@ public interface CampPlanMapper {
 
     // 체크인이 빠른 순 (같은 날이면 먼저 등록한 것부터)
     @Select("""
-            SELECT id, member_id AS memberId, camp_id AS campId, camp_name AS campName, place,
+            SELECT id, member_id AS memberId, camp_id AS campId, camp_name AS campName, place, lat, lng,
                    check_in AS checkIn, check_out AS checkOut, memo
               FROM camp_plan
              WHERE member_id = #{memberId}
@@ -25,16 +25,34 @@ public interface CampPlanMapper {
             """)
     List<CampPlan> findByMemberId(@Param("memberId") Long memberId);
 
+    // 내 일정 하나 (남의 id 는 null). 출발 준비 체크리스트가 쓴다
+    @Select("""
+            SELECT id, member_id AS memberId, camp_id AS campId, camp_name AS campName, place, lat, lng,
+                   check_in AS checkIn, check_out AS checkOut, memo
+              FROM camp_plan
+             WHERE id = #{planId} AND member_id = #{memberId}
+            """)
+    CampPlan findById(@Param("memberId") Long memberId, @Param("planId") Long planId);
+
     @Select("""
             SELECT EXISTS (SELECT 1 FROM camp_plan
                             WHERE member_id = #{memberId} AND camp_id = #{campId} AND check_in = #{checkIn})
             """)
     boolean exists(@Param("memberId") Long memberId, @Param("campId") Long campId, @Param("checkIn") LocalDate checkIn);
 
+    // 캠핑장이 아닌 자리(차박)의 중복: 같은 좌표 · 같은 체크인 (DB 의 camp_plan_spot_uq 와 같은 조건)
+    @Select("""
+            SELECT EXISTS (SELECT 1 FROM camp_plan
+                            WHERE member_id = #{memberId} AND camp_id IS NULL
+                              AND lat = #{lat} AND lng = #{lng} AND check_in = #{checkIn})
+            """)
+    boolean existsSpot(@Param("memberId") Long memberId, @Param("lat") double lat, @Param("lng") double lng,
+                       @Param("checkIn") LocalDate checkIn);
+
     // @Options: INSERT 후 DB 가 만든 id 를 plan.id 에 다시 채워 준다
     @Insert("""
-            INSERT INTO camp_plan (member_id, camp_id, camp_name, place, check_in, check_out, memo)
-            VALUES (#{memberId}, #{campId}, #{campName}, #{place}, #{checkIn}, #{checkOut}, #{memo})
+            INSERT INTO camp_plan (member_id, camp_id, camp_name, place, lat, lng, check_in, check_out, memo)
+            VALUES (#{memberId}, #{campId}, #{campName}, #{place}, #{lat}, #{lng}, #{checkIn}, #{checkOut}, #{memo})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(CampPlan plan);

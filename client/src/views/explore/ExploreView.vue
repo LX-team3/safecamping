@@ -4,9 +4,9 @@
 //  - 손잡이(가로 줄)·"지도" 버튼을 누르면 시트가 접혀 지도가 보인다
 //  - 목록 한 줄을 누르면 캠핑장 상세. 지도 마커는 한 번 누르면 이름표, 이름표를 다시 누르면 상세
 //  - 지역 칩 → RegionSheet(어디로), 날짜 칩 → TripSheet(누구와·언제). 고른 값은 trip store
-//  - 지도 레이어 버튼 → 내 주변과 같은 LayerSheet(안전 시설 켜고 끄기). 고른 캠핑장의 가까운 시설을 지도에 보여 준다
+//  - 지도 레이어 버튼 → 내 주변과 같은 LayerSheet(안전 시설 켜고 끄기). 처음엔 전부 꺼짐, 켠 종류는 지도 화면 안의 시설을 보여 준다
 // 데이터: GET /api/camps (지도 마커·전체 목록), /api/camps/recommend (추천),
-//         /api/nearby/layers (레이어 줄 목록), /api/camps/{id} (고른 캠핑장의 가까운 시설)
+//         /api/nearby/layers (레이어 줄 목록), /api/facilities?types=&swLat=… (지도 화면 안의 켠 시설)
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CampMap from '@/components/map/CampMap.vue'
@@ -15,8 +15,11 @@ import RegionSheet from '@/components/explore/RegionSheet.vue'
 import TripSheet from '@/components/explore/TripSheet.vue'
 import LayerSheet from '@/components/nearby/LayerSheet.vue'
 import BottomNav from '@/components/common/BottomNav.vue'
+import MapModeToggle from '@/components/common/MapModeToggle.vue'
+import { useDragSheet, useElementHeight } from '@/utils/dragSheet'
 import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
 import { api } from '@/utils/api'
+import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { vHscroll } from '@/utils/hscroll'
 import { shortLabel } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
@@ -33,7 +36,16 @@ const favorite = useFavoriteStore()
 const trip = useTripStore()
 
 // ---- 화면 상태 ----
-const sheetOpen = ref(true) // true: 목록 / false: 지도
+// 지도 위 시트: 목록(화면 전체) ↔ 지도(검색·필터만). 손잡이를 끌거나 눌러 오간다 (utils/dragSheet.js, 차박 지도와 같은 움직임)
+const stageEl = ref(null)
+const stageH = useElementHeight(stageEl, 700)
+const sheetSnaps = computed(() => ({ map: COLLAPSED, list: stageH.value }))
+const { snap: sheetSnap, dragging: sheetDragging, style: sheetStyle, events: sheetDrag } = useDragSheet(sheetSnaps, 'map') // 처음엔 지도 화면 (진단 안내 팝업도 지도 위에 뜬다)
+// true: 목록 / false: 지도 (다른 곳에서 sheetOpen = true 처럼 바꾸면 그 단계로 움직인다)
+const sheetOpen = computed({
+  get: () => sheetSnap.value === 'list',
+  set: (open) => (sheetSnap.value = open ? 'list' : 'map'),
+})
 const query = ref('') // 검색어 (이름·지역)
 const matchMine = ref(true) // "내 유형 맞춤" 켜짐
 const openSheet = ref(null) // null | 'region' | 'trip' | 'layers' — 열려 있는 아래 시트
@@ -134,16 +146,18 @@ const mapCamps = computed(() => allCamps.value.filter(matches))
 // ---- 지도 레이어 (안전 시설) ----
 // 줄 목록은 내 주변과 같은 서버 목록(GET /api/nearby/layers)을 쓴다 → 두 화면의 시트가 늘 같다
 const layers = ref([]) // [{ code, icon, label, desc, ready, on }]
-const facilityOn = ref({}) // { er: true, ... } 켜짐 여부
-const campFacilities = ref([]) // 고른 캠핑장의 가까운 시설 [{ no, id, type, name, lat, lng }]
+// 켠 종류(facilityOn)는 utils/facilityLayers.js — 시설 상세에 갔다 와도 유지 (처음엔 전부 꺼짐)
+const mapFacilities = ref([]) // 켠 종류의 시설 중 지도 화면 안에 있는 것 [{ id, type, name, lat, lng }]
+let mapBounds = null // 지도가 알려 준 보이는 범위 { swLat, swLng, neLat, neLng }
+let facilityReq = 0 // 늦게 온 앞 응답이 새 결과를 덮지 않게 요청 번호를 센다
 
 async function loadLayers() {
   try {
     const list = await api('/api/nearby/layers')
     layers.value = list
-    facilityOn.value = Object.fromEntries(list.map((l) => [l.code, l.on]))
+    initFacilityOn(list)
   } catch {
-    // 못 불러오면 레이어 버튼을 눌렀을 때 다시 시도한다 (그동안 시설은 전부 보인다)
+    // 못 불러오면 지도 설정 버튼을 눌렀을 때 다시 시도한다
   }
 }
 
@@ -153,25 +167,30 @@ async function openLayers() {
 }
 
 function toggleFacility(code) {
-  facilityOn.value = { ...facilityOn.value, [code]: !facilityOn.value[code] }
+  toggleFacilityOn(code)
+  loadFacilities()
 }
 
-// 캠핑장 마커를 고르면 그 캠핑장의 가까운 시설을 받아 온다 (캠핑장 상세 API 를 그대로 씀)
-// 빠르게 다른 캠핑장을 누르면 앞 응답이 늦게 와도 덮어쓰지 않게, 마지막으로 고른 id 인지 확인한다
-watch(selectedId, async (id) => {
-  campFacilities.value = []
-  if (id == null) return
-  try {
-    const detail = await api(`/api/camps/${id}`)
-    if (selectedId.value !== id) return
-    campFacilities.value = detail.facilities.map((f, i) => ({ ...f, no: i + 1 }))
-  } catch {
-    // 시설을 못 받아도 캠핑장 마커는 그대로 쓸 수 있다
-  }
-})
+// 지도를 움직이고 멈출 때마다 (CampMap 의 bounds) 켠 종류를 그 범위로 다시 받아 온다
+function onBounds(b) {
+  mapBounds = b
+  loadFacilities()
+}
 
-// 켜 둔 종류만 지도에. 레이어 목록을 아직 못 받았으면(undefined) 보여 준다 (안전 정보라 기본은 숨기지 않음)
-const mapFacilities = computed(() => campFacilities.value.filter((f) => facilityOn.value[f.type] !== false))
+async function loadFacilities() {
+  const no = ++facilityReq
+  const types = onTypes()
+  if (!types.length || !mapBounds) {
+    mapFacilities.value = []
+    return
+  }
+  try {
+    const list = await api('/api/facilities', { params: { types: types.join(','), ...mapBounds } })
+    if (no === facilityReq) mapFacilities.value = list
+  } catch {
+    // 못 받으면 시설 없이 캠핑장 마커만 보인다
+  }
+}
 
 const isRanked = computed(() => matchMine.value && !showExcluded.value)
 const title = computed(() => {
@@ -223,14 +242,18 @@ function onMarker(id) {
 
 <template>
   <div class="explore">
-    <div class="stage">
+    <div ref="stageEl" class="stage">
       <CampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="selectedId" :bottom-inset="COLLAPSED"
-        @select="onMarker" @layers="openLayers" />
+        @select="onMarker" @layers="openLayers" @bounds="onBounds" />
+      <!-- 캠핑장 지도 ↔ 차박 지도 전환 (목록을 펼치면 시트가 덮는다) -->
+      <MapModeToggle active="camp" class="mode-toggle" />
 
       <!-- 지도 위 시트 -->
-      <section class="sheet" :class="{ open: sheetOpen }" :style="{ top: sheetOpen ? '0px' : `calc(100% - ${COLLAPSED}px)` }">
-        <button type="button" class="handle" :aria-label="sheetOpen ? '지도 보기' : '목록 보기'"
-          :aria-expanded="sheetOpen" @click="sheetOpen = !sheetOpen">
+      <section class="sheet drag-sheet" :class="{ open: sheetOpen, dragging: sheetDragging }"
+        :style="sheetStyle">
+        <!-- 손잡이를 끌어서 목록을 올리고 내린다. 누르면 목록 ↔ 지도 -->
+        <button type="button" class="handle drag-handle" :aria-label="sheetOpen ? '지도 보기' : '목록 보기'"
+          :aria-expanded="sheetOpen" v-on="sheetDrag">
           <span />
         </button>
 
@@ -265,7 +288,7 @@ function onMarker(id) {
         </div>
 
         <!-- 목록 (시트를 펼쳤을 때만 보임) -->
-        <div v-show="sheetOpen" class="list-area">
+        <div v-show="sheetOpen || sheetDragging" class="list-area">
           <div class="list-head">
             <div>
               <h1>{{ title }}</h1>
@@ -350,6 +373,12 @@ function onMarker(id) {
   flex: 1;
   overflow: hidden; /* 접힌 시트·지도가 아래 탭을 넘지 않게 */
 }
+.mode-toggle {
+  position: absolute;
+  top: 14px;
+  left: 16px; /* 왼쪽 위. 지도 버튼은 오른쪽 위에 세로로 (CampMap .map-btns) */
+  z-index: 25; /* 지도 버튼(20) 위, 아래 시트(30) 밑 */
+}
 .sheet {
   position: absolute;
   left: 0;
@@ -362,7 +391,7 @@ function onMarker(id) {
   border-radius: 20px 20px 0 0;
   background: var(--color-card);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
-  transition: top 0.25s ease;
+  /* 높이 애니메이션은 전역 .drag-sheet (styles/base.css) */
 }
 .sheet.open {
   box-shadow: none;
@@ -375,7 +404,6 @@ function onMarker(id) {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
 }
 .handle span {
   width: 44px;

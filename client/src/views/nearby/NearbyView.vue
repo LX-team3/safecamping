@@ -1,6 +1,6 @@
 <script setup>
 // 내 주변 탭 (2부 모바일 · 캠핑 시작 이후)
-//  - 위: 지도 (내 위치 + 번호 붙은 안전 시설). 오른쪽 위 레이어 버튼 → "지도에 보일 것" 시트
+//  - 위: 지도 (내 위치 + 번호 붙은 안전 시설). 오른쪽 위 레이어 버튼 → "지도 설정" 시트
 //  - 아래 패널: 지금 이 위치 안전점수 · 119 신고 · 가족에게 내 위치 보내기 · 가까운 시설 목록
 //  - 시설 시간은 "차로 n분"만 보여 준다. 길찾기는 카카오맵으로 넘긴다 (앱 안 경로 화면 없음)
 // 데이터: GET /api/nearby?lat=&lng= (가장 가까운 캠핑장 기준 — 더미), /api/nearby/layers, /api/alerts?sido=
@@ -10,6 +10,7 @@ import LayerSheet from '@/components/nearby/LayerSheet.vue'
 import BottomNav from '@/components/common/BottomNav.vue'
 import { api } from '@/utils/api'
 import { FACILITY_LABEL, directionsUrl, shortSido } from '@/utils/place'
+import { useDragSheet } from '@/utils/dragSheet'
 
 const PANEL = 430 // 아래 패널 높이(px) — 지도가 마커를 이 위쪽에 모아 그린다
 const COLLAPSED = 120 // 손잡이를 눌러 내렸을 때 높이: 손잡이 + 안전점수 줄만 남겨 지도가 넓게 보인다
@@ -30,8 +31,12 @@ const loading = ref(true)
 const error = ref('')
 const sheetOpen = ref(false)
 const shareMsg = ref('')
-const collapsed = ref(false) // true: 패널을 내려서 지도를 보는 중
-const panelHeight = computed(() => (collapsed.value ? COLLAPSED : PANEL))
+// 아래 패널: 손잡이를 끌거나 눌러 내림·올림 (끌기·애니메이션은 utils/dragSheet.js, 차박 지도와 같음)
+const panelSnaps = computed(() => ({ min: COLLAPSED, open: PANEL }))
+const { snap: panelSnap, dragging: panelDragging, style: panelStyle, events: panelDrag } = useDragSheet(panelSnaps, 'open')
+const collapsed = computed(() => panelSnap.value === 'min') // true: 패널을 내려서 지도를 보는 중
+// 지도는 끄는 동안 매번 다시 맞추지 않고, 단계가 정해진 뒤에만 맞춘다 (덜 어지럽게)
+const mapInset = computed(() => panelSnaps.value[panelSnap.value])
 
 // 브라우저 위치 → 실패하면 예시 위치
 function locate() {
@@ -156,7 +161,7 @@ async function shareLocation() {
 <template>
   <div class="nearby">
     <div class="stage">
-      <NearbyMap :me="me" :facilities="shown" :grade="data?.grade" :bottom-inset="panelHeight" />
+      <NearbyMap :me="me" :facilities="shown" :grade="data?.grade" :bottom-inset="mapInset" />
 
       <!-- 왼쪽 위: 지역 · 기상특보 -->
       <div class="status">
@@ -167,7 +172,7 @@ async function shareLocation() {
       </div>
 
       <!-- 오른쪽 위: 레이어 -->
-      <button type="button" class="layer-btn" aria-label="지도에 보일 것" aria-haspopup="dialog"
+      <button type="button" class="layer-btn" aria-label="지도 설정" aria-haspopup="dialog"
         :disabled="!layers.length" @click="sheetOpen = true">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linejoin="round" aria-hidden="true">
@@ -177,10 +182,11 @@ async function shareLocation() {
       </button>
 
       <!-- 아래 패널 -->
-      <section class="panel" :class="{ collapsed }" :style="{ height: panelHeight + 'px' }">
-        <!-- 손잡이를 누르면 패널이 내려가 지도가 보이고, 다시 누르면 올라온다 -->
-        <button type="button" class="grip" :aria-label="collapsed ? '패널 펼치기' : '지도 보기'"
-          :aria-expanded="!collapsed" @click="collapsed = !collapsed">
+      <section class="panel drag-sheet" :class="{ collapsed: collapsed && !panelDragging, dragging: panelDragging }"
+        :style="panelStyle">
+        <!-- 손잡이를 끌어서 내리고 올린다. 누르면 내려가 지도가 보이고, 다시 누르면 올라온다 -->
+        <button type="button" class="grip drag-handle" :aria-label="collapsed ? '패널 펼치기' : '지도 보기'"
+          :aria-expanded="!collapsed" v-on="panelDrag">
           <span />
         </button>
 
@@ -318,7 +324,7 @@ async function shareLocation() {
   border-radius: 20px 20px 0 0;
   background: var(--color-card);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
-  transition: height 0.25s ease;
+  /* 높이 애니메이션은 전역 .drag-sheet (styles/base.css) */
 }
 .panel.collapsed {
   overflow-y: hidden; /* 내려간 상태에서는 안쪽이 스크롤되지 않게 */
@@ -332,7 +338,7 @@ async function shareLocation() {
   background: none;
   display: flex;
   justify-content: center;
-  cursor: pointer;
+  /* 커서(grab)·끌 때 화면 스크롤 막기는 전역 .drag-handle */
 }
 .grip span {
   width: 44px;

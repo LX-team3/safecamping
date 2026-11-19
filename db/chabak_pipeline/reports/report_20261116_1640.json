@@ -1,0 +1,111 @@
+{
+  "run_at": "2026-11-16T16:40:36",
+  "counts": [
+    {
+      "t": "open_spot",
+      "n": 46
+    },
+    {
+      "t": "campsite",
+      "n": 0
+    },
+    {
+      "t": "regulation",
+      "n": 845
+    },
+    {
+      "t": "land_attr",
+      "n": 124276
+    },
+    {
+      "t": "cadastre",
+      "n": 124276
+    }
+  ],
+  "match": [
+    {
+      "lx_miss": 4,
+      "char_miss": 856,
+      "total": 124276
+    }
+  ],
+  "regulation": [
+    {
+      "category": "백두대간",
+      "zone_name": "핵심구역",
+      "level": "불가",
+      "n": 17
+    },
+    {
+      "category": "백두대간",
+      "zone_name": "백두대간보호지역",
+      "level": "주의",
+      "n": 1
+    },
+    {
+      "category": "백두대간",
+      "zone_name": "완충구역",
+      "level": "주의",
+      "n": 11
+    },
+    {
+      "category": "산림보호",
+      "zone_name": "산림유전자원보호구역",
+      "level": "불가",
+      "n": 595
+    },
+    {
+      "category": "산림보호",
+      "zone_name": "산림보호구역",
+      "level": "주의",
+      "n": 103
+    },
+    {
+      "category": "산림보호",
+      "zone_name": "수원함양보호구역",
+      "level": "주의",
+      "n": 30
+    },
+    {
+      "category": "상수원",
+      "zone_name": "상수원보호구역",
+      "level": "불가",
+      "n": 2
+    },
+    {
+      "category": "자연공원",
+      "zone_name": "국립공원",
+      "level": "불가",
+      "n": 6
+    },
+    {
+      "category": "자연공원",
+      "zone_name": "군립공원",
+      "level": "불가",
+      "n": 1
+    },
+    {
+      "category": "하천",
+      "zone_name": "하천구역",
+      "level": "주의",
+      "n": 22
+    },
+    {
+      "category": "하천",
+      "zone_name": "홍수관리구역",
+      "level": "주의",
+      "n": 57
+    }
+  ],
+  "verdict_by_area": [
+    {
+      "verdict": "주의",
+      "n": 204
+    },
+    {
+      "verdict": "불가",
+      "n": 107
+    }
+  ],
+  "warnings": []
+}
