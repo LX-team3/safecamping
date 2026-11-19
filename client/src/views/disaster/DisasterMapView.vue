@@ -6,7 +6,6 @@ import { onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
 import { createDisasterMap, initialState } from '@/utils/disasterMap'
 import AlertPill from '@/components/disaster/AlertPill.vue'
 import RainSlider from '@/components/disaster/RainSlider.vue'
-import MapCompass from '@/components/disaster/MapCompass.vue'
 import EvacSheet from '@/components/disaster/EvacSheet.vue'
 
 const stage = ref(null)     // 지도가 들어갈 칸
@@ -51,7 +50,6 @@ onBeforeUnmount(() => {
     </header>
 
     <RainSlider v-show="!state.tourOn" :state="state" @change="mm => map?.setRain(mm)" />
-    <MapCompass :needle="state.needle" :map="map" />
     <EvacSheet :state="state" :map="map" />
 
     <div v-if="state.loading || state.error" class="loading">
@@ -62,19 +60,19 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* 이 화면만 쓰는 어두운 색 (야간 대피 상황을 고려). 지도 위에 겹치는 부품들이 함께 쓴다
-   ※ 팀 tokens.css 에 아직 없는 색이라 이 화면 안에만 둠 — 팀에서 정하면 tokens.css 로 옮긴다 */
+/* 이 화면의 어두운 색 (야간 대피 상황을 고려). 지도 위에 겹치는 부품들이 함께 쓴다
+   색 값은 tokens.css 의 --color-dm-* · --color-stage-* (팀 규칙: 색은 tokens.css 변수만) */
 .dm {
-  --dm-ground: #0B1014;
-  --dm-sheet: #141B21;
-  --dm-card: #1C252C;
-  --dm-line: #2B3741;
-  --dm-text: #EEF2F4;
-  --dm-muted: #9BAAB5;
-  --dm-water: #4C9BE8;
-  --dm-safe: #5FC795;
-  --dm-caution: #F2C14E;
-  --dm-severe: #EF5B4C;
+  --dm-ground: var(--color-dm-ground);
+  --dm-sheet: var(--color-dm-sheet);
+  --dm-card: var(--color-dm-card);
+  --dm-line: var(--color-dm-line);
+  --dm-text: var(--color-dm-text);
+  --dm-muted: var(--color-dm-muted);
+  --dm-water: var(--color-dm-water);
+  --dm-safe: var(--color-stage-0);
+  --dm-caution: var(--color-stage-1);
+  --dm-severe: var(--color-stage-3);
   --dm-font-num: 'IBM Plex Mono', ui-monospace, monospace;
   position: relative;
   height: 100%;
@@ -86,14 +84,14 @@ onBeforeUnmount(() => {
 .stage { position: absolute; inset: 0; touch-action: none; }
 .stage :deep(.cesium-widget-credits) { display: none !important; }
 .tags { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.credits { position: absolute; right: 8px; bottom: 174px; z-index: 4; font-size: 9px; color: rgba(255, 255, 255, .55); pointer-events: none; text-align: right; }
+.credits { position: absolute; right: 8px; bottom: 174px; z-index: 4; font-size: 9px; color: var(--color-dm-muted); pointer-events: none; text-align: right; }
 .credits :deep(a) { color: inherit; pointer-events: auto; }
 
 .topbar {
   position: absolute; left: 0; right: 0; top: 0; z-index: 5;
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
   padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 28px;
-  background: linear-gradient(rgba(11, 16, 20, 0.92), rgba(11, 16, 20, 0));
+  background: linear-gradient(var(--color-dm-shade), transparent);
   pointer-events: none;
 }
 .place { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -106,8 +104,8 @@ onBeforeUnmount(() => {
   position: absolute; transform: translate(-50%, -100%); white-space: nowrap;
   font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 7px; margin-top: -8px;
 }
-.tags :deep(.tag.me) { background: var(--dm-water); color: #04121F; margin-top: -80px; }
-.tags :deep(.tag.shelter) { background: var(--dm-safe); color: #04170D; }
+.tags :deep(.tag.me) { background: var(--dm-water); color: var(--dm-ground); margin-top: -58px; }   /* 캐릭터 머리 위 */
+.tags :deep(.tag.shelter) { background: var(--dm-safe); color: var(--dm-ground); }
 
 .loading {
   position: absolute; inset: 0; z-index: 30; background: var(--dm-ground); color: var(--dm-muted);
