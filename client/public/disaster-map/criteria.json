@@ -1,12 +1,11 @@
 {
-  "설명": "강수량 → 침수 단계 기준표. 60·90mm는 기상청 호우특보 기준(3시간 강수량: 주의보 60mm 이상, 경보 90mm 이상). 120·150mm는 기상청 기준이 아니라 범람 범위(80년·100년 빈도)를 보여 주기 위해 팀이 정한 참고 단계. AI 판단이 연결되지 않았을 때 이 표로 판단합니다.",
-  "단위": "3시간 누적 강수량(mm)",
-  "max": 200,
+  "설명": "최근 3시간 동안 내린 비(mm) → 대피 단계. 60·90mm = 기상청 호우주의보·경보 기준, 114mm = 서화 관측소 50년에 한 번 올 큰비(WAMIS 설계강수량, 3시간). 하천범람지도도 50년 빈도라 114mm 부터 50년 홍수 범위에 물을 채운다. 80·100년 빈도는 할 일이 50년과 같아 단계를 두지 않음. 12시간(110·180mm)·24시간(310mm) 조건은 서버 판단 때 함께 본다. color 는 tokens.css 변수 이름",
+  "단위": "최근 3시간 동안 내린 비(mm)",
+  "max": 160,
   "stages": [
-    { "from": 0,   "label": "안전",       "color": "#5FC795", "level": 0, "flood": 0 },
-    { "from": 60,  "label": "주의",       "color": "#F2C14E", "level": 1, "flood": 0, "alert": "주의보" },
-    { "from": 90,  "label": "강가 잠김",  "color": "#F28C3B", "level": 2, "flood": 1, "alert": "경보" },
-    { "from": 120, "label": "많이 잠김",  "color": "#EF5B4C", "level": 2, "flood": 2, "ref": true },
-    { "from": 150, "label": "넓게 잠김",  "color": "#B5172B", "level": 3, "flood": 3, "ref": true }
+    { "from": 0,   "label": "안전",      "color": "--color-stage-0", "level": 0, "flood": 0 },
+    { "from": 60,  "label": "준비",      "color": "--color-stage-1", "level": 1, "flood": 0, "alert": "주의보" },
+    { "from": 90,  "label": "대피",      "color": "--color-stage-2", "level": 2, "flood": 0, "alert": "경보" },
+    { "from": 114, "label": "즉시 대피", "color": "--color-stage-3", "level": 3, "flood": 1, "alert": "큰비" }
   ]
 }
