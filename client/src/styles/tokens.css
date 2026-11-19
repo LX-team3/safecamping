@@ -42,6 +42,32 @@
   --color-verdict-caution: #8a6410;
   --color-verdict-open: #4a6b33;
   --color-verdict-camp: #3f5a80;
+  /* 재난 대피 3D 지도(/disaster) 전용 — 야간 대피를 고려한 어두운 화면과 3D 지도 색.
+     utils/disasterMap.js 가 이 변수를 읽어 Cesium 지도에 칠한다. 사용자 승인으로 추가 (2026-11-19), 색 통일 때 다시 정함 */
+  --color-dm-ground: #0b1014;      /* 화면 바탕 */
+  --color-dm-sheet: #141b21;       /* 아래 안내 시트 */
+  --color-dm-card: #1c252c;        /* 시트 안 카드 */
+  --color-dm-line: #2b3741;        /* 테두리 */
+  --color-dm-grab: #3a4752;        /* 시트 손잡이 · 높이 그래프의 땅 */
+  --color-dm-text: #eef2f4;        /* 본문 */
+  --color-dm-muted: #9baab5;       /* 보조 글씨 */
+  --color-dm-water: #4c9be8;       /* 강조(물) · 내 위치 */
+  --color-dm-on-light: #120a02;    /* 밝은 단계 색 위의 글씨 */
+  --color-dm-shade: rgba(11, 16, 20, 0.92);  /* 지도 위 윗줄 그늘 · 떠 있는 상자 바탕 */
+  --color-stage-0: #5fc795;        /* 안전 */
+  --color-stage-1: #f2c14e;        /* 준비 (호우주의보) */
+  --color-stage-2: #f28c3b;        /* 대피 (호우경보) */
+  --color-stage-3: #ef5b4c;        /* 즉시 대피 (50년에 한 번 올 큰비) */
+  --color-flood-water: #1f6bb8;    /* 홍수 때 차오르는 3D 물 */
+  --color-flood-water-hi: #8cc7f2; /* 물결의 밝은 줄 */
+  --color-flood-wet: #5c9ad6;      /* 잠기는 범위 안 건물 */
+  --color-river: #21525f;          /* 평소 강물 */
+  --color-river-blend: #33615c;    /* 강물 물결에 섞는 색 */
+  --color-building: #e8e4dc;       /* 3D 건물 */
+  --color-evac: #14a05a;           /* 대피 화살표 길 */
+  --color-evac-edge: #06140c;      /* 대피 길 테두리 */
+  --color-contour: #fff4d6;        /* 등고선 */
+  --color-map-line: #ffffff;       /* 도로 · 대피 화살표 · 슬라이더 손잡이 */
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */
   --frame-height: 844px;      /* PC 에서 보여 줄 모바일 화면 높이 (설계 파일 크기) */

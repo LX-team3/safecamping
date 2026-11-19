@@ -37,3 +37,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Cesium 작업 파일 복사본 (scripts/copy-cesium.mjs 가 만듦)
+public/cesium/

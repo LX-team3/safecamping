@@ -52,6 +52,8 @@ const router = createRouter({
     { path: '/nearby', name: 'nearby', component: () => import('../views/nearby/NearbyView.vue') },
       // 차박 지도 (탐색 화면 위쪽 "캠핑장 | 차박" 토글로 들어옴). 지도에서 찍은 곳의 차박 판정. 로그인 없이도 된다
     { path: '/chabak', name: 'chabak', component: () => import('../views/chabak/ChabakView.vue') },
+    // 재난 대피 3D 지도 (인북천 물빛테마공원 캠핑장, CesiumJS). 이 화면에 들어올 때만 Cesium 을 불러온다
+    { path: '/disaster', name: 'disaster', component: () => import('../views/disaster/DisasterMapView.vue') },
 
   ],
 })
