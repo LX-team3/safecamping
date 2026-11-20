@@ -527,7 +527,7 @@ const parcelLine = computed(() =>
                 <p class="note">가까운 순 · 누르면 시설 상세를 보여줘요 · 시간은 직선거리로 어림한 값</p>
                 <ol class="rows facility-rows">
                   <li v-for="(f, i) in nearestByType" :key="f.id">
-                    <RouterLink :to="`/facilities/${f.id}`" class="row">
+                    <RouterLink :to="`/app/facilities/${f.id}`" class="row">
                       <b class="no">{{ i + 1 }}</b>
                       <span class="name">{{ f.type === 'er' ? `응급실 (${f.name})` : f.name }}</span>
                       <span class="dist">{{ f.distanceKm }}km</span>
@@ -565,7 +565,7 @@ const parcelLine = computed(() =>
                 <!-- 누르면 캠핑장 상세로 (서버가 이름으로 camp.id 를 찾아 붙임. 못 찾은 곳은 누를 수 없게 이름만) -->
                 <ul class="rows">
                   <li v-for="c in result.nearbyCamps" :key="c.name">
-                    <RouterLink v-if="c.id" :to="`/camps/${c.id}`" class="row">
+                    <RouterLink v-if="c.id" :to="`/app/camps/${c.id}`" class="row">
                       <i :style="{ background: 'var(--color-verdict-camp)' }" />
                       <span class="name">{{ c.name }}</span>
                       <span class="dist">{{ distanceText(c.distM) }}</span>

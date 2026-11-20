@@ -207,7 +207,7 @@ function openPlan() {
               <p class="hint">가까운 순 · 누르면 시설 상세를 보여줘요</p>
               <ol class="list">
                 <li v-for="(f, i) in facilities" :key="f.id">
-                  <RouterLink class="row" :to="`/facilities/${f.id}?camp=${id}`">
+                  <RouterLink class="row" :to="`/app/facilities/${f.id}?camp=${id}`">
                     <i class="no">{{ i + 1 }}</i>
                     <span class="name">{{ rowName(f) }}</span>
                     <span class="km">{{ f.distanceKm.toFixed(1) }}km</span>
@@ -228,7 +228,7 @@ function openPlan() {
 
           <!-- 관광지 탭 -->
           <div v-else>
-            <RouterLink v-if="!prefer.length" class="banner" :to="`/tour-preference?camp=${id}`">
+            <RouterLink v-if="!prefer.length" class="banner" :to="`/app/tour-preference?camp=${id}`">
               <span><b>취향 알려주면 맞춤 추천해요</b><small>즐길 거리 · 자연환경 · 약 30초</small></span>
               <b>시작 ›</b>
             </RouterLink>
@@ -236,11 +236,11 @@ function openPlan() {
               <p class="hint">
                 {{ prefer.length ? '내 취향에 맞는 곳부터 보여 드려요' : '지금은 인기순 · 취향을 알려주면 내 취향순으로 바뀌어요' }}
                 <!-- 배너는 취향이 없을 때만 보이므로, 저장한 뒤에는 여기서 바꾼다 -->
-                <RouterLink v-if="prefer.length" class="change" :to="`/tour-preference?camp=${id}`">바꾸기</RouterLink>
+                <RouterLink v-if="prefer.length" class="change" :to="`/app/tour-preference?camp=${id}`">바꾸기</RouterLink>
               </p>
               <ol class="list">
                 <li v-for="(t, i) in tours" :key="t.id">
-                  <RouterLink class="row" :to="`/tours/${t.id}?camp=${id}`">
+                  <RouterLink class="row" :to="`/app/tours/${t.id}?camp=${id}`">
                     <b class="tour-no">{{ i + 1 }}</b>
                     <span class="name">{{ t.name }}</span>
                     <span class="km">차로 약 {{ t.driveMin }}분<template v-if="t.note"> · {{ t.note }}</template></span>
@@ -268,7 +268,7 @@ function openPlan() {
           </div>
           <p v-if="selected" class="picked">
             <span>{{ selected.name }} · {{ distanceOf(selected).toFixed(1) }}km · 차로 {{ driveMinOf(selected) }}분</span>
-            <RouterLink :to="`/facilities/${selected.id}?camp=${id}`">시설 상세 ›</RouterLink>
+            <RouterLink :to="`/app/facilities/${selected.id}?camp=${id}`">시설 상세 ›</RouterLink>
           </p>
           <p v-else class="picked">이 캠핑장의 시설 정보를 준비하고 있어요.</p>
         </div>

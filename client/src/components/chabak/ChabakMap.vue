@@ -86,7 +86,7 @@ function closeFacilityPopup() {
 }
 function openFacilityPopup(f) {
   closeFacilityPopup()
-  const content = facilityPopupEl(f, FACILITY_LABEL[f.type] ?? '시설', () => router.push(`/facilities/${f.id}`))
+  const content = facilityPopupEl(f, FACILITY_LABEL[f.type] ?? '시설', () => router.push(`/app/facilities/${f.id}`))
   facPopup = new kakao.maps.CustomOverlay({
     map, position: new kakao.maps.LatLng(f.lat, f.lng), content, yAnchor: 1, zIndex: 30,
     clickable: true, // 말풍선을 누른 것이 지도 클릭으로 넘어가지 않게

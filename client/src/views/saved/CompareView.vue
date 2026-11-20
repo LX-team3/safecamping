@@ -63,7 +63,7 @@ function remove(campId) {
 <template>
   <div class="compare">
     <div class="head">
-      <RouterLink to="/saved" class="back" aria-label="저장으로 돌아가기">
+      <RouterLink to="/app/saved" class="back" aria-label="저장으로 돌아가기">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />
@@ -74,7 +74,7 @@ function remove(campId) {
 
     <div v-if="!auth.isLoggedIn" class="empty">
       <p>저장은 로그인하면 쓸 수 있어요.</p>
-      <RouterLink to="/login" class="primary">로그인</RouterLink>
+      <RouterLink to="/app/login" class="primary">로그인</RouterLink>
     </div>
 
     <p v-else-if="error" class="error" role="alert">{{ error }}</p>
@@ -82,14 +82,14 @@ function remove(campId) {
     <template v-else-if="data">
       <div v-if="data.camps.length === 0" class="empty">
         <p>아직 담은 캠핑장이 없어요. 탐색에서 하트를 눌러 담아 보세요.</p>
-        <RouterLink to="/explore" class="primary">캠핑장 둘러보기</RouterLink>
+        <RouterLink to="/app/explore" class="primary">캠핑장 둘러보기</RouterLink>
       </div>
 
       <template v-else>
         <!-- 1곳뿐이면 비교가 아니라 그 캠핑장 정보만 보여 주고, 더 담으라고 안내한다 -->
         <div v-if="!canCompare" class="need-more">
           <p>2곳 이상 담으면 항목별로 비교할 수 있어요.</p>
-          <RouterLink to="/explore" class="primary">캠핑장 더 담기</RouterLink>
+          <RouterLink to="/app/explore" class="primary">캠핑장 더 담기</RouterLink>
         </div>
 
         <span v-else-if="data.totalCount > data.camps.length" class="sub">

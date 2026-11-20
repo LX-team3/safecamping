@@ -72,12 +72,12 @@ async function save() {
   <BottomSheet title="내 캠핑에 일정 등록" @close="emit('close')">
     <div v-if="step === 'login'" class="plan-msg">
       <p>일정은 로그인하면 저장할 수 있어요.</p>
-      <RouterLink to="/login" class="plan-go">로그인하기</RouterLink>
+      <RouterLink to="/app/login" class="plan-go">로그인하기</RouterLink>
     </div>
 
     <div v-else-if="step === 'done'" class="plan-msg">
       <p><b>내 캠핑에 등록했어요.</b><br />내 캠핑 탭에서 확인할 수 있어요.</p>
-      <RouterLink to="/my-camping" class="plan-go">내 캠핑에서 보기</RouterLink>
+      <RouterLink to="/app/my-camping" class="plan-go">내 캠핑에서 보기</RouterLink>
     </div>
 
     <form v-else class="plan-form" @submit.prevent="save">

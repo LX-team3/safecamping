@@ -1,5 +1,5 @@
 <script setup>
-// 가족방 탭 오른쪽 위의 + 버튼 (모일 곳·아이 카드·일정이 같이 쓴다)
+// 가족방 탭 오른쪽 위의 + 버튼 (모일 곳·일정이 같이 쓴다)
 defineProps({ label: { type: String, required: true } })
 </script>
 

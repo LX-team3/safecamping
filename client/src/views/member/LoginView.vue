@@ -23,7 +23,7 @@ async function submit() {
   error.value = ''
   try {
     await auth.login(loginId.value, password.value, keep.value)
-    router.push('/') // 로그인 후에는 메인으로
+    router.push('/app/explore') // 로그인 후에는 메인으로
   } catch (e) {
     error.value = e.message
   } finally {
@@ -62,10 +62,10 @@ async function submit() {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
 
       <button class="primary" type="submit" :disabled="loading">로그인</button>
-      <div class="join">처음이세요?<RouterLink to="/signup">회원가입</RouterLink></div>
+      <div class="join">처음이세요?<RouterLink to="/app/signup">회원가입</RouterLink></div>
     </form>
 
-    <RouterLink to="/" class="guest">로그인 없이 둘러보기</RouterLink>
+    <RouterLink to="/app/explore" class="guest">로그인 없이 둘러보기</RouterLink>
   </div>
 </template>
 

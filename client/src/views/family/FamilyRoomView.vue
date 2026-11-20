@@ -5,7 +5,6 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useFamilyStore } from '@/stores/family'
 import MeetingPlaceTab from '@/components/family/MeetingPlaceTab.vue'
-import ChildCardTab from '@/components/family/ChildCardTab.vue'
 import ScheduleTab from '@/components/family/ScheduleTab.vue'
 import LocationTab from '@/components/family/LocationTab.vue'
 
@@ -17,7 +16,6 @@ const family = useFamilyStore()
 const TABS = [
   { label: '위치', component: LocationTab },
   { label: '모일 곳', component: MeetingPlaceTab },
-  { label: '아이 카드', component: ChildCardTab },
   { label: '일정', component: ScheduleTab },
 ]
 const tab = ref(0)
@@ -64,7 +62,7 @@ async function leave() {
   // 마지막 사람이 나가면 방과 그 안의 정보가 모두 지워지므로 한 번 더 묻는다
   const last = family.room.members.length === 1
   const msg = last
-    ? '마지막 구성원이라 나가면 가족방과 모일 곳·아이 카드·일정이 모두 지워집니다. 나갈까요?'
+    ? '마지막 구성원이라 나가면 가족방과 모일 곳·일정이 모두 지워집니다. 나갈까요?'
     : '가족방에서 나갈까요?'
   if (!window.confirm(msg)) return
   if (await run(() => family.leave(), error)) tab.value = 0
@@ -96,13 +94,13 @@ async function run(fn, errorRef) {
 <template>
   <div class="family-room">
     <div class="head">
-      <RouterLink to="/my-camping" class="back" aria-label="내 캠핑으로">‹</RouterLink>
+      <RouterLink to="/app/my-camping" class="back" aria-label="내 캠핑으로">‹</RouterLink>
       <h1>가족 모임방</h1>
     </div>
 
     <div v-if="!auth.isLoggedIn" class="empty">
       <p>가족 모임방은 로그인하면 쓸 수 있어요.</p>
-      <RouterLink to="/login" class="primary">로그인</RouterLink>
+      <RouterLink to="/app/login" class="primary">로그인</RouterLink>
     </div>
 
     <p v-else-if="loading" class="empty">불러오는 중...</p>

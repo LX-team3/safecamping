@@ -49,8 +49,8 @@ const directions = computed(() => {
 })
 
 function otherTours() {
-  if (tour.value?.from) router.push(`/camps/${tour.value.from.campId}?tab=tour`)
-  else router.push('/explore')
+  if (tour.value?.from) router.push(`/app/camps/${tour.value.from.campId}?tab=tour`)
+  else router.push('/app/explore')
 }
 </script>
 

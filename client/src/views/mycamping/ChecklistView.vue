@@ -84,8 +84,8 @@ const openText = computed(() => {
 })
 const safetyLink = computed(() =>
   isSpot.value
-    ? { to: { path: '/chabak', query: { lat: plan.value.lat, lng: plan.value.lng } }, text: '차박 판정 보기 ›' }
-    : { to: `/camps/${plan.value.campId}`, text: '캠핑장 상세 ›' },
+    ? { to: { path: '/app/chabak', query: { lat: plan.value.lat, lng: plan.value.lng } }, text: '차박 판정 보기 ›' }
+    : { to: `/app/camps/${plan.value.campId}`, text: '캠핑장 상세 ›' },
 )
 // ---- 날씨 예보 (서버 forecast.days: { date, minTemp, maxTemp, pop, maxWind, sky, precip }) ----
 const hasForecast = (d) => [d.minTemp, d.maxTemp, d.pop, d.maxWind, d.sky].some((v) => v != null)
@@ -99,11 +99,11 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
 <template>
   <div class="page">
     <div class="scroll">
-      <RouterLink to="/my-camping" class="back">‹ 내 캠핑</RouterLink>
+      <RouterLink to="/app/my-camping" class="back">‹ 내 캠핑</RouterLink>
 
       <div v-if="!auth.isLoggedIn" class="empty">
         <p>출발 준비는 로그인하면 쓸 수 있어요.</p>
-        <RouterLink to="/login" class="primary">로그인</RouterLink>
+        <RouterLink to="/app/login" class="primary">로그인</RouterLink>
       </div>
 
       <p v-else-if="error" class="state">

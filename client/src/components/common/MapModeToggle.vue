@@ -4,8 +4,8 @@
 defineProps({ active: { type: String, required: true } }) // 'camp' | 'chabak'
 
 const MODES = [
-  { key: 'camp', label: '캠핑장', to: '/explore' },
-  { key: 'chabak', label: '차박', to: '/chabak' },
+  { key: 'camp', label: '캠핑장', to: '/app/explore' },
+  { key: 'chabak', label: '차박', to: '/app/chabak' },
 ]
 </script>
 

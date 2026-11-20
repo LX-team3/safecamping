@@ -109,7 +109,7 @@ function later() {
 }
 // 끝나면 탐색으로 돌아오게 from 을 붙여 보낸다
 function startSurvey() {
-  router.push({ path: '/survey', query: { from: 'explore' } })
+  router.push({ path: '/app/survey', query: { from: 'explore' } })
 }
 
 onMounted(async () => {
@@ -231,7 +231,7 @@ function applied() {
 }
 
 function openDetail(id) {
-  router.push(`/camps/${id}`)
+  router.push(`/app/camps/${id}`)
 }
 
 function onMarker(id) {

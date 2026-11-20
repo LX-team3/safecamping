@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 
 defineProps({
   favorite: { type: Boolean, default: null }, // null 이면 하트를 숨긴다 (시설 상세)
-  fallback: { type: String, default: '/explore' }, // 주소로 바로 들어와 돌아갈 곳이 없을 때
+  fallback: { type: String, default: '/app/explore' }, // 주소로 바로 들어와 돌아갈 곳이 없을 때
 })
 defineEmits(['favorite'])
 

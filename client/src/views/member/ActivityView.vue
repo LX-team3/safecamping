@@ -69,7 +69,7 @@ async function save() {
 <template>
   <div class="activity">
     <div class="head">
-      <RouterLink to="/my-info" aria-label="내 정보로 돌아가기" class="back">
+      <RouterLink to="/app/my-info" aria-label="내 정보로 돌아가기" class="back">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />
@@ -80,7 +80,7 @@ async function save() {
 
     <div v-if="!auth.isLoggedIn" class="empty">
       <p>여행 취향은 로그인하면 고를 수 있습니다.</p>
-      <RouterLink to="/login" class="primary">로그인</RouterLink>
+      <RouterLink to="/app/login" class="primary">로그인</RouterLink>
     </div>
 
     <template v-else>

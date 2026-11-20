@@ -77,7 +77,7 @@ async function remove(p) {
 
       <div v-if="!auth.isLoggedIn" class="empty">
         <p>내 캠핑은 로그인하면 쓸 수 있어요.</p>
-        <RouterLink to="/login" class="primary">로그인</RouterLink>
+        <RouterLink to="/app/login" class="primary">로그인</RouterLink>
       </div>
 
       <template v-else>
@@ -95,14 +95,14 @@ async function remove(p) {
               <button type="button" class="del" :aria-label="`${p.campName} 일정 지우기`" @click="remove(p)">삭제</button>
             </div>
             <!-- 등록 캠핑장은 캠핑장 상세로, 차박 자리(campId 없음)는 차박 지도에서 그 자리로 -->
-            <RouterLink v-if="p.campId != null" :to="`/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
-            <RouterLink v-else :to="{ path: '/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
+            <RouterLink v-if="p.campId != null" :to="`/app/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
+            <RouterLink v-else :to="{ path: '/app/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
               {{ p.campName }}
             </RouterLink>
             <p class="plan-place">{{ p.place }}</p>
             <p class="plan-range">{{ p.range }}</p>
             <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
-            <RouterLink v-if="p.prep" :to="`/my-camping/${p.id}/checklist`" class="prep">
+            <RouterLink v-if="p.prep" :to="`/app/my-camping/${p.id}/checklist`" class="prep">
               <span v-if="p.prep.warn" class="warn-dot" aria-label="특보 발효 중" />
               <span class="prep-text">
                 <b>출발 준비</b>
@@ -116,7 +116,7 @@ async function remove(p) {
           등록한 캠핑이 없어요.<br />캠핑장 상세나 차박 지도에서 '내 캠핑에 일정 등록'을 눌러 보세요.
         </p>
 
-        <RouterLink to="/my-camping/family" class="family-btn">
+        <RouterLink to="/app/my-camping/family" class="family-btn">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="9" cy="8" r="3" />
@@ -125,7 +125,7 @@ async function remove(p) {
           </svg>
           <span class="text">
             <b>가족 모임방</b>
-            <small>모일 곳 · 아이 카드 · 일정을 가족과 함께 봐요</small>
+            <small>모일 곳 · 일정을 가족과 함께 봐요</small>
           </span>
           <span aria-hidden="true">›</span>
         </RouterLink>

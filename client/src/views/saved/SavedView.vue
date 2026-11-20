@@ -75,7 +75,7 @@ function countText(list) {
 
       <div v-if="!auth.isLoggedIn" class="empty">
         <p>저장은 로그인하면 쓸 수 있어요.</p>
-        <RouterLink to="/login" class="primary">로그인</RouterLink>
+        <RouterLink to="/app/login" class="primary">로그인</RouterLink>
       </div>
 
       <p v-else-if="tab !== 0" class="empty">준비 중이에요.</p>
@@ -90,7 +90,7 @@ function countText(list) {
         <p v-if="error" class="error" role="alert">{{ error }}</p>
 
         <div class="grid">
-          <RouterLink v-for="list in saved.lists" :key="list.id" :to="`/saved/lists/${list.id}`" class="card">
+          <RouterLink v-for="list in saved.lists" :key="list.id" :to="`/app/saved/lists/${list.id}`" class="card">
             <span class="thumb">
               <span v-for="i in 3" :key="i" :class="{ filled: filled(list, i - 1) }" />
               <span class="more">{{ more(list) }}</span>

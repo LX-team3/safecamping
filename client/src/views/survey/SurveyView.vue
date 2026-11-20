@@ -12,7 +12,7 @@ const survey = useSurveyStore()
 const router = useRouter()
 const route = useRoute()
 // 탐색 화면 팝업에서 왔으면(?from=explore) 끝난 뒤·나갈 때 탐색으로, 아니면 내 정보로 돌아간다
-const backTo = computed(() => (route.query.from === 'explore' ? '/explore' : '/my-info'))
+const backTo = computed(() => (route.query.from === 'explore' ? '/app/explore' : '/app/my-info'))
 
 // 단계 묶음과 문구는 설계 그대로. card: 세로 카드 모양(체크 원 있음), 아니면 알약 모양
 const STEPS = [

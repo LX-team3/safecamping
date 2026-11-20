@@ -16,7 +16,7 @@ const saving = ref(false)
 const loadError = ref('')
 const error = ref('')
 
-const backTo = computed(() => (props.campId ? `/camps/${props.campId}?tab=tour` : '/explore'))
+const backTo = computed(() => (props.campId ? `/app/camps/${props.campId}?tab=tour` : '/app/explore'))
 
 async function load() {
   loading.value = true

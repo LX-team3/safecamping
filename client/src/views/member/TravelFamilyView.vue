@@ -83,7 +83,7 @@ async function remove(child) {
 <template>
   <div class="travel-family">
     <div class="head">
-      <RouterLink to="/my-info" aria-label="내 정보로 돌아가기" class="back">
+      <RouterLink to="/app/my-info" aria-label="내 정보로 돌아가기" class="back">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />
@@ -95,7 +95,7 @@ async function remove(child) {
     <div class="body">
       <div v-if="!auth.isLoggedIn" class="empty">
         <p>함께 가는 가족은 로그인하면 넣을 수 있습니다.</p>
-        <RouterLink to="/login" class="primary">로그인</RouterLink>
+        <RouterLink to="/app/login" class="primary">로그인</RouterLink>
       </div>
 
       <template v-else-if="loaded">
@@ -103,7 +103,7 @@ async function remove(child) {
 
         <div v-if="!family.room" class="empty">
           <p>가족방을 만들면 아이를 추가할 수 있습니다.<br />아이 정보는 가족방 사람들과 함께 봅니다.</p>
-          <RouterLink to="/my-camping/family" class="primary">가족방 만들기</RouterLink>
+          <RouterLink to="/app/my-camping/family" class="primary">가족방 만들기</RouterLink>
         </div>
 
         <template v-else>
@@ -150,7 +150,7 @@ async function remove(child) {
             </svg>
             <span>
               같은 가족방 사람만 볼 수 있습니다. 알레르기 · 혈액형 같은 응급 정보는
-              <RouterLink to="/my-camping/family" class="link">가족방</RouterLink>에서 넣을 수 있습니다.
+              <RouterLink to="/app/my-camping/family" class="link">가족방</RouterLink>에서 넣을 수 있습니다.
             </span>
           </div>
         </template>

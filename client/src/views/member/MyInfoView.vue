@@ -28,15 +28,15 @@ onMounted(async () => {
 const menu = computed(() =>
   auth.isLoggedIn
     ? [
-        { name: '함께 가는 가족', to: '/my-info/family' },
-        { name: '여행 취향', to: '/my-info/activity' },
-        { name: '비상연락처', to: '/my-info/emergency-contacts' },
-        { name: '알림', to: '/my-info/alerts' },
+        { name: '함께 가는 가족', to: '/app/my-info/family' },
+        { name: '여행 취향', to: '/app/my-info/activity' },
+        { name: '비상연락처', to: '/app/my-info/emergency-contacts' },
+        { name: '알림', to: '/app/my-info/alerts' },
         { name: '공지사항 · 문의' }, // 화면이 아직 없어 누를 수 없음
       ]
     : [
-        { name: '로그인 · 회원가입', to: '/login' },
-        { name: '알림', to: '/my-info/alerts' },
+        { name: '로그인 · 회원가입', to: '/app/login' },
+        { name: '알림', to: '/app/my-info/alerts' },
         { name: '공지사항 · 문의' },
       ],
 )
@@ -45,7 +45,7 @@ async function logout() {
   await auth.logout()
   survey.reset() // 다음 사람에게 이전 사람의 진단 결과가 보이지 않게
   myCamping.reset() // 내 캠핑 목록도 같은 이유로 비운다
-  router.push('/login')
+  router.push('/app/login')
 }
 </script>
 
@@ -62,7 +62,7 @@ async function logout() {
           <span v-if="!auth.isLoggedIn" class="save-hint">로그인하면 진단 결과가 저장됩니다.</span>
         </div>
         <div class="result-actions">
-          <RouterLink to="/survey" class="redo">다시 진단하기</RouterLink>
+          <RouterLink to="/app/survey" class="redo">다시 진단하기</RouterLink>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ async function logout() {
           <li><b>2</b><span><b>맞춤 안전 수칙</b><span>내 유형에 꼭 필요한 것만</span></span></li>
           <li><b>3</b><span><b>맞춤 캠핑장 순서</b><span>탐색 TOP5가 내 유형 기준으로 바뀌어요</span></span></li>
         </ol>
-        <RouterLink to="/survey" class="start">1분 진단 시작하기</RouterLink>
+        <RouterLink to="/app/survey" class="start">1분 진단 시작하기</RouterLink>
       </div>
 
       <ul class="menu">
