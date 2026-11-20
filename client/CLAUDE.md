@@ -47,3 +47,10 @@ frontend/src/
 - 개발 중 `/api` 요청은 `vite.config.js` 의 proxy 가 백엔드(8080)로 넘긴다 → 백엔드를 먼저 켜 둔다
 - 연결된 화면: ② 1분 진단(답 저장), ③-1 지역별 캠핑장 수, ③-2 인원·날짜 확인, ④-1~10 캠핑지도 (`data/regionDummy.js` 는 더 이상 안 씀)
 - ④ 캠핑지도는 틀만 있음: 지도는 `MapCanvas` 의 임시 그림(설계 지도 위 x·y %), 길찾기 경로는 비어 있음 → 카카오 API 연결 때 채움
+
+## 폴더·이름 규칙 (웹 / 모바일 구분)
+- 웹(PC)과 모바일은 화면·부품을 폴더와 이름 앞 접두사로 나눈다. 둘이 같은 규칙이다
+  - 웹: `views/web/WebXxxView.vue`, `components/web/WebXxx.vue`, 라우트 `router/webRoutes.js`, 주소 `/web/...`, 색 `styles/tokens-web.css`(`--web-*`)
+  - 모바일: `views/mobile/MobileXxxView.vue`, `components/mobile/MobileXxx.vue`, 라우트 `router/mobileRoutes.js`, 주소 `/app/...`, 색 `styles/tokens.css`
+- 새 화면은 해당 폴더에 만들고 해당 라우트 파일에 한 줄 추가한다. 웹과 모바일이 같이 쓰는 것은 `stores/`, `utils/`, `layouts/`
+- 옛 모바일 주소(`/explore` 등)는 `mobileRoutes.js` 의 `legacyRedirects` 가 `/app/...` 으로 넘겨 준다

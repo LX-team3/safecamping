@@ -31,18 +31,18 @@ const guideOpen = ref(false)
 
       <div class="tools">
         <RouterLink v-if="!auth.isLoggedIn" to="/web/login" class="login">로그인</RouterLink>
-        <a v-else href="#" class="avatar" :aria-label="`마이페이지 (${auth.member?.name})`" @click.prevent>{{ initial }}</a>
+        <RouterLink v-else to="/web/my-info" class="avatar" :aria-label="`내 정보 (${auth.member?.name})`">{{ initial }}</RouterLink>
 
         <button type="button" class="icon-btn" aria-label="검색">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         </button>
-        <a href="#" class="icon-btn" aria-label="알림" @click.prevent>
+        <RouterLink to="/web/alerts" class="icon-btn" aria-label="알림">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" />
           </svg>
-        </a>
+        </RouterLink>
         <button type="button" class="icon-btn" aria-label="전체 메뉴" @click="menuOpen = true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>

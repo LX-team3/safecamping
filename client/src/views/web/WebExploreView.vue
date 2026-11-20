@@ -12,6 +12,7 @@ import WebCampMap from '@/components/web/WebCampMap.vue'
 import WebCarPanel from '@/components/web/WebCarPanel.vue'
 import WebCampDetailPanel from '@/components/web/WebCampDetailPanel.vue'
 import WebFacilityPanel from '@/components/web/WebFacilityPanel.vue'
+import WebTripModal from '@/components/web/WebTripModal.vue'
 import { api } from '@/utils/api'
 import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { directionsUrl } from '@/utils/place'
@@ -225,6 +226,12 @@ async function loadFacilities() {
 const CHIP_COLOR = { er: 'hospital', fire: 'fire', police: 'police', store: 'store', pharmacy: 'pharmacy', shelter: 'shelter' }
 
 // ---- 칩 글씨 ----
+const tripOpen = ref(false)
+const tripTab = ref('region')
+function openTrip(tab) {
+  tripTab.value = tab
+  tripOpen.value = true
+}
 const regionLabel = computed(() => trip.state.sigungu?.name || trip.state.sido?.name || '전국')
 const dateLabel = computed(() =>
   trip.state.checkIn && trip.state.checkOut ? `${shortLabel(trip.state.checkIn)}–${shortLabel(trip.state.checkOut)}` : '날짜',
@@ -260,8 +267,8 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
           </button>
-          <button type="button" class="chip" disabled>{{ regionLabel }} ▾</button>
-          <button type="button" class="chip" disabled>{{ dateLabel }} ▾</button>
+          <button type="button" class="chip" @click="openTrip('region')">{{ regionLabel }} ▾</button>
+          <button type="button" class="chip" @click="openTrip('date')">{{ dateLabel }} ▾</button>
         </div>
         <div class="tierbox">
           <span class="tierlabel">지도에 보일 캠핑장</span>
@@ -391,6 +398,7 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
       </div>
       <p v-if="copied" class="copied" role="status">링크를 복사했어요</p>
     </div>
+    <WebTripModal :open="tripOpen" :tab="tripTab" @close="tripOpen = false" @apply="tripOpen = false" />
   </WebMapShell>
 </template>
 

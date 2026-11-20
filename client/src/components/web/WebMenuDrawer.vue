@@ -27,7 +27,7 @@ async function logout() {
       <div class="top">
         <div v-if="auth.isLoggedIn" class="welcome">
           <span class="hello">환영합니다 {{ memberName }}님</span>
-          <a href="#" class="edit" @click.prevent>회원정보 수정 ›</a>
+          <RouterLink to="/web/my-info" class="edit" @click="emit('close')">내 정보 ›</RouterLink>
         </div>
         <div v-else class="auth">
           <RouterLink to="/web/login" class="btn-login">로그인</RouterLink>
@@ -42,20 +42,19 @@ async function logout() {
       <div class="body">
         <span class="group">내 활동</span>
         <RouterLink to="/web/my-booking" class="row strong" @click="emit('close')"><span>내 예약</span><i class="arrow"></i></RouterLink>
+        <RouterLink to="/web/my-info" class="row" @click="emit('close')"><span>내 정보</span><i class="arrow"></i></RouterLink>
         <RouterLink to="/web/saved" class="row"><span>찜한 캠핑장</span><i class="arrow"></i></RouterLink>
-        <a href="#" class="row" @click.prevent><span>최근 본 캠핑장</span><i class="arrow"></i></a>
         <RouterLink to="/web/survey" class="row"><span>내 캠핑 유형</span><span class="sub">저장된 검사 결과 ›</span></RouterLink>
 
         <span class="badge">안전</span>
-        <a href="#" class="row" @click.prevent><span>모임방</span><span class="sub">함께 가는 사람과 안전 공유 ›</span></a>
+        <RouterLink to="/web/family" class="row" @click="emit('close')"><span>모임방</span><span class="sub">함께 가는 사람과 안전 공유 ›</span></RouterLink>
         <a :href="METAVERSE_URL" target="_blank" rel="noopener" class="row" @click="emit('close')"><span>메타버스 안전 탐험</span><i class="arrow"></i></a>
         <RouterLink :to="DISASTER_PATH" class="row" @click="emit('close')"><span>3D 재난 대피 지도</span><i class="arrow"></i></RouterLink>
-        <a href="#" class="row" @click.prevent><span>안전 점검 체크리스트</span><i class="arrow"></i></a>
-        <a href="#" class="row" @click.prevent><span>내 안전 설정</span><i class="arrow"></i></a>
+        <RouterLink to="/web/my-booking" class="row" @click="emit('close')"><span>안전 점검 체크리스트</span><span class="sub">내 예약에서 열려요 ›</span></RouterLink>
       </div>
 
       <div class="bottom">
-        <a href="#" @click.prevent>알림 설정</a>
+        <RouterLink to="/web/alerts" @click="emit('close')">알림</RouterLink>
         <a href="#" @click.prevent>공지사항 · 문의하기</a>
         <a v-if="auth.isLoggedIn" href="#" class="logout" @click.prevent="logout">로그아웃</a>
       </div>

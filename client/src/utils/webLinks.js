@@ -4,5 +4,5 @@
 // (client 가 5173 을 쓰므로 metaverse 는 npm run dev 하면 5174 로 뜬다)
 export const METAVERSE_URL = import.meta.env.VITE_METAVERSE_URL || 'http://localhost:5174/metaverse'
 
-// 3D 재난 대피 지도는 client 안의 화면이다 (router/index.js 의 /disaster)
-export const DISASTER_PATH = '/disaster'
+// 3D 재난 대피 지도는 client 안의 화면이다 (router/mobileRoutes.js 의 /app/disaster)
+export const DISASTER_PATH = '/app/disaster'

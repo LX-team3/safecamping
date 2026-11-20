@@ -5,9 +5,24 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import WebGuideModal from '@/components/web/WebGuideModal.vue'
+import WebTripModal from '@/components/web/WebTripModal.vue'
+import { useTripStore } from '@/stores/trip'
+import { shortLabel } from '@/utils/date'
+import { shortSido } from '@/utils/place'
 import { loadSavedResult } from '@/utils/webSurvey'
 
 const auth = useAuthStore()
+// 검색칸(지역 · 날짜 · 인원): 누르면 지역·날짜 팝업이 열리고, 고른 값은 trip store 에 저장돼 탐색 화면에서도 그대로 쓴다
+const trip = useTripStore()
+const tripOpen = ref(false)
+const tripTab = ref('region')
+function openTrip(tab) {
+  tripTab.value = tab
+  tripOpen.value = true
+}
+const regionText = computed(() => (trip.state.sigungu ? `${shortSido(trip.state.sido?.name)} ${trip.state.sigungu.name}` : trip.state.sido ? shortSido(trip.state.sido.name) : '전국'))
+const dateText = computed(() => (trip.state.checkIn && trip.state.checkOut ? `${shortLabel(trip.state.checkIn)} – ${shortLabel(trip.state.checkOut)}` : '날짜 선택'))
+const peopleText = computed(() => `성인 ${trip.state.adults}${trip.state.kids ? ` · 아이 ${trip.state.kids}` : ''}`)
 // 진단 결과를 저장한 사람만 "내 유형" 영역을 보여 준다 (결과는 이 브라우저에 저장, utils/webSurvey.js)
 const savedType = computed(() => (auth.isLoggedIn && auth.member ? loadSavedResult(auth.member.id) : null))
 
@@ -114,14 +129,14 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
       <div class="hero-text">
         <h1>떠나기 전에,<br />안전부터 확인하세요</h1>
         <form class="search" @submit.prevent>
-          <button type="button" class="field">
-            <span class="k">지역</span><span class="v">강원 인제군</span><i class="chev"></i>
+          <button type="button" class="field" @click="openTrip('region')">
+            <span class="k">지역</span><span class="v">{{ regionText }}</span><i class="chev"></i>
           </button>
-          <button type="button" class="field divide">
-            <span class="k">날짜</span><span class="v">11.14 – 11.15</span><i class="chev"></i>
+          <button type="button" class="field divide" @click="openTrip('date')">
+            <span class="k">날짜</span><span class="v">{{ dateText }}</span><i class="chev"></i>
           </button>
-          <button type="button" class="field divide">
-            <span class="k">인원</span><span class="v">성인 2 · 아이 1</span><i class="chev"></i>
+          <button type="button" class="field divide" @click="openTrip('date')">
+            <span class="k">인원</span><span class="v">{{ peopleText }}</span><i class="chev"></i>
           </button>
           <RouterLink to="/web/explore" class="go">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -299,6 +314,7 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
     </div>
 
     <WebGuideModal :open="guideOpen" :text="guideText" @close="guideOpen = false" />
+    <WebTripModal :open="tripOpen" :tab="tripTab" @close="tripOpen = false" @apply="tripOpen = false" />
   </div>
 </template>
 
