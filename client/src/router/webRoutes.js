@@ -26,6 +26,8 @@ export const webRoutes = [
   { path: '/web/survey', name: 'web-survey', component: () => import('../views/web/WebSurveyView.vue'), meta: { layout: 'web' } },
   { path: '/web/nearby', name: 'web-nearby', component: () => import('../views/web/WebNearbyView.vue'), meta: { layout: 'web' } },
   { path: '/web/saved', name: 'web-saved', component: () => import('../views/web/WebSavedView.vue'), meta: { layout: 'web' } },
+  // 재난 대피 3D 지도: 전체 화면 지도라 헤더·하단이 없다 (이 화면에 들어올 때만 Cesium 을 불러온다)
+  { path: '/web/disaster', name: 'web-disaster', component: () => import('../views/web/WebDisasterMapView.vue'), meta: { layout: 'web' } },
   {
     path: '/web',
     component: () => import('../layouts/WebLayout.vue'),

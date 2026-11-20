@@ -273,7 +273,8 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
     </div>
 
     <!-- ⑧ 1분 안전 진단 팝업 -->
-    <div v-if="showNudge" class="dim" role="dialog" aria-modal="true" aria-labelledby="web-nudge-title">
+    <!-- 어두운 바탕(.dim)을 누르면 닫힌다. 카드 안쪽을 눌렀을 때는 닫히지 않게 .self -->
+    <div v-if="showNudge" class="dim" role="dialog" aria-modal="true" aria-labelledby="web-nudge-title" @click.self="closeNudge">
       <div class="nudge">
         <div class="nudge-main">
           <div class="nudge-head">
@@ -840,13 +841,14 @@ h2 {
   position: fixed;
   inset: 0;
   z-index: 20;
-  padding-top: 150px;
+  padding: 16px 0;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  overflow-y: auto; /* 화면이 낮으면 스크롤로 아래까지 볼 수 있게 (잘리지 않게) */
   background: var(--web-dim);
 }
 .nudge {
+  margin: auto; /* 가로·세로 정중앙. 화면보다 크면 위에서부터 스크롤 */
+  flex: none;
   width: 560px;
   max-width: calc(100% - 32px);
   border-radius: 32px;

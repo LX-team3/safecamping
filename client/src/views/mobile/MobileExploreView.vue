@@ -17,7 +17,7 @@ import MobileLayerSheet from '@/components/mobile/MobileLayerSheet.vue'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import MobileMapModeToggle from '@/components/mobile/MobileMapModeToggle.vue'
 import { useDragSheet, useElementHeight } from '@/utils/dragSheet'
-import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
+import MobileSurveyNudge from '@/components/mobile/MobileSurveyNudge.vue'
 import { api } from '@/utils/api'
 import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { vHscroll } from '@/utils/hscroll'
@@ -86,15 +86,19 @@ async function load() {
 }
 
 // ---- 1분 진단 안내 팝업 ----
-// 진단을 안 한 사람에게만 한 번 보여 준다. "나중에하기"를 누르면 이 브라우저 탭에서는 다시 안 뜬다
+// 진단을 안 한 사람에게만 보여 준다 (디자인: components/mobile/MobileSurveyNudge.vue, 웹 홈 팝업과 같음)
+//  - "닫기"·어두운 바탕 누르기: 이 브라우저 탭에서는 다시 안 뜬다
+//  - "오늘 하루 보지 않기": 오늘 하루는 다시 안 뜬다 (다음 날 다시 뜸)
 const PROMPT_KEY = 'survey-prompt-dismissed'
+const HIDE_DAY_KEY = 'survey-prompt-hidden-date'
+const today = () => new Date().toISOString().slice(0, 10)
 const surveyChecked = ref(false) // 서버의 내 진단 답까지 확인했는지 (확인 전에 띄우면 한 번 깜빡인다)
 const promptDismissed = ref(readDismissed())
 const showSurveyPrompt = computed(() => surveyChecked.value && !survey.done && !promptDismissed.value)
 
 function readDismissed() {
   try {
-    return sessionStorage.getItem(PROMPT_KEY) === '1'
+    return sessionStorage.getItem(PROMPT_KEY) === '1' || localStorage.getItem(HIDE_DAY_KEY) === today()
   } catch {
     return false // 저장소를 못 쓰면 매번 보여 준다
   }
@@ -106,6 +110,14 @@ function later() {
   } catch {
     // 저장 못 해도 이번 화면에서는 닫힌다
   }
+}
+function hideToday() {
+  try {
+    localStorage.setItem(HIDE_DAY_KEY, today())
+  } catch {
+    // 저장 못 해도 이번 화면에서는 닫힌다
+  }
+  promptDismissed.value = true
 }
 // 끝나면 탐색으로 돌아오게 from 을 붙여 보낸다
 function startSurvey() {
@@ -340,18 +352,7 @@ function onMarker(id) {
     <MobileBottomNav active="explore" />
 
     <!-- 1분 진단 안내 팝업 (진단 전에만) -->
-    <div v-if="showSurveyPrompt" class="prompt-back">
-      <div class="prompt" role="dialog" aria-modal="true" aria-labelledby="prompt-title">
-        <!-- 장식 그림이라 alt 는 비워 둔다 (스크린리더가 읽지 않게) -->
-        <img :src="campingImg" alt="" class="prompt-img" />
-        <h2 id="prompt-title">내 유형 진단하기</h2>
-        <p>결과에 따라 안전수칙과 캠핑장 추천이 달라집니다.</p>
-        <div class="prompt-buttons">
-          <button type="button" class="later" @click="later">나중에하기</button>
-          <button type="button" class="now" @click="startSurvey">지금하기</button>
-        </div>
-      </div>
-    </div>
+    <MobileSurveyNudge v-if="showSurveyPrompt" @start="startSurvey" @hide-today="hideToday" @close="later" />
 
     <!-- 아래 시트 (화면 전체를 어둡게 덮음) -->
     <MobileRegionSheet v-if="openSheet === 'region'" @close="openSheet = null" @apply="applied" />
@@ -546,73 +547,6 @@ h1 {
   color: var(--color-text);
   text-decoration: underline;
   cursor: pointer;
-}
-/* 진단 안내 팝업: 화면 전체를 어둡게 덮고 가운데에 카드 */
-.prompt-back {
-  position: absolute;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.45);
-}
-.prompt {
-  width: 100%;
-  max-width: 344px;
-  padding: 24px 16px 20px;
-  text-align: center;
-  border-radius: 20px;
-  background: var(--color-card);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-/* 높이를 제한해서 버튼이 화면 아래로 밀리지 않게 한다 */
-.prompt-img {
-  align-self: center;
-  height: 110px;
-  width: auto;
-  margin-bottom: 4px;
-}
-.prompt h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 900;
-}
-.prompt p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  letter-spacing: -0.03em;
-  word-break: keep-all; /* 단어 중간에서 줄이 바뀌지 않게 */
-  text-wrap: balance; /* 좁은 화면에서 두 줄이 되더라도 "다." 만 홀로 남지 않게 */
-  color: var(--color-text);
-}
-.prompt-buttons {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-.prompt-buttons button {
-  height: 48px;
-  border-radius: 24px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.prompt-buttons .later {
-  flex: 1;
-  border: 1.5px solid var(--color-text);
-  background: var(--color-card);
-  color: var(--color-text);
-}
-.prompt-buttons .now {
-  flex: 1.4;
-  border: 0;
-  background: var(--color-text);
-  color: var(--color-card);
 }
 .to-map {
   position: absolute;

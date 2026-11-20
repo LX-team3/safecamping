@@ -1,6 +1,6 @@
 <script setup>
-// 여행 취향 (관광지 탭에서 들어온다). 고른 취향으로 관광지 순서만 바꾸고 안전점수에는 쓰지 않는다
-// 끝나면 ?camp= 로 받은 캠핑장의 관광지 탭으로 돌아간다. 1분 진단(survey)·내 정보 여행 취향과는 별개 화면
+// 여행 취향 (관광지 탭 또는 내 정보 메뉴에서 들어온다). 고른 취향으로 관광지 순서만 바꾸고 안전점수에는 쓰지 않는다
+// 끝나면 ?camp= 로 받은 캠핑장의 관광지 탭으로, 캠핑장 없이 들어왔으면 내 정보로 돌아간다. 1분 진단(survey)과는 별개 화면
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
@@ -16,7 +16,7 @@ const saving = ref(false)
 const loadError = ref('')
 const error = ref('')
 
-const backTo = computed(() => (props.campId ? `/app/camps/${props.campId}?tab=tour` : '/app/explore'))
+const backTo = computed(() => (props.campId ? `/app/camps/${props.campId}?tab=tour` : '/app/my-info'))
 
 async function load() {
   loading.value = true
@@ -96,7 +96,7 @@ async function save() {
         </section>
 
         <!-- 연령 데이터가 없어 활동을 뒤로 보내지는 못한다 → 하지 않는 동작을 약속하지 않고 확인을 안내한다 -->
-        <p class="note">아이와 함께라면 활동별 연령 제한을 꼭 확인하세요. 아이 정보는 내 정보 › 함께 가는 가족에서 바꿀 수 있어요.</p>
+        <p class="note">아이와 함께라면 활동별 연령 제한을 꼭 확인하세요.</p>
       </template>
     </main>
 
