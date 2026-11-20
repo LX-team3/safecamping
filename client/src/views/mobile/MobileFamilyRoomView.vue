@@ -1,12 +1,12 @@
 <script setup>
 // 가족 모임방 (내 캠핑 → 가족 모임방 버튼으로 들어옴. 설계 파일 없음 — 저장 화면 모양에 맞춤)
-// 방이 없으면 만들기·초대코드 입력, 있으면 방 정보 + 탭. 탭 내용은 components/family/ 에 하나씩
+// 방이 없으면 만들기·초대코드 입력, 있으면 방 정보 + 탭. 탭 내용은 components/mobile/ 에 하나씩 (MobileXxxTab)
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useFamilyStore } from '@/stores/family'
-import MeetingPlaceTab from '@/components/family/MeetingPlaceTab.vue'
-import ScheduleTab from '@/components/family/ScheduleTab.vue'
-import LocationTab from '@/components/family/LocationTab.vue'
+import MobileMeetingPlaceTab from '@/components/mobile/MobileMeetingPlaceTab.vue'
+import MobileScheduleTab from '@/components/mobile/MobileScheduleTab.vue'
+import MobileLocationTab from '@/components/mobile/MobileLocationTab.vue'
 
 const auth = useAuthStore()
 const family = useFamilyStore()
@@ -14,9 +14,9 @@ const family = useFamilyStore()
 // component 가 null 이면 "준비 중"
 // 위치를 맨 앞에 둔다 → 가족방에 들어오면 위치 탭이 먼저 보인다 (tab 기본값 0)
 const TABS = [
-  { label: '위치', component: LocationTab },
-  { label: '모일 곳', component: MeetingPlaceTab },
-  { label: '일정', component: ScheduleTab },
+  { label: '위치', component: MobileLocationTab },
+  { label: '모일 곳', component: MobileMeetingPlaceTab },
+  { label: '일정', component: MobileScheduleTab },
 ]
 const tab = ref(0)
 const loading = ref(true)
@@ -271,7 +271,7 @@ h2 {
 }
 </style>
 
-<!-- 가족방 화면과 탭 컴포넌트(components/family/)가 같이 쓰는 입력칸·버튼 모양.
+<!-- 가족방 화면과 탭 컴포넌트(components/mobile/ 의 MobileXxxTab)가 같이 쓰는 입력칸·버튼 모양.
      scoped 가 아니어서 탭 안에서도 적용된다 → .family-room 안으로만 범위를 묶어 다른 화면에 새지 않게 한다 -->
 <style>
 .family-room .sub {

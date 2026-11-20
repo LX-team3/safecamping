@@ -7,7 +7,7 @@
 // 날씨 카드의 기온·강수확률·풍속은 기상청 예보를 그대로 보여 줄 뿐, 우리가 기준을 정해 항목을 바꾸지 않는다 (침낭 항목에만 예보 최저기온을 덧붙임)
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import BottomNav from '@/components/common/BottomNav.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { fromIso, labelWithDay } from '@/utils/date'
@@ -200,7 +200,7 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
         </p>
       </template>
     </div>
-    <BottomNav active="mycamp" />
+    <MobileBottomNav active="mycamp" />
   </div>
 </template>
 

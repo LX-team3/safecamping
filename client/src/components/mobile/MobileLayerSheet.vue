@@ -4,7 +4,7 @@
 //  - 아래: 안전 시설 켜고 끄기
 // 줄 목록은 서버(GET /api/nearby/layers)가 정본 — 대피소는 데이터가 없어 켜도 지도에 아무것도 안 나온다
 import { nextTick, onMounted, ref } from 'vue'
-import BottomSheet from '@/components/common/BottomSheet.vue'
+import MobileBottomSheet from '@/components/mobile/MobileBottomSheet.vue'
 import { MAP_TYPES, drawSkyPreview, mapType } from '@/utils/mapType'
 import { loadKakaoMap } from '@/utils/kakaoMap'
 
@@ -40,7 +40,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <BottomSheet title="지도 설정" @close="emit('close')">
+  <MobileBottomSheet title="지도 설정" @close="emit('close')">
     <!-- 지도 종류: 둘 중 하나만 고르는 것이라 라디오 묶음. 미리보기 그림 + 이름 -->
     <div class="types" role="radiogroup" aria-label="지도 종류">
       <button v-for="t in MAP_TYPES" :key="t.key" type="button" role="radio" class="type"
@@ -95,7 +95,7 @@ onMounted(async () => {
         </button>
       </li>
     </ul>
-  </BottomSheet>
+  </MobileBottomSheet>
 </template>
 
 <style scoped>

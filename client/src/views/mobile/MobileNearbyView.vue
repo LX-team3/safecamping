@@ -5,9 +5,9 @@
 //  - 시설 시간은 "차로 n분"만 보여 준다. 길찾기는 카카오맵으로 넘긴다 (앱 안 경로 화면 없음)
 // 데이터: GET /api/nearby?lat=&lng= (가장 가까운 캠핑장 기준 — 더미), /api/nearby/layers, /api/alerts?sido=
 import { computed, onMounted, ref } from 'vue'
-import NearbyMap from '@/components/nearby/NearbyMap.vue'
-import LayerSheet from '@/components/nearby/LayerSheet.vue'
-import BottomNav from '@/components/common/BottomNav.vue'
+import MobileNearbyMap from '@/components/mobile/MobileNearbyMap.vue'
+import MobileLayerSheet from '@/components/mobile/MobileLayerSheet.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import { api } from '@/utils/api'
 import { FACILITY_LABEL, directionsUrl, shortSido } from '@/utils/place'
 import { useDragSheet } from '@/utils/dragSheet'
@@ -80,7 +80,7 @@ async function loadWarnings(sido) {
   if (!sido) return
   try {
     const res = await api('/api/alerts', { params: { sido: shortSido(sido) } })
-    warnings.value = res.activeWarnings
+    warnings.value = res.activeWarnings.length // 서버는 발효 중 특보 목록을 준다 → 건수로 센다
   } catch {
     warnings.value = null
   }
@@ -161,7 +161,7 @@ async function shareLocation() {
 <template>
   <div class="nearby">
     <div class="stage">
-      <NearbyMap :me="me" :facilities="shown" :grade="data?.grade" :bottom-inset="mapInset" />
+      <MobileNearbyMap :me="me" :facilities="shown" :grade="data?.grade" :bottom-inset="mapInset" />
 
       <!-- 왼쪽 위: 지역 · 기상특보 -->
       <div class="status">
@@ -236,9 +236,9 @@ async function shareLocation() {
       </section>
     </div>
 
-    <BottomNav active="nearby" />
+    <MobileBottomNav active="nearby" />
 
-    <LayerSheet v-if="sheetOpen" :layers="layers" :on="on" @close="sheetOpen = false" @toggle="toggle" />
+    <MobileLayerSheet v-if="sheetOpen" :layers="layers" :on="on" @close="sheetOpen = false" @toggle="toggle" />
   </div>
 </template>
 

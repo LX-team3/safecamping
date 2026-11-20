@@ -3,7 +3,7 @@
 // "적용"을 누르면 서버 POST /api/trips/check 로 검사 → 통과하면 trip store 에 넣는다
 // 로그인 회원은 아이 나이대를 GET/PUT /api/member/children 로 불러오고 저장한다
 import { computed, onMounted, ref, watch } from 'vue'
-import BottomSheet from '@/components/common/BottomSheet.vue'
+import MobileBottomSheet from '@/components/mobile/MobileBottomSheet.vue'
 import { api } from '@/utils/api'
 import { useTripStore } from '@/stores/trip'
 import { useAuthStore } from '@/stores/auth'
@@ -139,7 +139,7 @@ async function apply() {
 </script>
 
 <template>
-  <BottomSheet title="누구와, 언제 가세요?" @close="emit('close')">
+  <MobileBottomSheet title="누구와, 언제 가세요?" @close="emit('close')">
     <section>
       <div class="sec-head">
         <h3>함께 가는 사람</h3>
@@ -222,7 +222,7 @@ async function apply() {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <button type="button" class="apply" :disabled="!canApply" @click="apply">적용하고 캠핑장 보기</button>
     </template>
-  </BottomSheet>
+  </MobileBottomSheet>
 </template>
 
 <style scoped>

@@ -5,7 +5,7 @@
 // 등록 대상 두 가지: 등록 캠핑장(campId) 또는 캠핑장이 아닌 자리(차박 후보지 · 찍은 자리 = lat·lng, campId 없음)
 // 둘 중 하나는 있어야 한다 (서버·DB 가 한 번 더 검사)
 import { ref } from 'vue'
-import BottomSheet from '@/components/common/BottomSheet.vue'
+import MobileBottomSheet from '@/components/mobile/MobileBottomSheet.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { useTripStore } from '@/stores/trip'
@@ -69,7 +69,7 @@ async function save() {
 </script>
 
 <template>
-  <BottomSheet title="내 캠핑에 일정 등록" @close="emit('close')">
+  <MobileBottomSheet title="내 캠핑에 일정 등록" @close="emit('close')">
     <div v-if="step === 'login'" class="plan-msg">
       <p>일정은 로그인하면 저장할 수 있어요.</p>
       <RouterLink to="/app/login" class="plan-go">로그인하기</RouterLink>
@@ -94,7 +94,7 @@ async function save() {
       <p v-if="error" class="plan-error" role="alert">{{ error }}</p>
       <button type="submit" class="plan-go" :disabled="saving">{{ saving ? '등록 중...' : '등록하기' }}</button>
     </form>
-  </BottomSheet>
+  </MobileBottomSheet>
 </template>
 
 <style scoped>

@@ -3,7 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSavedStore } from '@/stores/saved'
-import BottomNav from '@/components/common/BottomNav.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 
 const auth = useAuthStore()
 const saved = useSavedStore()
@@ -103,7 +103,7 @@ function countText(list) {
         </div>
       </template>
     </div>
-    <BottomNav active="saved" />
+    <MobileBottomNav active="saved" />
   </div>
 </template>
 

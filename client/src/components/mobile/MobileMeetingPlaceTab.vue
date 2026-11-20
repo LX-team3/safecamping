@@ -3,7 +3,7 @@
 // 좌표는 "지금 내 위치 넣기"로만 넣는다 (지도에서 고르기는 카카오맵 SDK 연결 때)
 import { ref, onMounted } from 'vue'
 import { useFamilyStore } from '@/stores/family'
-import AddButton from './AddButton.vue'
+import MobileAddButton from './MobileAddButton.vue'
 
 const family = useFamilyStore()
 
@@ -78,7 +78,7 @@ function mapLink(place) {
 <template>
   <div class="tab-head">
     <p class="sub">비상시 가족이 모일 곳을 정해 두세요.</p>
-    <AddButton label="모일 곳 추가" @click="adding = !adding" />
+    <MobileAddButton label="모일 곳 추가" @click="adding = !adding" />
   </div>
 
   <form v-if="adding" class="stack-form" @submit.prevent="add">

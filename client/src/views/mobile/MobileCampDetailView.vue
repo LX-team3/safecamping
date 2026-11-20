@@ -6,11 +6,11 @@
 // 데이터: GET /api/camps/{id}, GET /api/camps/{id}/tours?prefer=, GET /api/camps/{id}/routes
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import RouteMap from '@/components/map/RouteMap.vue'
-import DetailTopBar from '@/components/detail/DetailTopBar.vue'
-import PhotoBox from '@/components/detail/PhotoBox.vue'
-import InfoRows from '@/components/detail/InfoRows.vue'
-import PlanSheet from '@/components/mycamping/PlanSheet.vue'
+import MobileRouteMap from '@/components/mobile/MobileRouteMap.vue'
+import MobileDetailTopBar from '@/components/mobile/MobileDetailTopBar.vue'
+import MobilePhotoBox from '@/components/mobile/MobilePhotoBox.vue'
+import MobileInfoRows from '@/components/mobile/MobileInfoRows.vue'
+import MobilePlanSheet from '@/components/mobile/MobilePlanSheet.vue'
 import { api } from '@/utils/api'
 import { vHscroll } from '@/utils/hscroll'
 import { FACILITY_LABEL, shortSido } from '@/utils/place'
@@ -146,7 +146,7 @@ const routeNote = computed(() => {
 const isFavorite = computed(() => favorite.has(props.id))
 
 // ---- 내 캠핑에 일정 등록 ----
-// 시트(로그인 안내 · 날짜 입력 · 저장)는 components/mycamping/PlanSheet.vue — 차박 판정 카드도 같이 쓴다
+// 시트(로그인 안내 · 날짜 입력 · 저장)는 components/mobile/MobilePlanSheet.vue — 차박 판정 카드도 같이 쓴다
 const planOpen = ref(false)
 function openPlan() {
   planOpen.value = true
@@ -155,7 +155,7 @@ function openPlan() {
 
 <template>
   <div class="detail">
-    <DetailTopBar :favorite="isFavorite" @favorite="favorite.toggle(id)" />
+    <MobileDetailTopBar :favorite="isFavorite" @favorite="favorite.toggle(id)" />
 
     <div v-if="error" class="state">
       <p>{{ error }}</p>
@@ -164,7 +164,7 @@ function openPlan() {
     <p v-else-if="!camp" class="state">불러오는 중...</p>
 
     <template v-else>
-      <RouteMap :origin="origin" :targets="targets" :grade="camp.grade" :selected-id="selectedId" :bottom-inset="COLLAPSED"
+      <MobileRouteMap :origin="origin" :targets="targets" :grade="camp.grade" :selected-id="selectedId" :bottom-inset="COLLAPSED"
         @select="(fid) => (selectedId = fid)" />
       <p v-if="!sheetOpen" class="route-note">{{ routeNote }}</p>
 
@@ -176,7 +176,7 @@ function openPlan() {
 
         <!-- 올린 상태: 상세 -->
         <div v-if="sheetOpen" class="scroll">
-          <PhotoBox :src="camp.imageUrl || ''" :alt="camp.name" :caption="`${camp.name} 대표 사진`" />
+          <MobilePhotoBox :src="camp.imageUrl || ''" :alt="camp.name" :caption="`${camp.name} 대표 사진`" />
           <h1>{{ camp.name }}</h1>
           <p class="sub">{{ subLine }}</p>
 
@@ -222,7 +222,7 @@ function openPlan() {
 
           <!-- 캠핑장 정보 탭 -->
           <div v-else-if="tab === 'info'">
-            <InfoRows v-if="camp.infos.length" :infos="camp.infos" />
+            <MobileInfoRows v-if="camp.infos.length" :infos="camp.infos" />
             <p v-else class="empty">캠핑장 정보를 준비하고 있어요.</p>
           </div>
 
@@ -285,7 +285,7 @@ function openPlan() {
       </section>
 
       <!-- 일정 등록 시트 -->
-      <PlanSheet v-if="planOpen" :camp-id="id" :camp-name="camp.name" :place="place" @close="planOpen = false" />
+      <MobilePlanSheet v-if="planOpen" :camp-id="id" :camp-name="camp.name" :place="place" @close="planOpen = false" />
     </template>
   </div>
 </template>

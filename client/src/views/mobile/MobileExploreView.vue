@@ -3,19 +3,19 @@
 //  - 시트를 펼치면 목록 (내 유형 추천 TOP 5 · 전체 목록)
 //  - 손잡이(가로 줄)·"지도" 버튼을 누르면 시트가 접혀 지도가 보인다
 //  - 목록 한 줄을 누르면 캠핑장 상세. 지도 마커는 한 번 누르면 이름표, 이름표를 다시 누르면 상세
-//  - 지역 칩 → RegionSheet(어디로), 날짜 칩 → TripSheet(누구와·언제). 고른 값은 trip store
-//  - 지도 레이어 버튼 → 내 주변과 같은 LayerSheet(안전 시설 켜고 끄기). 처음엔 전부 꺼짐, 켠 종류는 지도 화면 안의 시설을 보여 준다
+//  - 지역 칩 → MobileRegionSheet(어디로), 날짜 칩 → MobileTripSheet(누구와·언제). 고른 값은 trip store
+//  - 지도 레이어 버튼 → 내 주변과 같은 MobileLayerSheet(안전 시설 켜고 끄기). 처음엔 전부 꺼짐, 켠 종류는 지도 화면 안의 시설을 보여 준다
 // 데이터: GET /api/camps (지도 마커·전체 목록), /api/camps/recommend (추천),
 //         /api/nearby/layers (레이어 줄 목록), /api/facilities?types=&swLat=… (지도 화면 안의 켠 시설)
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import CampMap from '@/components/map/CampMap.vue'
-import CampRow from '@/components/explore/CampRow.vue'
-import RegionSheet from '@/components/explore/RegionSheet.vue'
-import TripSheet from '@/components/explore/TripSheet.vue'
-import LayerSheet from '@/components/nearby/LayerSheet.vue'
-import BottomNav from '@/components/common/BottomNav.vue'
-import MapModeToggle from '@/components/common/MapModeToggle.vue'
+import MobileCampMap from '@/components/mobile/MobileCampMap.vue'
+import MobileCampRow from '@/components/mobile/MobileCampRow.vue'
+import MobileRegionSheet from '@/components/mobile/MobileRegionSheet.vue'
+import MobileTripSheet from '@/components/mobile/MobileTripSheet.vue'
+import MobileLayerSheet from '@/components/mobile/MobileLayerSheet.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
+import MobileMapModeToggle from '@/components/mobile/MobileMapModeToggle.vue'
 import { useDragSheet, useElementHeight } from '@/utils/dragSheet'
 import campingImg from '@/assets/illust/camping.svg' // 진단 안내 팝업 그림 (unDraw, 출처 표기 불필요)
 import { api } from '@/utils/api'
@@ -171,7 +171,7 @@ function toggleFacility(code) {
   loadFacilities()
 }
 
-// 지도를 움직이고 멈출 때마다 (CampMap 의 bounds) 켠 종류를 그 범위로 다시 받아 온다
+// 지도를 움직이고 멈출 때마다 (MobileCampMap 의 bounds) 켠 종류를 그 범위로 다시 받아 온다
 function onBounds(b) {
   mapBounds = b
   loadFacilities()
@@ -243,10 +243,10 @@ function onMarker(id) {
 <template>
   <div class="explore">
     <div ref="stageEl" class="stage">
-      <CampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="selectedId" :bottom-inset="COLLAPSED"
+      <MobileCampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="selectedId" :bottom-inset="COLLAPSED"
         @select="onMarker" @layers="openLayers" @bounds="onBounds" />
       <!-- 캠핑장 지도 ↔ 차박 지도 전환 (목록을 펼치면 시트가 덮는다) -->
-      <MapModeToggle active="camp" class="mode-toggle" />
+      <MobileMapModeToggle active="camp" class="mode-toggle" />
 
       <!-- 지도 위 시트 -->
       <section class="sheet drag-sheet" :class="{ open: sheetOpen, dragging: sheetDragging }"
@@ -312,7 +312,7 @@ function onMarker(id) {
           <p v-else-if="!listCamps.length" class="state">조건에 맞는 캠핑장이 없어요.</p>
 
           <ol v-else class="list">
-            <CampRow v-for="(camp, i) in listCamps" :key="camp.id" :camp="camp" :rank="isRanked ? i + 1 : 0"
+            <MobileCampRow v-for="(camp, i) in listCamps" :key="camp.id" :camp="camp" :rank="isRanked ? i + 1 : 0"
               :favorite="favorite.has(camp.id)" @open="openDetail" @favorite="favorite.toggle" />
           </ol>
 
@@ -337,7 +337,7 @@ function onMarker(id) {
       </button>
     </div>
 
-    <BottomNav active="explore" />
+    <MobileBottomNav active="explore" />
 
     <!-- 1분 진단 안내 팝업 (진단 전에만) -->
     <div v-if="showSurveyPrompt" class="prompt-back">
@@ -354,9 +354,9 @@ function onMarker(id) {
     </div>
 
     <!-- 아래 시트 (화면 전체를 어둡게 덮음) -->
-    <RegionSheet v-if="openSheet === 'region'" @close="openSheet = null" @apply="applied" />
-    <TripSheet v-if="openSheet === 'trip'" @close="openSheet = null" @apply="applied" />
-    <LayerSheet v-if="openSheet === 'layers'" :layers="layers" :on="facilityOn" @close="openSheet = null"
+    <MobileRegionSheet v-if="openSheet === 'region'" @close="openSheet = null" @apply="applied" />
+    <MobileTripSheet v-if="openSheet === 'trip'" @close="openSheet = null" @apply="applied" />
+    <MobileLayerSheet v-if="openSheet === 'layers'" :layers="layers" :on="facilityOn" @close="openSheet = null"
       @toggle="toggleFacility" />
   </div>
 </template>
@@ -376,7 +376,7 @@ function onMarker(id) {
 .mode-toggle {
   position: absolute;
   top: 14px;
-  left: 16px; /* 왼쪽 위. 지도 버튼은 오른쪽 위에 세로로 (CampMap .map-btns) */
+  left: 16px; /* 왼쪽 위. 지도 버튼은 오른쪽 위에 세로로 (MobileCampMap .map-btns) */
   z-index: 25; /* 지도 버튼(20) 위, 아래 시트(30) 밑 */
 }
 .sheet {

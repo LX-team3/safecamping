@@ -3,10 +3,10 @@
 // 데이터: GET /api/tours/{id}?campId=
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import DetailTopBar from '@/components/detail/DetailTopBar.vue'
-import PhotoBox from '@/components/detail/PhotoBox.vue'
-import InfoRows from '@/components/detail/InfoRows.vue'
-import NoteList from '@/components/detail/NoteList.vue'
+import MobileDetailTopBar from '@/components/mobile/MobileDetailTopBar.vue'
+import MobilePhotoBox from '@/components/mobile/MobilePhotoBox.vue'
+import MobileInfoRows from '@/components/mobile/MobileInfoRows.vue'
+import MobileNoteList from '@/components/mobile/MobileNoteList.vue'
 import { api } from '@/utils/api'
 import { directionsUrl, shortSido } from '@/utils/place'
 import { useFavoriteStore } from '@/stores/favorite'
@@ -56,7 +56,7 @@ function otherTours() {
 
 <template>
   <div class="tour">
-    <DetailTopBar :favorite="favorite.has(favoriteKey)" @favorite="favorite.toggle(favoriteKey)" />
+    <MobileDetailTopBar :favorite="favorite.has(favoriteKey)" @favorite="favorite.toggle(favoriteKey)" />
 
     <div v-if="error" class="state">
       <p>{{ error }}</p>
@@ -66,7 +66,7 @@ function otherTours() {
 
     <template v-else>
       <main class="body">
-        <PhotoBox square :alt="tour.name" :caption="`${tour.name} 대표 사진`" />
+        <MobilePhotoBox square :alt="tour.name" :caption="`${tour.name} 대표 사진`" />
         <div class="text">
           <div class="tags">
             <span class="tag">{{ tour.categoryLabel }}</span>
@@ -78,10 +78,10 @@ function otherTours() {
 
           <template v-if="tour.notes.length">
             <h2>가기 전에 알아두세요</h2>
-            <NoteList :notes="tour.notes" />
+            <MobileNoteList :notes="tour.notes" />
           </template>
 
-          <InfoRows class="infos" :infos="tour.infos" />
+          <MobileInfoRows class="infos" :infos="tour.infos" />
         </div>
       </main>
 

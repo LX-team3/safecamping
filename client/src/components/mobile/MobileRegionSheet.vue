@@ -3,7 +3,7 @@
 // 전국(시·도 17곳) → 시·도를 누르면 그 시·군·구 → 하나 고르고 "이 지역 캠핑장 보기"
 // 데이터: GET /api/regions/sidos, /api/regions/sidos/{id}/sigungus, /api/regions/sigungus?q= (검색)
 import { computed, onMounted, ref, watch } from 'vue'
-import BottomSheet from '@/components/common/BottomSheet.vue'
+import MobileBottomSheet from '@/components/mobile/MobileBottomSheet.vue'
 import { api } from '@/utils/api'
 import { shortSido } from '@/utils/place'
 import { useTripStore } from '@/stores/trip'
@@ -91,7 +91,7 @@ function apply() {
 </script>
 
 <template>
-  <BottomSheet title="어디로 캠핑을 떠나시나요?" @close="emit('close')">
+  <MobileBottomSheet title="어디로 캠핑을 떠나시나요?" @close="emit('close')">
     <!-- TODO: 안심 데이터가 있는 지역이 늘면 서버(is_safety_ready)에서 문구를 만든다 -->
     <p class="notice">지금은 <b>강원 인제군 시범 서비스</b>예요. 다른 지역은 안전점수 데이터를 준비하고 있어요.</p>
 
@@ -156,7 +156,7 @@ function apply() {
       <p class="foot-text">{{ footText }}</p>
       <button type="button" class="apply" @click="apply">이 지역 캠핑장 보기</button>
     </template>
-  </BottomSheet>
+  </MobileBottomSheet>
 </template>
 
 <style scoped>

@@ -3,9 +3,9 @@
 //  - only='avoid' (맨 왼쪽 필터 아이콘): 피해야 할 곳 — 불가 구역 · 주의 구역 (면, 처음엔 꺼짐 — 켜면 지도가 빨갛게 덮여서)
 //  - only='safety' ("주변 안전 ▾" 칩): 안전점수로 거르기 (전체 · 주의 이상 40↑ · 안전만 70↑, 캠핑장 등급과 같은 기준) — 점에만 적용
 //  - only 없음: 전부 (갈 수 있는 곳 차박 후보지·등록 야영장 포함 — 지금은 칩으로 밖에 나와 있어 안 씀)
-// 고르면 바로 지도에 반영된다 (적용 버튼 없음). 닫기는 ✕ · 바깥 · 손잡이 끌기 (공통 BottomSheet)
+// 고르면 바로 지도에 반영된다 (적용 버튼 없음). 닫기는 ✕ · 바깥 · 손잡이 끌기 (공통 MobileBottomSheet)
 import { computed } from 'vue'
-import BottomSheet from '@/components/common/BottomSheet.vue'
+import MobileBottomSheet from '@/components/mobile/MobileBottomSheet.vue'
 import { SAFETY_FILTERS } from '@/utils/chabak'
 
 const props = defineProps({
@@ -33,7 +33,7 @@ const title = computed(() => ({ avoid: '지도에 구역 표시', safety: '주�
 </script>
 
 <template>
-  <BottomSheet :title="title" @close="emit('close')">
+  <MobileBottomSheet :title="title" @close="emit('close')">
     <template v-for="g in groups" :key="g.key">
     <h3 v-if="!only" class="sub">{{ g.title }}</h3>
     <p v-else class="hint">켜면 지도에 구역을 칠해요 · 정확한 판정은 지도를 눌러서 봐요</p>
@@ -62,7 +62,7 @@ const title = computed(() => ({ avoid: '지도에 구역 표시', safety: '주�
       </button>
     </div>
     </template>
-  </BottomSheet>
+  </MobileBottomSheet>
 </template>
 
 <style scoped>

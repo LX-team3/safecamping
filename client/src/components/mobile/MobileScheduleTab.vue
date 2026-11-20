@@ -2,7 +2,7 @@
 // 가족방 · 일정 탭. 가족이 함께 보는 일정 (예: 06:00 출발, 15:00 체크인). 시간 순, 날짜별로 묶어 보여 준다
 import { ref, computed, onMounted } from 'vue'
 import { useFamilyStore } from '@/stores/family'
-import AddButton from './AddButton.vue'
+import MobileAddButton from './MobileAddButton.vue'
 
 const family = useFamilyStore()
 
@@ -76,7 +76,7 @@ const groups = computed(() => {
 <template>
   <div class="tab-head">
     <p class="sub">가족이 함께 볼 일정을 적어 두세요.</p>
-    <AddButton label="일정 추가" @click="adding = !adding" />
+    <MobileAddButton label="일정 추가" @click="adding = !adding" />
   </div>
 
   <form v-if="adding" class="stack-form" @submit.prevent="add">

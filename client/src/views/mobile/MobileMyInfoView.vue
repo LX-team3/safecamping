@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
 import { useMyCampingStore } from '@/stores/myCamping'
-import BottomNav from '@/components/common/BottomNav.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
@@ -98,7 +98,7 @@ async function logout() {
         </li>
       </ul>
     </div>
-    <BottomNav active="me" />
+    <MobileBottomNav active="me" />
   </div>
 </template>
 

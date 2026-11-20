@@ -7,7 +7,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
-import BottomNav from '@/components/common/BottomNav.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
@@ -131,7 +131,7 @@ async function remove(p) {
         </RouterLink>
       </template>
     </div>
-    <BottomNav active="mycamp" />
+    <MobileBottomNav active="mycamp" />
   </div>
 </template>
 

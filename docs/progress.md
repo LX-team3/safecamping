@@ -579,3 +579,10 @@
 - 모바일 화면·부품 25개 파일의 링크 69곳을 `/app/...` 으로 바꿈. 서버에는 화면 주소를 쓰는 곳이 없어 변경 없음
 - 확인: `npm run build` 통과, 라우터만 따로 돌려 옛 주소 8개가 `/app` 으로 넘어가는 것 확인
 - 확인 못 함: 브라우저에서 모바일 화면을 직접 눌러 보기 (특히 하단 탭, 뒤로가기, 로그인 후 이동)
+
+## 2026-11-20 클라이언트 폴더·이름 규칙 통일 (웹 `Web…` / 모바일 `Mobile…`)
+- 모바일 화면을 `views/mobile/Mobile○○View.vue`, 부품을 `components/mobile/Mobile○○.vue` 로 한 폴더에 모음 (웹의 `views/web/Web○○View.vue`, `components/web/Web○○.vue` 와 같은 규칙). `git mv` 로 옮겨 이력 유지, 파일 48개
+- 컴포넌트 이름과 `import` 경로, 라우터(`mobileRoutes.js`)를 함께 고침. 화면 주소(`/app/...`)와 라우트 이름은 그대로
+- 안 쓰던 Vue 기본 템플릿 파일(HelloWorld · TheWelcome · WelcomeItem · AboutView · HomeView · components/icons)은 삭제
+- 위 옛 기록의 `views/camp/…` 같은 경로는 당시 이름이다 → 지금은 `views/mobile/Mobile…View.vue`
+- 확인: `npm run build` 통과, 모바일 화면 13개 주소를 실제 브라우저로 열어 정상 표시 확인. 확인 못 함: 로그인 후 화면

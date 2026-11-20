@@ -5,10 +5,10 @@
 //       이 시설의 도로 경로를 받으면 그 길을 따라 그리고, 못 받으면 점선 직선 (도로가 아니라는 표시)
 // 전화·주소는 지어내지 않는다 → 없으면 "확인 필요"
 import { computed, ref, watch } from 'vue'
-import RouteMap from '@/components/map/RouteMap.vue'
-import DetailTopBar from '@/components/detail/DetailTopBar.vue'
-import InfoRows from '@/components/detail/InfoRows.vue'
-import NoteList from '@/components/detail/NoteList.vue'
+import MobileRouteMap from '@/components/mobile/MobileRouteMap.vue'
+import MobileDetailTopBar from '@/components/mobile/MobileDetailTopBar.vue'
+import MobileInfoRows from '@/components/mobile/MobileInfoRows.vue'
+import MobileNoteList from '@/components/mobile/MobileNoteList.vue'
 import { api } from '@/utils/api'
 import { FACILITY_LABEL, directionsUrl, shortSido } from '@/utils/place'
 
@@ -95,7 +95,7 @@ async function copyPhone() {
 
 <template>
   <div class="facility">
-    <DetailTopBar :favorite="null" />
+    <MobileDetailTopBar :favorite="null" />
 
     <div v-if="error" class="state">
       <p>{{ error }}</p>
@@ -106,7 +106,7 @@ async function copyPhone() {
     <template v-else>
       <div class="map">
         <!-- 마커 색 = 출발 캠핑장의 안전점수 등급 (캠핑장 없이 들어오면 회색) -->
-        <RouteMap :origin="origin" :targets="targets" :grade="facility.from?.grade" :selected-id="facility.id" :dotted="dotted" />
+        <MobileRouteMap :origin="origin" :targets="targets" :grade="facility.from?.grade" :selected-id="facility.id" :dotted="dotted" />
       </div>
 
       <main class="body">
@@ -128,16 +128,16 @@ async function copyPhone() {
         <p v-if="routeNote" class="route-note">{{ routeNote }}</p>
         <p v-if="facility.dummy" class="dummy">거리·시간·위치는 더미 데이터예요. 실제 정보가 아니에요.</p>
 
-        <InfoRows :infos="facility.infos">
+        <MobileInfoRows :infos="facility.infos">
           <div class="phone">
             <dt>전화</dt>
             <dd :class="{ empty: !facility.phone }">{{ facility.phone || '확인 필요' }}</dd>
             <button v-if="facility.phone" type="button" class="copy" @click="copyPhone">복사</button>
           </div>
-        </InfoRows>
+        </MobileInfoRows>
         <p v-if="copied" class="copied" role="status">{{ copied }}</p>
 
-        <NoteList class="notes" :notes="facility.notes" />
+        <MobileNoteList class="notes" :notes="facility.notes" />
       </main>
 
       <footer class="foot">

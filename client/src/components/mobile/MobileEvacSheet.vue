@@ -1,7 +1,7 @@
 <script setup>
 // 아래 대피 안내 시트: 기본(대피 장소·경로 고르기·행동요령) / 길안내(단계별) 두 모양
 // 지도를 만지면 접히고(지도가 가려지지 않게), 손잡이를 누르면 펼쳐진다
-import RouteProfile from '@/components/disaster/RouteProfile.vue'
+import MobileRouteProfile from '@/components/mobile/MobileRouteProfile.vue'
 
 defineProps({
   state: { type: Object, required: true },
@@ -45,7 +45,7 @@ defineProps({
         <button type="button" class="btn ghost" @click="map?.toggleTour()">{{ state.tourOn ? '■ 미리 보기 멈추기' : '▶ 대피 경로 따라가기' }}</button>
       </div>
 
-      <RouteProfile :state="state" />
+      <MobileRouteProfile :state="state" />
 
       <div class="sec small">
         <h3>침수 시 행동요령</h3>

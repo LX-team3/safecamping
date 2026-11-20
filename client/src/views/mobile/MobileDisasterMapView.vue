@@ -4,9 +4,9 @@
 // 화면을 떠나면 지도를 정리한다 (Cesium 은 그래픽 메모리를 많이 써서 꼭 destroy 해야 함)
 import { onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
 import { createDisasterMap, initialState } from '@/utils/disasterMap'
-import AlertPill from '@/components/disaster/AlertPill.vue'
-import RainSlider from '@/components/disaster/RainSlider.vue'
-import EvacSheet from '@/components/disaster/EvacSheet.vue'
+import MobileAlertPill from '@/components/mobile/MobileAlertPill.vue'
+import MobileRainSlider from '@/components/mobile/MobileRainSlider.vue'
+import MobileEvacSheet from '@/components/mobile/MobileEvacSheet.vue'
 
 const stage = ref(null)     // 지도가 들어갈 칸
 const tagLayer = ref(null)  // 지도 위 이름표 칸
@@ -46,11 +46,11 @@ onBeforeUnmount(() => {
         <h1>호우 및 침수 시 대피경로</h1>
         <span class="loc">인북천 물빛테마공원 캠핑장 · 인제군 서화면</span>
       </div>
-      <AlertPill :alert="state.alert" />
+      <MobileAlertPill :alert="state.alert" />
     </header>
 
-    <RainSlider v-show="!state.tourOn" :state="state" @change="mm => map?.setRain(mm)" />
-    <EvacSheet :state="state" :map="map" />
+    <MobileRainSlider v-show="!state.tourOn" :state="state" @change="mm => map?.setRain(mm)" />
+    <MobileEvacSheet :state="state" :map="map" />
 
     <div v-if="state.loading || state.error" class="loading">
       <div v-if="!state.error" class="spin"></div>

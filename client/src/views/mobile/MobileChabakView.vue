@@ -7,13 +7,13 @@
 //  - 판정 카드(지도나 목록에서 고름): 차박 규제 · 주변 안전 · 자세히 보기 · (등록 야영장이면) 내 캠핑에 등록
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import ChabakMap from '@/components/chabak/ChabakMap.vue'
-import LayerSheet from '@/components/nearby/LayerSheet.vue'
-import FilterSheet from '@/components/chabak/FilterSheet.vue'
-import SpotRow from '@/components/chabak/SpotRow.vue'
-import PlanSheet from '@/components/mycamping/PlanSheet.vue'
-import MapModeToggle from '@/components/common/MapModeToggle.vue'
-import BottomNav from '@/components/common/BottomNav.vue'
+import MobileChabakMap from '@/components/mobile/MobileChabakMap.vue'
+import MobileLayerSheet from '@/components/mobile/MobileLayerSheet.vue'
+import MobileFilterSheet from '@/components/mobile/MobileFilterSheet.vue'
+import MobileSpotRow from '@/components/mobile/MobileSpotRow.vue'
+import MobilePlanSheet from '@/components/mobile/MobilePlanSheet.vue'
+import MobileMapModeToggle from '@/components/mobile/MobileMapModeToggle.vue'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import { api } from '@/utils/api'
 import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { GRADE_LABEL, INJE_CENTER, LAYER_CHIPS, SAFETY_FILTERS, VERDICT, distanceText, driveMinOf } from '@/utils/chabak'
@@ -147,7 +147,7 @@ function toggleFacility(code) {
   toggleFacilityOn(code)
   loadMapFacilities()
 }
-// 지도를 움직이고 멈출 때마다 (ChabakMap 의 bounds) 켠 종류를 그 범위로 다시 받는다
+// 지도를 움직이고 멈출 때마다 (MobileChabakMap 의 bounds) 켠 종류를 그 범위로 다시 받는다
 function onBounds(b) {
   mapBounds = b
   loadMapFacilities()
@@ -278,7 +278,7 @@ function closeVerdict() {
   selectedCamp.value = null
 }
 
-// ---- 둘러보기 목록: 켜 둔 차박 후보지 · 등록 야영장을 한 목록으로 (탐색 목록과 같은 모양, SpotRow) ----
+// ---- 둘러보기 목록: 켜 둔 차박 후보지 · 등록 야영장을 한 목록으로 (탐색 목록과 같은 모양, MobileSpotRow) ----
 // 주변 안전 필터 · 검색어를 거쳐 정렬. 누르면 지도를 그 자리로 옮기고 판정 카드
 const query = ref('')
 const sort = ref('score') // score 안전점수순 · er 응급실 가까운순
@@ -321,7 +321,7 @@ function onMapPick(lat, lng, item) {
 
 // ---- 내 캠핑에 등록 (판정 결과가 나온 모든 자리) ----
 // 등록 야영장이면 camp.id 로, 그 밖(차박 후보지 · 지도에서 찍은 자리)은 지번 이름 + 좌표로 등록한다 (불가·주의 자리도 — 고르는 건 사람 마음)
-// 시트는 캠핑장 상세와 같은 PlanSheet. 내 캠핑 카드에서 누르면 /chabak?lat=&lng= 로 이 자리가 다시 열린다
+// 시트는 캠핑장 상세와 같은 MobilePlanSheet. 내 캠핑 카드에서 누르면 /chabak?lat=&lng= 로 이 자리가 다시 열린다
 const selectedCamp = ref(null) // 고른 등록 야영장 { id, name, area, ... }
 const planOpen = ref(false)
 const PLACE = '강원 인제군' // 판정 범위가 인제군뿐이라 (읍·면은 데이터에 없음)
@@ -370,9 +370,9 @@ const parcelLine = computed(() =>
 <template>
   <div class="chabak">
     <div ref="stageEl" class="stage">
-      <ChabakMap ref="mapRef" :picked="picked" :facilities="mapFacilities" :parcel="result?.parcel"
+      <MobileChabakMap ref="mapRef" :picked="picked" :facilities="mapFacilities" :parcel="result?.parcel"
         :verdict="result?.verdict" :layers="mapLayers" @pick="onMapPick" @bounds="onBounds" @ready="onMapReady" />
-      <MapModeToggle active="chabak" class="toggle" />
+      <MobileMapModeToggle active="chabak" class="toggle" />
 
 
       <!-- 오른쪽 위에 모은 지도 버튼: 지도 설정 · 내 위치 (탐색 지도와 같은 자리·모양, 전역 .map-btns · .map-btn)
@@ -462,7 +462,7 @@ const parcelLine = computed(() =>
             </p>
             <p v-else-if="!listItems.length" class="state">조건에 맞는 곳이 없어요. 주변 안전을 넓혀 보세요</p>
             <ol v-else class="spot-list">
-              <SpotRow v-for="(it, i) in listItems" :key="`${it.kind}-${it.id ?? it.name}-${it.lat}`" :item="it"
+              <MobileSpotRow v-for="(it, i) in listItems" :key="`${it.kind}-${it.id ?? it.name}-${it.lat}`" :item="it"
                 :rank="i + 1" @open="pickFromList" />
             </ol>
           </template>
@@ -606,16 +606,16 @@ const parcelLine = computed(() =>
       </button>
     </div>
 
-    <BottomNav active="explore" />
+    <MobileBottomNav active="explore" />
 
     <!-- 지도 설정: 지도 종류 · 안전 시설 (탐색·내 주변과 같은 시트) -->
-    <LayerSheet v-if="layerSheetOpen" :layers="layers" :on="facilityOn" @close="layerSheetOpen = false"
+    <MobileLayerSheet v-if="layerSheetOpen" :layers="layers" :on="facilityOn" @close="layerSheetOpen = false"
       @toggle="toggleFacility" />
     <!-- 차박지 필터: 구역 표시(필터 아이콘) · 주변 안전(칩) -->
-    <FilterSheet v-if="filterOpen" :only="filterOpen" :spots="verdictLayers" :on="layerOn" :counts="filterCounts"
+    <MobileFilterSheet v-if="filterOpen" :only="filterOpen" :spots="verdictLayers" :on="layerOn" :counts="filterCounts"
       :safety="safetyFilter" @close="filterOpen = null" @toggle="toggleLayer" @safety="safetyFilter = $event" />
     <!-- 내 캠핑에 일정 등록 (등록 야영장) -->
-    <PlanSheet v-if="planOpen && planTarget" :camp-id="planTarget.campId" :camp-name="planTarget.name"
+    <MobilePlanSheet v-if="planOpen && planTarget" :camp-id="planTarget.campId" :camp-name="planTarget.name"
       :place="planTarget.place" :lat="planTarget.lat ?? null" :lng="planTarget.lng ?? null" @close="planOpen = false" />
   </div>
 </template>
