@@ -25,6 +25,8 @@ public class CampPlanService {
 
     private final MemberMapper memberMapper;
     private final CampPlanMapper campPlanMapper;
+    private final CampReviewMapper reviewMapper;   // 일정을 지울 때 후기 사진 파일도 지우려고
+    private final ReviewPhotoStore photoStore;
 
     public List<CampPlanResponse> findAll(String loginId) {
         Long memberId = findMember(loginId).getId();
@@ -79,10 +81,13 @@ public class CampPlanService {
 
     public void delete(String loginId, Long planId) {
         Long memberId = findMember(loginId).getId();
+        // 후기 · 사진 줄은 DB 가 같이 지우지만(CASCADE) 사진 파일은 서버 폴더에 남으므로, 지우기 전에 이름을 받아 둔다
+        List<String> photoFiles = reviewMapper.findFileNamesByPlan(memberId, planId);
         // 남의 등록이거나 없는 id 면 0줄 → 없는 것처럼 404
         if (campPlanMapper.delete(memberId, planId) == 0) {
             throw new NotFoundException("등록한 캠핑을 찾을 수 없습니다.");
         }
+        photoFiles.forEach(photoStore::delete);
     }
 
     private static double round6(double v) {
