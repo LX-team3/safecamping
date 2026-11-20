@@ -21,7 +21,8 @@
 - `public` — 서버가 읽는 화면용 테이블 + 회원 데이터
 - 화면용(`camp` · `facility` · `tour` · `camp_facility` · `camp_tour` · `place_info` · `place_note`)은 `merge_to_public.sql` 이 raw 에서 만든다
 - 값이 틀리면: 원본·화면용을 직접 `UPDATE` 하지 말고 `merge_to_public.sql` 안에서 보정한다 (직접 고치면 다음 merge 때 사라짐)
-- 회원 데이터(`member` · `saved_*` · `camp_plan` · `family_*` 등)만 직접 고친다
+- 회원 데이터(`member` · `saved_*` · `camp_plan` · `camp_review*` · `family_*` 등)만 직접 고친다
+- 후기 사진(`camp_review_photo`)은 파일 이름만 저장하고 파일은 서버 폴더에 있다 → 줄만 지우면 파일이 남는다 (서버 API 로 지울 것)
 - 서버 SQL 에서 원본을 읽을 때는 `raw.camps` 처럼 스키마를 꼭 붙인다 (접속 기본 스키마가 public)
 
 ## 테이블 설계 기본

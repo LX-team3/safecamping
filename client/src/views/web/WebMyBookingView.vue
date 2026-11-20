@@ -2,12 +2,14 @@
 // 웹 내 예약 (설계 1-7): 제목 띠 + 탭(다가오는 캠핑 · 지난 캠핑) + 캠핑 한 건마다 카드
 // 데이터: 내 캠핑 일정 GET /api/member/camp-plans (캠핑장 상세의 "내 캠핑에 일정 등록"으로 저장),
 //         출발 준비 GET /api/member/camp-plans/{id}/checklist (특보 · 예보 · 안전), 캠핑장 GET /api/camps/{id} (사진 · 예약 사이트 · 시설)
-// 설계와 다른 점: 인원 · 동행 · 이동 수단 · 체크인 시각은 일정에 저장되는 칸이 없어서 메모로만 보이고, 후기 쓰기는 서버 기능이 없어 준비 중
-import { computed, onMounted, ref } from 'vue'
+//         지난 캠핑 후기 GET /api/member/camp-plans/reviews · 쓰기·수정 POST /api/member/camp-plans/{id}/review (사진은 서버 폴더)
+// 설계와 다른 점: 인원 · 동행 · 이동 수단 · 체크인 시각은 일정에 저장되는 칸이 없어서 메모로만 보인다. 후기에 별점은 없다 (팀 결정)
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '@/utils/api'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
 import WebConfirmModal from '@/components/web/WebConfirmModal.vue'
+import WebReviewModal from '@/components/web/WebReviewModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { DISASTER_PATH, METAVERSE_URL } from '@/utils/webLinks'
@@ -32,6 +34,7 @@ async function load() {
     return
   }
   loading.value = false
+  loadReviews()
   // 끝나지 않은 일정마다 출발 준비를 받는다. 캠핑장이 있으면 상세(사진 · 시설)도. 못 받아도 카드는 그대로 보인다
   myCamping.plans.forEach((p) => {
     if (p.checkOut >= todayIso()) myCamping.loadChecklist(p.id).catch(() => {})
@@ -94,6 +97,8 @@ async function confirmRemove() {
   error.value = ''
   try {
     await myCamping.remove(target.value.id)
+    const { [target.value.id]: _, ...rest } = reviews.value // 일정과 함께 후기도 지워졌다 (서버 CASCADE)
+    reviews.value = rest
     target.value = null
   } catch (e) {
     error.value = e.message
@@ -102,6 +107,89 @@ async function confirmRemove() {
     removing.value = false
   }
 }
+// ---- 지난 캠핑 후기 ----
+// 일정 id → 서버 후기 { planId, content, photos: [{ id, url }], createdAt, updatedAt }
+const reviews = ref({})
+const reviewError = ref('') // 후기 목록을 못 받았을 때 (카드는 그대로 보인다)
+async function loadReviews() {
+  reviewError.value = ''
+  try {
+    const list = await api('/api/member/camp-plans/reviews')
+    reviews.value = Object.fromEntries(list.map((r) => [r.planId, r]))
+    await nextTick()
+    measureAll()
+  } catch (e) {
+    reviewError.value = `후기를 불러오지 못했어요. ${e.message}`
+  }
+}
+
+const reviewTarget = ref(null) // 후기 팝업을 연 지난 캠핑
+const reviewSaving = ref(false)
+const reviewSaveError = ref('') // 저장 실패 문구는 팝업 안에 보인다 (쓰던 내용이 날아가지 않게 팝업은 그대로)
+function openReview(p) {
+  reviewSaveError.value = ''
+  reviewTarget.value = p
+}
+// 팝업이 넘긴 값을 서버 칸 이름 그대로 multipart 로 보낸다 (axios 가 FormData 를 보고 형식을 맞춰 줌)
+async function saveReview({ content, keepPhotoIds, files }) {
+  const id = reviewTarget.value.id
+  const form = new FormData()
+  form.append('content', content)
+  keepPhotoIds.forEach((pid) => form.append('keepPhotoIds', pid))
+  files.forEach((f) => form.append('photos', f))
+  reviewSaving.value = true
+  reviewSaveError.value = ''
+  try {
+    const saved = await api(`/api/member/camp-plans/${id}/review`, { method: 'post', body: form })
+    reviews.value = { ...reviews.value, [id]: saved }
+    expanded.value = { ...expanded.value, [id]: false }
+    reviewTarget.value = null
+    await nextTick()
+    measureAll()
+  } catch (e) {
+    reviewSaveError.value = e.message
+  } finally {
+    reviewSaving.value = false
+  }
+}
+// "2026.11.20 작성" (고쳤으면 고친 날짜로 "수정")
+function writtenLabel(r) {
+  const edited = r.updatedAt && r.createdAt && new Date(r.updatedAt) - new Date(r.createdAt) > 1000
+  const d = new Date(edited ? r.updatedAt : r.createdAt)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${edited ? '수정' : '작성'}`
+}
+
+// 후기 글은 3줄까지만 보이고, 넘치면 "더보기" (실제로 잘렸는지는 화면에 그린 뒤 높이로 확인)
+const expanded = ref({}) // 일정 id → 펼침
+const clamped = ref({}) // 일정 id → 3줄을 넘어 잘렸는지
+const textEls = {} // 일정 id → 후기 글 요소
+function setTextEl(id, el) {
+  if (el) textEls[id] = el
+  else delete textEls[id]
+}
+function measureAll() {
+  const next = { ...clamped.value }
+  Object.entries(textEls).forEach(([id, el]) => {
+    if (!expanded.value[id]) next[id] = el.scrollHeight > el.clientHeight + 1
+  })
+  clamped.value = next
+}
+// 숨겨진 탭에서는 높이를 잴 수 없어서, 지난 캠핑 탭을 연 뒤에 잰다
+async function showPastTab() {
+  tab.value = 'past'
+  await nextTick()
+  measureAll()
+}
+
+// 후기 사진 크게 보기 (아무 데나 누르거나 Esc 로 닫기)
+const bigPhoto = ref('')
+const onKey = (e) => {
+  if (bigPhoto.value && e.key === 'Escape') bigPhoto.value = ''
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+
 const toggle = (i) => (open.value = { ...open.value, [i]: !open.value[i] })
 const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.startsWith('특보는')
 </script>
@@ -116,7 +204,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
         <h1>내 예약</h1>
         <div class="tabs" role="tablist" aria-label="예약 구분">
           <button type="button" role="tab" :aria-selected="tab === 'up'" :class="{ on: tab === 'up' }" @click="tab = 'up'">다가오는 캠핑 <span>{{ upcoming.length }}</span></button>
-          <button type="button" role="tab" :aria-selected="tab === 'past'" :class="{ on: tab === 'past' }" @click="tab = 'past'">지난 캠핑 <span>{{ past.length }}</span></button>
+          <button type="button" role="tab" :aria-selected="tab === 'past'" :class="{ on: tab === 'past' }" @click="showPastTab">지난 캠핑 <span>{{ past.length }}</span></button>
         </div>
       </div>
     </section>
@@ -206,17 +294,37 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
         <template v-else>
           <div class="sec"><h2>지난 캠핑</h2></div>
           <p v-if="!past.length" class="state">지난 캠핑이 아직 없어요.</p>
+          <p v-else-if="reviewError" class="state">{{ reviewError }} <button type="button" class="link" @click="loadReviews">다시 시도</button></p>
           <article v-for="p in past" :key="p.id" class="pcard">
-            <span class="pphoto" role="img" :aria-label="`${p.campName} 사진`">
-              <img v-if="p.image" :src="p.image" :alt="p.campName" />
-            </span>
-            <div class="pinfo">
-              <RouterLink v-if="p.campId" :to="`/web/camps/${p.campId}`" class="pname">{{ p.campName }}</RouterLink>
-              <span v-else class="pname">{{ p.campName }}</span>
-              <span class="sub">{{ p.inDate }} – {{ p.outDate }} · {{ p.nights }}박<template v-if="p.memo"> · {{ p.memo }}</template></span>
+            <div class="phead">
+              <!-- 사진: 후기 첫 사진 → 캠핑장 사진 순 -->
+              <span class="pphoto" role="img" :aria-label="`${p.campName} 사진`">
+                <img v-if="reviews[p.id]?.photos[0]?.url || p.image" :src="reviews[p.id]?.photos[0]?.url || p.image" :alt="p.campName" />
+              </span>
+              <div class="pinfo">
+                <RouterLink v-if="p.campId" :to="`/web/camps/${p.campId}`" class="pname">{{ p.campName }}</RouterLink>
+                <span v-else class="pname">{{ p.campName }}</span>
+                <span class="sub">{{ p.inDate }} – {{ p.outDate }}<template v-if="p.memo"> · {{ p.memo }}</template></span>
+              </div>
+              <span class="pacts">
+                <button type="button" class="review" :class="{ done: reviews[p.id] }" :disabled="!!reviewError" @click="openReview(p)">{{ reviews[p.id] ? '수정하기' : '후기 쓰기' }}</button>
+                <button type="button" class="del pdel" :aria-label="`${p.campName} 일정 지우기`" @click="remove(p)">삭제</button>
+              </span>
             </div>
-            <span class="review" aria-disabled="true">후기 쓰기 (준비 중)</span>
-            <button type="button" class="del pdel" :aria-label="`${p.campName} 일정 지우기`" @click="remove(p)">삭제</button>
+            <!-- 작성한 후기: 사진(위) → 글 → 작성 날짜 -->
+            <section v-if="reviews[p.id]" class="myreview" :aria-label="`${p.campName} 내 후기`">
+              <div v-if="reviews[p.id].photos.length" class="rphotos">
+                <button v-for="(ph, k) in reviews[p.id].photos" :key="ph.id" type="button" class="rphoto" :aria-label="`후기 사진 ${k + 1} 크게 보기`" @click="bigPhoto = ph.url">
+                  <img :src="ph.url" alt="" loading="lazy" />
+                </button>
+              </div>
+              <p v-if="reviews[p.id].content" :ref="(el) => setTextEl(p.id, el)" class="rtext" :class="{ open: expanded[p.id] }">{{ reviews[p.id].content }}</p>
+              <div class="rfoot">
+                <button v-if="clamped[p.id] || expanded[p.id]" type="button" class="more"
+                  @click="expanded = { ...expanded, [p.id]: !expanded[p.id] }">{{ expanded[p.id] ? '접기' : '더보기' }}</button>
+                <span class="written">{{ writtenLabel(reviews[p.id]) }}</span>
+              </div>
+            </section>
           </article>
         </template>
       </div>
@@ -224,6 +332,15 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
     <WebConfirmModal :open="!!target" title="이 일정을 지울까요?" :text="target ? `'${target.campName}' 일정이 내 예약에서 사라져요.
 실제 예약 사이트의 예약은 취소되지 않아요.` : ''"
       confirm-label="삭제" :busy="removing" @confirm="confirmRemove" @cancel="target = null" />
+    <WebReviewModal :open="!!reviewTarget" :camp-name="reviewTarget?.campName || ''"
+      :sub="reviewTarget ? `${reviewTarget.inDate} – ${reviewTarget.outDate}` : ''"
+      :review="reviewTarget ? reviews[reviewTarget.id] || null : null"
+      :busy="reviewSaving" :error="reviewSaveError"
+      @save="saveReview" @cancel="reviewTarget = null" />
+    <!-- 후기 사진 크게 보기 -->
+    <div v-if="bigPhoto" class="lightbox" role="dialog" aria-modal="true" aria-label="후기 사진 크게 보기" @click="bigPhoto = ''">
+      <img :src="bigPhoto" alt="후기 사진" />
+    </div>
   </div>
 </template>
 
@@ -667,10 +784,102 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
   background: var(--web-bg);
   border: 1px solid var(--web-line);
   border-radius: 16px;
+}
+.phead {
   display: flex;
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
+}
+.pacts {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+/* 작성한 후기 (카드 안에 펼쳐짐) */
+.myreview {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--web-line);
+}
+.rphotos {
+  margin-bottom: 14px;
+  padding-bottom: 4px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.rphoto {
+  flex: 0 0 auto;
+  width: 132px;
+  height: 100px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--web-photo-empty);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.rphoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rtext {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--web-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.rtext.open {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+.rfoot {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+}
+.more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--web-text-sub);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.written {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--web-text-mute);
+}
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  cursor: zoom-out;
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
 }
 .pphoto {
   flex: 0 0 96px;
@@ -694,12 +903,26 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
 .review {
   height: 44px;
   padding: 0 18px;
+  border: 0;
   border-radius: 10px;
-  background: var(--web-bg-chip);
-  color: var(--web-text-faint);
+  background: var(--web-green);
+  color: var(--web-white);
+  font-family: inherit;
   font-size: 15px;
   font-weight: 700;
   display: flex;
   align-items: center;
+  cursor: pointer;
+}
+/* 후기를 쓴 뒤에는 테두리 버튼으로 (수정) */
+.review.done {
+  border: 1px solid var(--web-green);
+  background: var(--web-bg);
+  color: var(--web-green);
+}
+/* 후기 목록을 못 받았으면 덮어쓰지 않게 잠근다 */
+.review:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 </style>

@@ -1,5 +1,14 @@
 # 진행 상황
 
+## 2026-11-20 웹 내 예약 · 지난 캠핑 후기 (클라이언트 ↔ 서버, 브랜치 `lyh-record`)
+- DB: `db/schema_06.sql` — `camp_review`(일정 하나에 후기 하나, 별점 없음, 일정 · 회원 지우면 CASCADE) · `camp_review_photo`(파일 이름 · 순서) — **DB 에 직접 실행해야 함**
+- 서버 `mycamping/`: `CampReview*` · `ReviewPhotoStore`(인터페이스) · `LocalReviewPhotoStore`(서버 폴더 `{CAMPIN_UPLOAD_DIR 또는 uploads}/reviews`, `.gitignore` 에 `uploads/`). API 3개(목록 · 작성/수정 multipart POST · 사진 파일) — 표는 `server/CLAUDE.md`
+  - 규칙: 체크아웃 지난 일정만 · 글이나 사진 하나는 꼭 · 글 1000자 · 사진 9장 · 한 장 10MB · 이미지는 파일 앞부분으로 판별 · 파일 이름은 UUID
+  - 일정 삭제 때 후기 사진 파일도 지움(`CampPlanService.delete`). 업로드 크기 초과는 `GlobalExceptionHandler` 에서 400. `application.properties` 에 multipart 크기 두 줄 추가
+- 클라이언트: `components/web/WebReviewModal.vue`(새로 — 이전 브랜치 작업이 커밋 전에 사라져 다시 만듦) · `WebMyBookingView` 지난 캠핑 카드에 후기(사진 줄 → 글 3줄 더보기 → 작성/수정 날짜), 사진 크게 보기, 날짜 줄 "N박" 뺌. 저장 실패 문구는 팝업 안에 보이고 쓰던 내용은 그대로
+- 확인: `mvnw test` 166개 통과 (새 `CampReviewServiceTest` 11개, `CampPlanServiceTest` 에 사진 파일 삭제 1개), `npm run build` 통과
+- 확인 못 함: 실제 DB · 서버를 켜서 업로드 · 사진 보기 (schema_06 미실행), 브라우저 화면. 회원 탈퇴(CASCADE) 때는 사진 파일이 서버 폴더에 남음 (탈퇴 기능이 생기면 함께 지워야 함)
+
 ## 2026-11-19 재난 대피 3D 지도 → 최신 main 위로 합침 (브랜치 `hjs-disaster-map-v2`)
 - `hjs-disaster-map` 를 main(b0b8272) 에서 새로 판 브랜치에 merge. 충돌 3곳(tokens.css 색 변수 · router 경로 · 이 파일)은 양쪽을 모두 남김. 차박·가족방 위치·메타버스 작업은 그대로
 - 확인: `npm run build` 통과. 확인 못 함: 합친 뒤 `npm run dev` 로 화면 열어 보기
