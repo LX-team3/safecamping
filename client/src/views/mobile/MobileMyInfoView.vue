@@ -28,16 +28,12 @@ onMounted(async () => {
 const menu = computed(() =>
   auth.isLoggedIn
     ? [
-        { name: '함께 가는 가족', to: '/app/my-info/family' },
-        { name: '여행 취향', to: '/app/my-info/activity' },
-        { name: '비상연락처', to: '/app/my-info/emergency-contacts' },
+        { name: '여행 취향', to: '/app/tour-preference' },
         { name: '알림', to: '/app/my-info/alerts' },
-        { name: '공지사항 · 문의' }, // 화면이 아직 없어 누를 수 없음
       ]
     : [
         { name: '로그인 · 회원가입', to: '/app/login' },
         { name: '알림', to: '/app/my-info/alerts' },
-        { name: '공지사항 · 문의' },
       ],
 )
 

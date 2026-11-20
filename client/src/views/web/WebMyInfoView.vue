@@ -1,6 +1,6 @@
 <script setup>
 // 웹 내 정보: 내 계정 · 내 캠핑 유형(1분 진단 저장 결과) · 바로가기 메뉴 · 로그아웃
-// 비상연락처 · 여행 취향 · 함께 가는 가족은 웹 화면이 아직 없어 "준비 중"으로 둔다 (모바일에서 쓸 수 있다)
+// 여행 취향은 웹 화면이 아직 없어 "준비 중"으로 둔다 (모바일에서 쓸 수 있다)
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import WebSubPage from '@/components/web/WebSubPage.vue'
@@ -39,10 +39,7 @@ const GROUPS = [
   {
     title: '설정',
     rows: [
-      { name: '비상연락처', sub: '준비 중 · 모바일에서 쓸 수 있어요' },
       { name: '여행 취향', sub: '준비 중 · 모바일에서 쓸 수 있어요' },
-      { name: '함께 가는 가족', sub: '준비 중 · 모바일에서 쓸 수 있어요' },
-      { name: '공지사항 · 문의', sub: '준비 중' },
     ],
   },
 ]

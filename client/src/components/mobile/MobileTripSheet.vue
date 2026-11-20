@@ -182,7 +182,7 @@ async function apply() {
           </button>
         </div>
         <p class="save-note">
-          {{ auth.isLoggedIn ? '내 정보 › 함께 가는 가족에 저장됩니다' : '로그인하면 다음에도 불러올 수 있어요' }}
+          {{ auth.isLoggedIn ? '아이 나이대는 내 정보에 저장됩니다' : '로그인하면 다음에도 불러올 수 있어요' }}
         </p>
       </div>
     </section>

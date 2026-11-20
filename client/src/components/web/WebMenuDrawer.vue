@@ -55,7 +55,6 @@ async function logout() {
 
       <div class="bottom">
         <RouterLink to="/web/alerts" @click="emit('close')">알림</RouterLink>
-        <a href="#" @click.prevent>공지사항 · 문의하기</a>
         <a v-if="auth.isLoggedIn" href="#" class="logout" @click.prevent="logout">로그아웃</a>
       </div>
     </aside>

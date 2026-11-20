@@ -586,3 +586,26 @@
 - 안 쓰던 Vue 기본 템플릿 파일(HelloWorld · TheWelcome · WelcomeItem · AboutView · HomeView · components/icons)은 삭제
 - 위 옛 기록의 `views/camp/…` 같은 경로는 당시 이름이다 → 지금은 `views/mobile/Mobile…View.vue`
 - 확인: `npm run build` 통과, 모바일 화면 13개 주소를 실제 브라우저로 열어 정상 표시 확인. 확인 못 함: 로그인 후 화면
+
+## 2026-11-20 앱 비상연락처·함께 가는 가족 화면 삭제 / 웹 메뉴 정리
+- 앱에서 `MobileEmergencyContactView`(비상연락처)와 `MobileTravelFamilyView`(함께 가는 가족) 화면, 라우트(`/app/my-info/emergency-contacts`, `/app/my-info/family`), 내 정보 메뉴 항목을 삭제
+- `stores/family.js` 의 아이 카드 함수·`children` 목록 삭제 (이 화면만 쓰던 것). 모임방 기능은 그대로
+- 문구 수정: 인원·날짜 시트의 "내 정보 › 함께 가는 가족에 저장됩니다" → "아이 나이대는 내 정보에 저장됩니다", 여행 취향 화면의 "함께 가는 가족에서 바꿀 수 있어요" 문장 삭제
+- 웹: 전체 메뉴의 "공지사항 · 문의하기", 내 정보의 비상연락처 · 함께 가는 가족 · 공지사항 · 문의 항목 삭제 (최근 본 캠핑장 · 내 안전 설정은 앞서 삭제)
+- 서버 API(`/api/member/emergency-contacts`, `/api/family/children`)와 DB 테이블(`emergency_contact`, `child_card`)은 그대로 둠 (삭제는 따로 정할 일)
+- 확인: `npm run build` 통과, 삭제한 화면 이름이 코드에 남아 있지 않음. 확인 못 함: 브라우저에서 앱 내 정보 화면 직접 열어 보기
+
+## 2026-11-20 웹 재난 대피 3D 지도 / 앱 공지사항·문의 삭제
+- 웹 `/web/disaster` 추가 (`views/web/WebDisasterMapView.vue` + `components/web/WebDisasterPanel.vue`). 지도는 앱과 같은 `utils/disasterMap.js`(CesiumJS)를 그대로 쓰고, 앱에서 지도 위·아래에 흩어져 있던 제목·기상특보·비 슬라이더·대피 안내를 왼쪽 400px 패널 한 칸에 모음. 높낮이 그래프만 앱의 `MobileRouteProfile` 을 그대로 가져다 씀(화면 배치가 없는 그림이라)
+- 웹 메뉴·내 정보·내 예약의 "3D 재난 대피 지도" 링크를 `/web/disaster` 로 연결 (`utils/webLinks.js`). 좁은 화면에서 `/web/disaster` 로 오면 기존 규칙대로 `/app/disaster` 로 감
+- 앱 내 정보의 "공지사항 · 문의" 항목 삭제 (로그인 전·후 모두)
+- 확인: `npm run build` 통과. 실제 Chrome(1400px)에서 지도·패널·비 슬라이더·높낮이 그래프 표시, "대피 길안내 시작" 눌러 단계 안내로 바뀜, 콘솔 오류 없음, 390px 에서 `/app/disaster` 로 이동
+- 확인 못 함: 길안내 단계에서 지도 바탕이 하얗게 보인 것이 테스트용 Chrome(소프트웨어 그래픽)의 타일 로딩 때문인지 (앱에도 같은 코드라 코드 문제는 아닐 것으로 보임), 사람 손으로 지도 돌리기·확대, 비 슬라이더로 물 차오르는 모양
+
+## 2026-11-20 1분 진단 안내 팝업: 웹 위치·바탕 닫기, 앱에 같은 디자인 적용
+- 웹 홈 팝업(`WebHomeView`): 위에서 150px 띄우던 배치를 가로·세로 정중앙으로 바꿈(화면이 낮으면 스크롤, 아래가 잘리지 않음). 어두운 바탕을 누르면 닫힘(카드 안쪽은 안 닫힘)
+- 앱 탐색 화면의 진단 안내 팝업을 웹 디자인으로 교체: 새 `components/mobile/MobileSurveyNudge.vue`(390px 틀에 맞춰 줄임). 문구는 앱 진단이 5문항이라 "5문항 · 약 1분 · 로그인 없이". 버튼은 진단 시작하기 / 오늘 하루 보지 않기 / 닫기, 바탕 누르면 닫힘
+- "닫기"·바탕 누르기는 이 탭에서만 안 뜸(sessionStorage), "오늘 하루 보지 않기"는 오늘 하루 안 뜸(localStorage 날짜). 뜨는 조건(진단 전에만)은 그대로
+- 색은 `tokens.css` 에 `--color-nudge-*` 7개 추가 (웹 `tokens-web.css` 의 진단 팝업 값과 같음, 사용자 요청)
+- 옛 앱 팝업 그림(`assets/illust/camping.svg`)은 이제 쓰는 곳이 없다 (파일은 남겨 둠)
+- 확인: `npm run build` 통과, 실제 Chrome 에서 웹(1400×700)·앱(390×800) 팝업 표시와 바탕 클릭으로 닫힘 확인. 확인 못 함: "오늘 하루 보지 않기" 다음 날 다시 뜨는지, 아주 낮은 화면(400px 이하 높이)에서의 스크롤

@@ -18,10 +18,8 @@ const defs = [
   ['/my-camping/family', 'family-room', () => import('../views/mobile/MobileFamilyRoomView.vue')],
   // 1분 진단 (누구나 할 수 있고, 로그인했으면 서버에 저장)
   ['/survey', 'survey', () => import('../views/mobile/MobileSurveyView.vue')],
-  // 내 정보와 그 안의 화면들 (비상연락처 · 함께 가는 가족 · 여행 취향 · 알림)
+  // 내 정보와 그 안의 화면들 (여행 취향 · 알림)
   ['/my-info', 'my-info', () => import('../views/mobile/MobileMyInfoView.vue')],
-  ['/my-info/emergency-contacts', 'emergency-contacts', () => import('../views/mobile/MobileEmergencyContactView.vue')],
-  ['/my-info/family', 'travel-family', () => import('../views/mobile/MobileTravelFamilyView.vue')],
   ['/my-info/activity', 'activity', () => import('../views/mobile/MobileActivityView.vue')],
   ['/my-info/alerts', 'alerts', () => import('../views/mobile/MobileAlertView.vue')],
   // 탐색 · 캠핑장 · 시설 · 관광지
