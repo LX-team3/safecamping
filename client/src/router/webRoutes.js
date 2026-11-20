@@ -34,6 +34,11 @@ export const webRoutes = [
       { path: '', name: 'web-home', component: () => import('../views/web/WebHomeView.vue') },
       { path: 'my-booking', name: 'web-my-booking', component: () => import('../views/web/WebMyBookingView.vue') },
       { path: 'booking-check', name: 'web-booking-check', component: () => import('../views/web/WebBookingCheckView.vue') },
+      { path: 'tours/:id(\\d+)', name: 'web-tour-detail', component: () => import('../views/web/WebTourDetailView.vue') },
+      { path: 'my-info', name: 'web-my-info', component: () => import('../views/web/WebMyInfoView.vue') },
+      { path: 'alerts', name: 'web-alerts', component: () => import('../views/web/WebAlertsView.vue') },
+      { path: 'family', name: 'web-family', component: () => import('../views/web/WebFamilyView.vue') },
+      { path: 'checklist/:planId(\\d+)', name: 'web-checklist', component: () => import('../views/web/WebChecklistView.vue') },
       // ↓ 웹 화면은 여기에 추가
       { path: ':pathMatch(.*)*', name: 'web-not-ready', component: WebNotReadyView },
     ],

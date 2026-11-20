@@ -189,8 +189,8 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
                   <span><span class="k">가까운 응급실</span><b>{{ b.er != null ? `${b.erApprox ? '약 ' : ''}${b.er}분` : '정보 없음' }}</b></span>
                   <span><span class="k">가까운 소방서</span><b>{{ b.fire != null ? `약 ${b.fire}분` : '정보 없음' }}</b></span>
                 </div>
-                <RouterLink :to="`/web/camps/${b.campId || ''}`" class="listlink" :class="{ dis: !b.campId }">
-                  <span class="lt">안전 점검 체크리스트</span><span class="ls">출발 준비는 모바일 내 캠핑에서 이어서 할 수 있어요 ›</span>
+                <RouterLink :to="`/web/checklist/${b.id}`" class="listlink">
+                  <span class="lt">안전 점검 체크리스트</span><span class="ls">특보 · 날씨 · 준비물 확인하기 ›</span>
                 </RouterLink>
                 <div class="tools">
                   <RouterLink :to="b.campId ? `/web/nearby?camp=${b.campId}` : '/web/nearby'" class="main-tool"><span aria-hidden="true">📍</span>주변 안전시설 · 길찾기</RouterLink>
