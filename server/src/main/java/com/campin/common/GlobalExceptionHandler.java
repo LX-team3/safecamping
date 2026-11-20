@@ -11,6 +11,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 
@@ -72,6 +73,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> notFound(NoResourceFoundException e) {
         return ApiResponse.fail("없는 주소입니다.");
+    }
+
+    // 올린 파일이 application.properties 의 크기 제한(spring.servlet.multipart.*)을 넘음 → 400
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> tooLarge(MaxUploadSizeExceededException e) {
+        return ApiResponse.fail("사진은 한 장에 10MB, 한 번에 100MB까지 올릴 수 있습니다.");
     }
 
     // 그 밖의 오류 → 500. 내부 내용은 로그에만 남기고 사용자에게는 공통 문구

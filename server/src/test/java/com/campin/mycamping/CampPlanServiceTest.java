@@ -25,6 +25,8 @@ class CampPlanServiceTest {
     private static final LocalDate TODAY = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
     private final List<CampPlan> table = new ArrayList<>();
+    private final FakeCampReviewMapper reviews = new FakeCampReviewMapper();
+    private final FakeReviewPhotoStore photoStore = new FakeReviewPhotoStore();
     private CampPlanService service;
 
     @BeforeEach
@@ -64,10 +66,12 @@ class CampPlanServiceTest {
                 return 1;
             }
             @Override public int delete(Long memberId, Long planId) {
-                return table.removeIf(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId)) ? 1 : 0;
+                boolean removed = table.removeIf(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId));
+                if (removed) reviews.cascadeDeletePlan(planId);  // DB 의 ON DELETE CASCADE 흉내
+                return removed ? 1 : 0;
             }
         };
-        service = new CampPlanService(fakeMembers, fakePlans);
+        service = new CampPlanService(fakeMembers, fakePlans, reviews, photoStore);
     }
 
     // 오늘에서 며칠 뒤 체크인, nights 박
@@ -151,5 +155,27 @@ class CampPlanServiceTest {
 
         service.delete("camper01", id);
         assertTrue(service.findAll("camper01").isEmpty());
+    }
+
+    @Test
+    void 일정을_지우면_후기_사진_파일도_지운다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        CampReview r = new CampReview();
+        r.setPlanId(id);
+        r.setMemberId(1L);
+        reviews.insert(r);
+        CampReviewPhoto photo = new CampReviewPhoto();
+        photo.setReviewId(r.getId());
+        photo.setFileName("a.jpg");
+        photo.setSortOrder(0);
+        reviews.insertPhoto(photo);
+        photoStore.files.put("a.jpg", new byte[] {1});
+
+        assertThrows(NotFoundException.class, () -> service.delete("camper02", id));
+        assertTrue(photoStore.files.containsKey("a.jpg"));  // 남의 요청으로는 파일도 그대로
+
+        service.delete("camper01", id);
+        assertTrue(photoStore.files.isEmpty());
+        assertTrue(reviews.reviews.isEmpty());
     }
 }
