@@ -16,6 +16,8 @@ const defs = [
   ['/my-camping', 'my-camping', () => import('../views/mobile/MobileMyCampingView.vue')],
   ['/my-camping/:planId(\\d+)/checklist', 'my-camping-checklist', () => import('../views/mobile/MobileChecklistView.vue')],
   ['/my-camping/family', 'family-room', () => import('../views/mobile/MobileFamilyRoomView.vue')],
+  // 예약 정보 확인: 예약 사이트에서 예약한 뒤 날짜·인원을 확인해 내 캠핑에 저장 (?camp=캠핑장id)
+  ['/booking-check', 'booking-check', () => import('../views/mobile/MobileBookingCheckView.vue')],
   // 1분 진단 (누구나 할 수 있고, 로그인했으면 서버에 저장)
   ['/survey', 'survey', () => import('../views/mobile/MobileSurveyView.vue')],
   // 내 정보와 그 안의 화면들 (여행 취향 · 알림)

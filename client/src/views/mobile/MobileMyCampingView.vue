@@ -3,11 +3,15 @@
 // 지금은 캠핑장 상세에서 "내 캠핑에 일정 등록"한 캠핑을 카드로 보여 준다 (서버 저장, stores/myCamping.js)
 // 카드 아래 "출발 준비" 줄: 눌러서 체크리스트(ChecklistView)로. 특보는 출발 3일 전부터 서버가 확인해 알려 준다
 // 예보(기온·강수) 값은 아직 없다 — 수치를 지어내지 않기 위해 비워 둔다
-import { computed, onMounted, ref } from 'vue'
+// 지난 캠핑 카드: 후기 쓰기·수정 (GET /api/member/camp-plans/reviews · POST /api/member/camp-plans/{id}/review, 웹 내 예약과 같은 서버)
+// 예약 전·중 카드: "예약 정보 확인" 으로 예약 확인 화면(MobileBookingCheckView)
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
+import { api } from '@/utils/api'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
+import MobileReviewSheet from '@/components/mobile/MobileReviewSheet.vue'
 
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
@@ -25,8 +29,80 @@ async function load() {
   }
   // 끝나지 않은 일정마다 출발 준비 요약(특보·안전점수)을 받는다. 못 받아도 카드는 그대로 (줄에 글자만 빠짐)
   myCamping.plans.filter((p) => p.checkOut >= todayIso()).forEach((p) => myCamping.loadChecklist(p.id).catch(() => {}))
+  loadReviews()
 }
 onMounted(load)
+
+// ---- 지난 캠핑 후기 ----
+// 일정 id → 서버 후기 { planId, content, photos: [{ id, url }], createdAt, updatedAt }
+const reviews = ref({})
+const reviewError = ref('') // 후기 목록을 못 받았을 때 (카드는 그대로 보인다)
+async function loadReviews() {
+  reviewError.value = ''
+  try {
+    const list = await api('/api/member/camp-plans/reviews')
+    reviews.value = Object.fromEntries(list.map((r) => [r.planId, r]))
+    await nextTick()
+    measureAll()
+  } catch (e) {
+    reviewError.value = `후기를 불러오지 못했어요. ${e.message}`
+  }
+}
+
+const reviewTarget = ref(null) // 후기 화면을 연 지난 캠핑
+const reviewSaving = ref(false)
+const reviewSaveError = ref('') // 저장 실패 문구는 후기 화면 안에 보인다 (쓰던 내용이 날아가지 않게 화면은 그대로)
+function openReview(p) {
+  reviewSaveError.value = ''
+  reviewTarget.value = p
+}
+// 후기 화면이 넘긴 값을 서버 칸 이름 그대로 multipart 로 보낸다 (axios 가 FormData 를 보고 형식을 맞춰 줌)
+async function saveReview({ content, keepPhotoIds, files }) {
+  const id = reviewTarget.value.id
+  const form = new FormData()
+  form.append('content', content)
+  keepPhotoIds.forEach((pid) => form.append('keepPhotoIds', pid))
+  files.forEach((f) => form.append('photos', f))
+  reviewSaving.value = true
+  reviewSaveError.value = ''
+  try {
+    const saved = await api(`/api/member/camp-plans/${id}/review`, { method: 'post', body: form })
+    reviews.value = { ...reviews.value, [id]: saved }
+    expanded.value = { ...expanded.value, [id]: false }
+    reviewTarget.value = null
+    await nextTick()
+    measureAll()
+  } catch (e) {
+    reviewSaveError.value = e.message
+  } finally {
+    reviewSaving.value = false
+  }
+}
+// "2026.11.20 작성" (고쳤으면 고친 날짜로 "수정")
+function writtenLabel(r) {
+  const edited = r.updatedAt && r.createdAt && new Date(r.updatedAt) - new Date(r.createdAt) > 1000
+  const d = new Date(edited ? r.updatedAt : r.createdAt)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${edited ? '수정' : '작성'}`
+}
+
+// 후기 글은 3줄까지만 보이고, 넘치면 "더보기" (실제로 잘렸는지는 화면에 그린 뒤 높이로 확인)
+const expanded = ref({}) // 일정 id → 펼침
+const clamped = ref({}) // 일정 id → 3줄을 넘어 잘렸는지
+const textEls = {} // 일정 id → 후기 글 요소
+function setTextEl(id, el) {
+  if (el) textEls[id] = el
+  else delete textEls[id]
+}
+function measureAll() {
+  const next = { ...clamped.value }
+  Object.entries(textEls).forEach(([id, el]) => {
+    if (!expanded.value[id]) next[id] = el.scrollHeight > el.clientHeight + 1
+  })
+  clamped.value = next
+}
+
+const bigPhoto = ref('') // 후기 사진 크게 보기 (아무 데나 누르면 닫힘)
 
 // 출발 준비 줄에 보일 작은 글: 특보 > 특보 없음/받지 못함(가까울 때) > 특보가 보이는 날짜 + 안전점수(먼 일정)
 function prepLine(c) {
@@ -110,6 +186,34 @@ async function remove(p) {
               </span>
               <span class="arrow" aria-hidden="true">›</span>
             </RouterLink>
+            <!-- 예약 사이트에서 예약한 뒤 날짜·인원을 확인해 저장하는 화면 (캠핑장 일정만, 차박 자리는 없음) -->
+            <RouterLink v-if="!p.past && p.campId != null" :to="`/app/booking-check?camp=${p.campId}`" class="check-link">
+              예약 정보 확인 ›
+            </RouterLink>
+
+            <!-- 지난 캠핑: 후기 쓰기 · 수정, 작성한 후기 (사진 → 글 → 작성 날짜) -->
+            <template v-if="p.past">
+              <p v-if="reviewError" class="review-err">
+                {{ reviewError }} <button type="button" class="retry" @click="loadReviews">다시 시도</button>
+              </p>
+              <button v-else type="button" class="review-btn" :class="{ done: reviews[p.id] }" @click="openReview(p)">
+                {{ reviews[p.id] ? '후기 수정하기' : '후기 쓰기' }}
+              </button>
+              <section v-if="reviews[p.id]" class="myreview" :aria-label="`${p.campName} 내 후기`">
+                <div v-if="reviews[p.id].photos.length" class="rphotos">
+                  <button v-for="(ph, k) in reviews[p.id].photos" :key="ph.id" type="button" class="rphoto"
+                    :aria-label="`후기 사진 ${k + 1} 크게 보기`" @click="bigPhoto = ph.url">
+                    <img :src="ph.url" alt="" loading="lazy" />
+                  </button>
+                </div>
+                <p v-if="reviews[p.id].content" :ref="(el) => setTextEl(p.id, el)" class="rtext" :class="{ open: expanded[p.id] }">{{ reviews[p.id].content }}</p>
+                <div class="rfoot">
+                  <button v-if="clamped[p.id] || expanded[p.id]" type="button" class="more"
+                    @click="expanded = { ...expanded, [p.id]: !expanded[p.id] }">{{ expanded[p.id] ? '접기' : '더보기' }}</button>
+                  <span class="written">{{ writtenLabel(reviews[p.id]) }}</span>
+                </div>
+              </section>
+            </template>
           </li>
         </ul>
         <p v-else class="placeholder">
@@ -132,12 +236,23 @@ async function remove(p) {
       </template>
     </div>
     <MobileBottomNav active="mycamp" />
+
+    <MobileReviewSheet :open="!!reviewTarget" :camp-name="reviewTarget?.campName || ''"
+      :sub="reviewTarget ? `${labelWithDay(reviewTarget.checkIn)} – ${labelWithDay(reviewTarget.checkOut)}` : ''"
+      :review="reviewTarget ? reviews[reviewTarget.id] || null : null"
+      :busy="reviewSaving" :error="reviewSaveError"
+      @save="saveReview" @cancel="reviewTarget = null" />
+    <!-- 후기 사진 크게 보기 -->
+    <div v-if="bigPhoto" class="lightbox" role="dialog" aria-modal="true" aria-label="후기 사진 크게 보기" @click="bigPhoto = ''">
+      <img :src="bigPhoto" alt="후기 사진" />
+    </div>
   </div>
 </template>
 
 <style scoped>
 /* 화면 전체 틀: 위는 내용(스크롤), 맨 아래는 하단바 (탐색 화면과 같은 방식) */
 .page {
+  position: relative; /* 후기 화면·사진 크게 보기가 이 화면을 덮는 기준 */
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -214,8 +329,121 @@ h1 {
   flex-direction: column;
   gap: 4px;
 }
-.plan.past {
-  opacity: 0.6;
+/* 지난 캠핑은 카드 전체를 흐리게 하면 후기도 흐려져서, 이름·날짜만 연하게 한다 */
+.plan.past .plan-name,
+.plan.past .plan-range {
+  color: var(--color-text-sub);
+}
+.check-link {
+  align-self: flex-start;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.review-btn {
+  margin-top: 10px;
+  height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--color-text);
+  color: var(--color-card);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* 후기를 쓴 뒤에는 테두리 버튼으로 (수정) */
+.review-btn.done {
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text);
+}
+.review-err {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--color-text-sub);
+}
+/* 작성한 후기 (카드 안에 펼쳐짐) */
+.myreview {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rphotos {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.rphoto {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-photo);
+  cursor: pointer;
+}
+.rphoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rtext {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rtext.open {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.rfoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.written {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-sub);
+}
+.lightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.88);
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 .plan-head {
   display: flex;
