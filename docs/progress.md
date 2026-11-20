@@ -564,3 +564,18 @@
 - CSRF 방어 켬 (`csrf.spa()`) — curl 로 토큰 없으면 403, 있으면 통과 확인
 - 로그인할 때 세션 id·CSRF 토큰 새로 발급 (`sessionAuthenticationStrategy`), requestCache 끔 → 로그인 안 한 요청에 세션 안 생김 (curl 확인). 토큰 교체는 member 테이블이 없어 확인 못 함
 - 남은 일: 주소 검색 연결(지금은 직접 입력), 오류 문구 색(토큰에 없음 → 정해야 함), ①-1 메인
+
+## 2026-11-20 웹(PC) 화면 (브랜치 `bgh-split-layout`, 주소 `/web/...`)
+- 구조: 웹은 `router/webRoutes.js` + `views/web/` + `components/web/` + `styles/tokens-web.css`(`--web-*`)로 따로 둔다. 모바일 화면·`tokens.css` 는 그대로. 좁은 화면은 `/web/...` → 모바일 주소로 보낸다
+- 설계서(CAMPINE PC 화면설계) 25장 구현: 홈, 로그인·가입, 1분 진단(6유형), 탐색·캠핑장 상세·시설 상세·차박지, 내 주변(카카오 도로 경로), 저장(비교표), 내 예약, 예약 확인, 전체 메뉴
+- 설계서에 없던 화면(모바일 기능을 웹 모양으로): 지역·날짜 선택 팝업(`WebTripModal`, 홈 검색칸·탐색 칩), 관광지 상세, 알림, 출발 준비 체크리스트, 모임방(모일 곳·아이 카드·일정), 내 정보
+- 모임방의 가족 위치(지도) 탭은 웹에 없음. 내 정보의 비상연락처·여행 취향·가족·공지는 "준비 중"
+- 확인: `npm run build` 통과. 확인 못 함: 브라우저에서 새 화면 직접 보기(지도·로그인 화면 포함)
+
+## 2026-11-20 웹·앱 주소 분리: 모바일을 `/app` 으로
+- 모바일 라우트를 `router/mobileRoutes.js` 로 옮기고 주소에 `/app` 접두사를 붙임 (`/explore` → `/app/explore`). 화면 파일 위치·라우트 이름은 그대로
+- 옛 주소(`/explore`, `/camps/12?tab=tour` 등)는 쿼리를 유지한 채 `/app/...` 으로 자동 이동 (`legacyRedirects`) → 이미 공유한 링크·북마크 보호
+- `/` 는 화면 폭으로 `/web` 또는 `/app/explore`. 좁은 화면에서 `/web/...` 로 오면 같은 모바일 화면으로 보냄 (웹에만 있는 이름은 대응표로: alerts→my-info/alerts, family→my-camping/family, my-booking→my-camping, checklist/:id→my-camping/:id/checklist)
+- 모바일 화면·부품 25개 파일의 링크 69곳을 `/app/...` 으로 바꿈. 서버에는 화면 주소를 쓰는 곳이 없어 변경 없음
+- 확인: `npm run build` 통과, 라우터만 따로 돌려 옛 주소 8개가 `/app` 으로 넘어가는 것 확인
+- 확인 못 함: 브라우저에서 모바일 화면을 직접 눌러 보기 (특히 하단 탭, 뒤로가기, 로그인 후 이동)
