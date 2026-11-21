@@ -35,6 +35,7 @@ nearby/   # 내 주변 탭 (내 위치 → 가장 가까운 캠핑장 기준 안
 mycamping/ # 내 캠핑 탭 · 일정 등록한 캠핑 CampPlan* (camp_plan 테이블). 회원 개인 것이라 가족방(family/)과 별개. 출발 준비 체크리스트 Checklist* (ChecklistItems 문구 · ChecklistService 3일 규칙 · ChecklistSource 인터페이스=테스트용, 구현 ChecklistLookup)
 weather/  # 날씨 예보 (화면 없음, 체크리스트가 씀). 기상청 단기예보 KmaForecastClient(getVilageFcst, 격자별 3시간 캐시, 환경변수 KMA_SERVICE_KEY) + KmaGrid(위·경도 → 5km 격자) + ForecastParser(시간별 → 하루치 DayForecast). 못 받으면 empty (예시 값 없음). ForecastSource = 테스트용 인터페이스. 4~7일 앞 중기예보는 아직 없음
 chabak/   # 차박 판정 (지도에서 찍은 지점 → 불가·주의·제한 없음·야영 가능). 판정 규칙은 전부 DB chabak 스키마 함수(fn_verdict → fn_verdict_json)에 있고 서버는 그 JSON 을 ChabakVerdictResponse 로 옮겨 전달. 범위 인제군
+disaster/ # 재난 대피 3D 지도(/disaster) 실시간 정보. 인북천 캠핑장 격자의 최근 비 = KmaRainClient(기상청 초단기실황 RN1, 시간별로 받아 24시간치 저장, 환경변수 KMA_SERVICE_KEY) + 상류 수위 = HrfcoWaterClient(한강홍수통제소 반월촌교 1011620, 기준수위 하루·수위 5분 캐시, 환경변수 HRFCO_SERVICE_KEY) + 인제군 기상특보(alert 의 WarningSource 재사용) → DisasterRules(비: 3h 60/90/114 · 12h 110/180 · 24h 310 / 수위: 관심→1 · 경보→2 · 심각→3, 둘 중 높은 단계) 로 단계. 못 받으면 비워 둠(예시 값 없음). RainSource · WaterLevelSource = 테스트용 인터페이스
 score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(분) 기준 → camp.safety_score·er_drive_min, camp_facility.drive_min 값만 고침 (DB 구조 그대로, km 는 직선 그대로). 기준은 ScoreRules 한곳: 등급(TIERS) → ROC 배점, 분 기준(TIME). 직선거리·score_weights·보안등·CCTV 는 쓰지 않음. 실행: 서버를 --score 인자로 켤 때 한 번
 ```
 
@@ -98,6 +99,7 @@ score/    # 안전점수 일괄 계산 (화면 없음). 카카오 소요시간(�
 | `GET /api/chabak/facilities?lat=&lng=` | 차박 지도 "지도에 보일 것" 레이어: 찍은 지점에서 종류별(er·fire·police·store·pharmacy) 가까운 3곳 `[{ id, type, name, lat, lng, distanceKm, dummy }]` 가까운 순. 거리는 위도·경도 어림. 위치 빠짐·범위 밖 400. 로그인 없이 됨 |
 | `GET /api/facilities?types=er,pharmacy&swLat=&swLng=&neLat=&neLng=` | 탐색 지도 "지도 설정"에서 켠 종류의 시설 중 지도 화면 안에 있는 것 `[{ id, type, name, lat, lng, dummy }]`. 화면 가운데에서 가까운 순 최대 300곳. 종류는 `NearbyLayer` 중 ready 인 것만 (그 밖은 무시, 비면 빈 목록). 범위 빠짐·남서>북동 400. 로그인 없이 됨 |
 | `GET /api/nearby/layers` | "지도에 보일 것" 안전 시설 목록 `[{ code, icon, label, desc, ready, on }]` (응급실·소방서·경찰서·편의점·약국·대피소, 공중화장실 뺌). 대피소는 `ready: false` (데이터 없음). 약국은 더미 데이터가 있어 `ready: true` |
+| `GET /api/disaster/now` | 재난지도 인북천 캠핑장 지금 정보 `{ place, rainAvailable, observedAt, rain3h, rain12h, rain24h, level(0~3), reasons[], warningAvailable, warnings[{ category, area, message, issuedAt }], water{ station, observedAt, wl, attention, alarm, serious, level, stale } }`. level = 비·수위 중 높은 단계. 실황을 못 받으면 rain* null, 둘 다 못 받으면 level null, 수위를 못 받으면 water null(1시간 넘게 새 자료 없으면 stale·판단 제외), 특보를 못 받으면 warnings 빈 목록. 로그인 없이 됨 |
 
 - 로그인은 Spring Security **세션 방식**. remember-me 서명 키는 환경변수 `REMEMBER_ME_KEY` (없으면 실행마다 임시 키)
 - CSRF 켜 둠 (`csrf.spa()`): POST·PUT·PATCH·DELETE 는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 보내야 한다 (axios 는 자동, 없으면 403). curl·Postman 으로 시험할 때는 먼저 GET 으로 쿠키를 받는다
