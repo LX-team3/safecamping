@@ -45,6 +45,8 @@ const defs = [
   ['/nearby', 'nearby', () => import('../views/mobile/MobileNearbyView.vue')],
   ['/chabak', 'chabak', () => import('../views/mobile/MobileChabakView.vue')],
   ['/disaster', 'disaster', () => import('../views/mobile/MobileDisasterMapView.vue')],
+  // 잠금화면 알림 테스트 (임시 — 확인 끝나면 이 줄과 views/test/ 삭제)
+  ['/test/notify', 'notify-test', () => import('../views/test/NotifyTestView.vue')],
 ]
 
 export const APP_PREFIX = '/app'

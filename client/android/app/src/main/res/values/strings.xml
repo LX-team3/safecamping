@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">내 캠핑메이트</string>
+    <string name="title_activity_main">내 캠핑메이트</string>
+    <string name="package_name">com.campin.app</string>
+    <string name="custom_url_scheme">com.campin.app</string>
+</resources>
