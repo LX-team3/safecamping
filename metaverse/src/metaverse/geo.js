@@ -6,7 +6,7 @@
 // 선택 파일: 파일이 없거나 내용이 잘못돼도 오류 없이 null을 돌려줘요
 export async function loadGeoOptional(name) {
   try {
-    const res = await fetch(`/data/${name}.geojson`)
+    const res = await fetch(`${import.meta.env.BASE_URL}data/${name}.geojson`)
     if (!res.ok) return null
     const data = await res.json()
     return Array.isArray(data?.features) ? data : null

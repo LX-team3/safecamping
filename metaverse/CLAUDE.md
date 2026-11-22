@@ -23,8 +23,13 @@
 
 ```bash
 npm install        # 처음 한 번
-npm run dev        # http://localhost:5173/metaverse
+npm run dev        # 메타버스 서버(5174). 이것만 띄우면 http://localhost:5174/metaverse/metaverse
 ```
+
+- 평소에는 **client 주소로** 열어요: Spring(8080) + client `npm run dev`(5173) + 이 폴더 `npm run dev`(5174)를 모두 켜고
+  **http://localhost:5173/metaverse/metaverse** 에 접속해요. client가 `/metaverse` 요청을 5174로 넘겨 줘요.
+- 주소가 하나여야 로그인 쿠키가 공유되고, 나중에 앱(Capacitor) 안에서도 열려요. 그래서
+  `public/` 파일은 `` `${import.meta.env.BASE_URL}data/...` ``로 부르고, `http://localhost:5174` 같은 주소나 새 창은 쓰지 않아요.
 
 ## 기술 구성
 

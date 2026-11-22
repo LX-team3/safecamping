@@ -60,7 +60,7 @@ export function createScene(container, events = {}) {
       if (g.type === 'Polygon') bedRings.push(g.coordinates[0])
       if (g.type === 'MultiPolygon') for (const p of g.coordinates) bedRings.push(p[0])
     }
-    terrain = await loadTerrain('/data/terrain.asc', { flatArea: firstRing(boundary), carveAreas: bedRings })
+    terrain = await loadTerrain(`${import.meta.env.BASE_URL}data/terrain.asc`, { flatArea: firstRing(boundary), carveAreas: bedRings })
     scene.add(terrain.mesh)
 
     camp = await buildCampsite(terrain)

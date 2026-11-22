@@ -1,5 +1,25 @@
 # 진행 상황
 
+## 2026-11-22 메타버스를 client 주소 아래로 연결 (브랜치 `hjs-metaverse-proxy`)
+- 목표: client 개발 서버(5173) 하나로 `/` client · `/api` Spring(8080) · `/metaverse/` 메타버스(5174)를 모두 열기. 주소가 하나라서 로그인 쿠키가 공유되고, 나중에 앱(Capacitor)으로 감쌀 때 메타버스가 앱 안에서 그대로 열림
+- 메타버스
+  - `metaverse/vite.config.js`: `base: '/metaverse/'`, 포트 5174 고정(`strictPort`). 메타버스만 따로 띄워도 퀴즈를 Spring에서 받도록 `/api` → 8080 proxy 추가
+  - `public/` 파일 경로 3곳을 `import.meta.env.BASE_URL` 기준으로 (`geo.js` geojson, `missions.js` 예비 파일, `scene.js` 지형). `/api/quizzes`는 그대로
+  - `MetaverseView.vue`: 왼쪽 위 "← 캠핑 앱으로" 링크(`href="/"` → client가 화면 폭을 보고 `/web` 또는 `/app/explore`로 보냄). 좁은 화면에서는 시간·점수 줄과 안 겹치게 정보줄을 한 칸 내림
+  - `metaverse/CLAUDE.md` 실행 주소, `metaverse/docs/작업기록.md` 결정 사항 갱신
+- client
+  - `client/vite.config.js`: proxy에 `/metaverse` → 5174 (`ws: true`, 코드 수정 자동 반영용)
+  - `utils/webLinks.js`: `METAVERSE_URL` 기본값을 `http://localhost:5174/metaverse` → `/metaverse/metaverse`
+  - PC 메타버스 링크 3곳(`WebMenuDrawer.vue`, `WebMyBookingView.vue`, `WebMyInfoView.vue`)에서 `target="_blank"` 삭제 (앱에서는 새 창이 안 열리거나 밖으로 나감). 내 정보 안내 문구 "새 창에서 열려요" → "3D 캠핑장에서 안전 퀴즈"
+  - 모바일 내 정보(`MobileMyInfoView.vue`) 메뉴에 "메타버스 안전 탐험" 추가 (로그인 전·후 모두)
+- 지킬 것: `http://localhost:5174` 같은 주소를 코드에 쓰지 않기 · 파일 경로는 `BASE_URL` 기준 · API는 `/api/...` · 새 창 쓰지 않기
+- 실행(창 3개): server `.\mvnw.cmd spring-boot:run`(8080) · client `npm run dev`(5173) · metaverse `npm run dev`(5174) → http://localhost:5173/metaverse/metaverse
+- 확인: client·metaverse `npm run build` 통과. 브라우저에서 PC·모바일(375px) 링크가 같은 탭에서 열리고 3D 캠핑장·지형이 나옴, 돌아가기 버튼으로 PC는 `/web`, 모바일은 `/app/explore`로 돌아옴
+- 확인 못 함 / 남은 것
+  - 퀴즈를 DB에서 가져오기: 요청은 client → Spring까지 가지만 Spring에 `/api/quizzes`가 없어 404 → 예비 파일 사용. 퀴즈는 Spring AI + RAG(안전 자료를 pgvector에 저장 → 퀴즈 후보 생성 → 사람이 검토·승인 → quiz 표)로 만들 예정이고, 게임은 승인된 문제만 `/api/quizzes`로 읽기로 함. 응답 모양은 `metaverse/public/data/missions.json`과 같게
+  - 배포: 지금은 개발 서버 proxy로만 묶임. 배포할 때는 메타버스 빌드(`dist`, 경로가 `/metaverse/...`)를 client 배포 결과의 `metaverse/` 폴더에 넣거나 같은 주소로 묶는 설정이 따로 필요
+  - Capacitor 앱 안에서 열기 (팀원 담당)
+
 ## 2026-11-21 재난지도 3단계 · 산 대피 · 단계별 행동요령 · 119 전화 (브랜치 `hjs-disaster-live`)
 - 화면 단계는 **안전 · 준비 · 대피** 셋. 114mm(서화 50년 큰비)는 단계 이름을 따로 두지 않고 막대 눈금에 "캠핑장 잠김"으로만 표시 (`criteria.json`, `disasterMap.js` DEFAULT_CRIT). 내부 level 3 은 그대로 둬서 물은 캠핑장까지 차고, 할 일 문장만 더 급하게. 서버 `DisasterRules` 는 바꾸지 않음 (level 3 = 화면에선 "대피")
 - 높은 곳 안내를 "남서쪽 산으로 올라가세요"로 (방향은 코드가 계산한 `hDir`). 이유: 도로만 따라 다리 없이 물보다 높은 곳(311m, 100년 범위 밖)까지 가면 1,520m · 약 30분이고 캠핑장(290m)보다 낮은 285m 강가와 범람 범위 안을 약 460m 지나감 → 쓸 수 없음 (계산: 데이터 폴더 `road_route.py`, 그림 `도로경로_비교.png`). 산길은 지형 계산 방향이고 실제 길은 확인 못 함 → 이름표·길안내에 "길 확인 전"

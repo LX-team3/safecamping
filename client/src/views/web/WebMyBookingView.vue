@@ -282,7 +282,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
                 </RouterLink>
                 <div class="tools">
                   <RouterLink :to="b.campId ? `/web/nearby?camp=${b.campId}` : '/web/nearby'" class="main-tool"><span aria-hidden="true">📍</span>주변 안전시설 · 길찾기</RouterLink>
-                  <a :href="METAVERSE_URL" target="_blank" rel="noopener" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</a>
+                  <a :href="METAVERSE_URL" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</a>
                   <RouterLink :to="DISASTER_PATH" class="sub-tool"><span aria-hidden="true">🌊</span>3D 재난 대피 지도</RouterLink>
                 </div>
               </div>
