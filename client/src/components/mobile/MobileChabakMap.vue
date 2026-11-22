@@ -58,6 +58,7 @@ onMounted(async () => {
     closeFacilityPopup()
     emit('pick', e.latLng.getLat(), e.latLng.getLng())
   })
+  kakao.maps.event.addListener(map, 'zoom_changed', syncOpenIcons)
   // idle = 끌기·확대가 끝나 멈췄을 때 한 번 (움직이는 동안 계속 부르지 않게)
   kakao.maps.event.addListener(map, 'idle', () => {
     const b = map.getBounds()
@@ -128,6 +129,38 @@ function layerDotEl(item, color) {
   return dot
 }
 
+// 점 대신 아이콘 배지 (utils/facilityIcon.js): 등록 야영장 = 텐트(camp), 차박 후보지 = 자동차(car, 지도를 확대했을 때만)
+// 바탕색은 점과 같은 판정 색 (야영 가능 파랑 · 제한 없음 초록). 누르는 범위(44px 버튼)와 눌렀을 때 하는 일도 점과 같다
+function layerIconEl(item, color, type, size, glyph = null) {
+  const btn = layerDotEl(item, color)
+  btn.classList.add('chabak-icon')
+  const badge = facilityBadgeEl({ type })
+  badge.style.background = color // 기본은 등급 회색 클래스라 판정 색으로 덮어쓴다
+  badge.style.setProperty('--fac-size', `${size}px`)
+  if (glyph) {
+    // 배지 안 그림 크기(기본은 배지의 64%) — 자동차는 선 그림이라 더 크게 해야 또렷하다
+    const svg = badge.querySelector('svg')
+    if (svg) {
+      svg.style.width = glyph
+      svg.style.height = glyph
+    }
+  }
+  btn.appendChild(badge)
+  return btn
+}
+
+// 차박 후보지는 개수가 많아(최대 1000곳) 멀리서는 작은 점, 이 레벨보다 가까이 확대했을 때만 아이콘 (겹침 · 속도 때문)
+// 카카오 지도 레벨은 숫자가 작을수록 가까움. 5 는 너무 가까이 가야 해서 확대해도 점만 보였다 → 7 (화면 폭 2km 안팎, 이때 한 화면의 후보지는 수십 곳)
+const ICON_LEVEL = 7
+let openAsIcon = false
+
+// 이 레이어의 점/아이콘 하나
+function layerMarkerEl(layer, item, color) {
+  if (layer.type === 'camp') return layerIconEl(item, color, 'camp', 30) // 원래 크기
+  if (layer.type === 'open' && openAsIcon) return layerIconEl(item, color, 'car', 36, '72%')
+  return layerDotEl(item, color)
+}
+
 // 레이어 하나를 그리고, 그 범위를 돌려준다
 function drawOneLayer(layer) {
   const color = verdictColor(layer.verdict)
@@ -147,7 +180,7 @@ function drawOneLayer(layer) {
       const position = new kakao.maps.LatLng(item.lat, item.lng)
       bounds.extend(position)
       list.push(new kakao.maps.CustomOverlay({
-        map, position, content: layerDotEl(item, color), clickable: true, zIndex,
+        map, position, content: layerMarkerEl(layer, item, color), clickable: true, zIndex,
       }))
     }
   })
@@ -196,6 +229,18 @@ function syncLayers() {
 }
 
 watch(() => props.layers, syncLayers)
+
+// 확대·축소로 "후보지를 아이콘으로 볼 거리"를 넘나들 때만 후보지를 다시 그린다 (매 확대 단계마다 1000개를 다시 그리지 않게)
+function syncOpenIcons() {
+  if (!map) return
+  const near = map.getLevel() <= ICON_LEVEL
+  if (near === openAsIcon) return
+  openAsIcon = near
+  const layer = props.layers.find((l) => l.type === 'open')
+  if (!layer || !layerDrawn.open) return
+  layerDrawn.open.forEach((o) => o.setMap(null))
+  drawOneLayer(layer) // layerDrawn.open 을 새로 채움 (범위·같은 목록 표시는 그대로 둠 → 지도가 움직이지 않음)
+}
 
 // GeoJSON 좌표는 [경도, 위도] 순서 → 카카오는 LatLng(위도, 경도)
 function toPolygons(geo) {
@@ -363,6 +408,13 @@ defineExpose({ moveTo, showMe })
   border-radius: 50%;
   background: var(--dot);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+/* 아이콘 배지(등록 야영장 텐트 · 확대한 차박 후보지 자동차): 점 대신, 같은 44px 버튼 안 가운데에 (.fac-badge 는 styles/base.css, 크기는 스크립트가 --fac-size 로) */
+.chabak-icon::after {
+  display: none;
+}
+.chabak-icon .fac-badge {
+  pointer-events: none; /* 눌림은 바깥 버튼이 받는다 */
 }
 /* 내 위치 점 (탐색 지도 CampMap 의 .my-location 과 같은 모양) */
 .chabak-me {

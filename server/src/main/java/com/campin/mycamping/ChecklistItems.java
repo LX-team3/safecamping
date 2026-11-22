@@ -32,9 +32,11 @@ final class ChecklistItems {
     }
 
     // ---- 계절 준비물 ----
+    // 온도로 판단하는 준비물(침낭 · 핫팩 · 일산화탄소 경보기 · 동파)은 여기 두지 않고 "날씨" 묶음으로 옮겼다 (아래 weatherItems).
+    // 계절 월 기준은 그대로이고, 겨울에는 온도와 상관없는 계절 항목이 없어 이 묶음이 비어 화면에서 사라진다
     private static final Map<String, List<Entry>> SEASON = Map.of(
             "봄", List.of(
-                    new Entry("season-spring-jacket", "겉옷 (일교차)", "봄 · 아침저녁 쌀쌀해요"),
+                    new Entry("season-spring-jacket", "겉옷 (일교차)", "봄 · 아침저녁 쌀쌀"),
                     new Entry("season-spring-bug", "벌레 퇴치제", "봄"),
                     new Entry("season-spring-mask", "마스크 (황사 · 꽃가루)", "봄"),
                     new Entry("season-spring-fire", "화기 사용 가능 여부 확인", "산불 조심 시기")),
@@ -44,14 +46,9 @@ final class ChecklistItems {
                     new Entry("season-summer-ice", "아이스박스 · 얼음", "여름"),
                     new Entry("season-summer-rain", "우비", "여름 · 소나기")),
             "가을", List.of(
-                    new Entry("season-autumn-jacket", "겉옷 (일교차)", "가을 · 아침저녁 쌀쌀해요"),
-                    new Entry("season-autumn-bag", "침낭", "내 침낭의 쾌적온도를 확인하세요"),
+                    new Entry("season-autumn-jacket", "겉옷 (일교차)", "가을 · 아침저녁 쌀쌀"),
                     new Entry("season-autumn-fire", "화기 사용 가능 여부 확인", "낙엽 · 건조 시기")),
-            "겨울", List.of(
-                    new Entry("season-winter-bag", "침낭", "내 침낭의 쾌적온도를 확인하세요"),
-                    new Entry("season-winter-warm", "핫팩 · 보온 매트", "겨울"),
-                    new Entry("season-winter-co", "일산화탄소 경보기", "난방기구를 쓴다면 꼭 챙기세요"),
-                    new Entry("season-winter-water", "물통 · 식수 동파 주의", "겨울")));
+            "겨울", List.of());
 
     // ---- 공통 준비물 (campOnly: 캠핑장 예약이 있을 때만 — 차박 자리에는 텐트·예약이 없다) ----
     private record Common(String id, String text, boolean campOnly) {
@@ -67,7 +64,7 @@ final class ChecklistItems {
 
     // ---- 차박 자리 전용 ----
     private static final List<Entry> SPOT = List.of(
-            new Entry("spot-air", "창문 조금 열어 환기 · 일산화탄소 주의", "차박은 밀폐되기 쉬워요"),
+            new Entry("spot-air", "창문 조금 열어 환기 · 일산화탄소 주의", "밀폐되기 쉬움"),
             new Entry("spot-car", "차량 연료 · 배터리 확인", "차박"),
             new Entry("spot-park", "물이 고이지 않는 곳에 주차", "배수 · 낙석 확인"));
 
@@ -94,13 +91,16 @@ final class ChecklistItems {
     //    "특보가 발표된다"고 하지 않고 "발표 기준 온도에 해당하는 예보가 있다"까지만 말한다
     //  - 0℃: 물이 어는 온도 (물리적 기준, 별도 기관 기준은 아님)
     //  - 비·눈: 예보에 강수가 있는지만 본다 (몇 % 이상 같은 수치 기준 없음)
+    // 온도별 준비물 (계절이 아니라 예보 최저기온으로 판단. 예보가 있는 출발 3일 전부터만 나온다):
+    //  - -12℃ 이하: 핫팩 · 보온 매트, 일산화탄소 경보기
+    //  - 0℃ 이하: 물통 · 식수 동파 주의, 침낭 쾌적온도 확인  (-12℃ 이하면 이것도 함께)
     // 일부러 쓰지 않는 것: 풍속(캠핑에 맞는 공식 기준 없음) · 폭염(기상청 기준이 체감온도라 단기예보 기온으로 판정 불가 → 특보에 맡김)
     //  · "10℃ 이하" 같은 우리만의 구간
     static final double COLD_WAVE_ADVISORY_C = -12.0;
     static final double FREEZING_C = 0.0;
 
-    // 침낭 항목들 (계절·한파 특보). 예보 최저기온이 있으면 설명에 그 값을 보여 준다 — 판단(쾌적온도 비교)은 사용자 몫
-    private static final List<String> SLEEPING_BAG_IDS = List.of("season-autumn-bag", "season-winter-bag", "warn-cold-4");
+    // 침낭 항목들 (영하 예보·한파 특보). 예보 최저기온이 있으면 설명에 그 값을 보여 준다 — 판단(쾌적온도 비교)은 사용자 몫
+    private static final List<String> SLEEPING_BAG_IDS = List.of("wx-freeze-2", "warn-cold-4");
 
     static List<ChecklistItem> build(String season, boolean spot, List<String> warningCategories) {
         return build(season, spot, warningCategories, null);
@@ -132,7 +132,7 @@ final class ChecklistItems {
         if (coldest == null) {
             return items;
         }
-        String why = "예보 최저 " + Math.round(coldest) + "°와 침낭 쾌적온도를 비교하세요";
+        String why = "쾌적온도 비교 " + Math.round(coldest) + "° 이하";
         return items.stream()
                 .map(i -> SLEEPING_BAG_IDS.contains(i.id())
                         ? new ChecklistItem(i.id(), i.group(), i.text(), why, i.level()) : i)
@@ -164,18 +164,19 @@ final class ChecklistItems {
         DayForecast cold = days.stream().filter(d -> d.minTemp() != null && d.minTemp() <= COLD_WAVE_ADVISORY_C)
                 .findFirst().orElse(null);
         if (cold != null) {
-            String why = dayLabel(cold) + " 예보 최저 " + Math.round(cold.minTemp()) + "° · 한파주의보 발표 기준(-12° 이하)에 해당";
+            String why = dayLabel(cold) + " 예보 최저 " + Math.round(cold.minTemp()) + "° · 한파주의보 기준 이하";
             out.add(ChecklistItem.of("wx-cold-1", "날씨", "핫팩 · 보온 매트", why));
             out.add(ChecklistItem.of("wx-cold-2", "날씨", "일산화탄소 경보기", why));
-            out.add(ChecklistItem.of("wx-cold-3", "날씨", "내 침낭의 쾌적온도 확인",
-                    dayLabel(cold) + " 예보 최저 " + Math.round(cold.minTemp()) + "°와 침낭 쾌적온도를 비교하세요"));
         }
 
         DayForecast freeze = days.stream().filter(d -> d.minTemp() != null && d.minTemp() <= FREEZING_C)
                 .findFirst().orElse(null);
         if (freeze != null) {
             out.add(ChecklistItem.of("wx-freeze-1", "날씨", "물통 · 식수 동파 주의",
-                    dayLabel(freeze) + " 예보 최저 " + Math.round(freeze.minTemp()) + "° · 0° 이하면 물이 얼어요"));
+                    dayLabel(freeze) + " 예보 최저 " + Math.round(freeze.minTemp()) + "° · 0° 이하"));
+            // 침낭은 제품마다 표기 온도가 달라 몇 도면 어떤 침낭이라고 정하지 않는다 (설명은 build 가 예보 최저기온으로 덧붙임)
+            out.add(ChecklistItem.of("wx-freeze-2", "날씨", "내 침낭의 쾌적온도 확인",
+                    "쾌적온도 비교 " + Math.round(freeze.minTemp()) + "° 이하"));
         }
 
         DayForecast wet = days.stream().filter(d -> d.precip() != null && !"없음".equals(d.precip())).findFirst().orElse(null);

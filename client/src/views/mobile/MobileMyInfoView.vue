@@ -17,8 +17,7 @@ const router = useRouter()
 
 onMounted(async () => {
   try {
-    await survey.fetchQuestions() // 요약에 선택지 이름이 필요하다
-    await survey.load(auth.isLoggedIn)
+    await survey.load(auth.isLoggedIn) // 이 브라우저에 저장된 내 진단 답 (요약 카드)
   } catch {
     // 진단 카드를 못 불러와도 나머지 메뉴는 쓸 수 있게 둔다 (진단 전 모양으로 보임)
   }
@@ -68,7 +67,7 @@ async function logout() {
       <!-- 진단 전 (ForYouNew.dc.html) -->
       <div v-else class="diagnosis">
         <div class="head">
-          <span class="step">3단계 · 5문항 · 약 1분</span>
+          <span class="step">2단계 · 8문항 · 약 1분</span>
           <span class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</span>
         </div>
         <ol class="points">

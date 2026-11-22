@@ -277,13 +277,14 @@ class ChecklistServiceTest {
 
     @Test
     void 예보_최저기온이_있으면_침낭_항목_설명에_보여_준다() {
-        plan(1, 10L, 1);   // 11월 = 가을 → 가을 침낭 항목
+        plan(1, 10L, 1);   // 예보 최저가 0° 이하라서 날씨 묶음에 침낭 항목이 생긴다 (계절이 아니라 온도로 판단)
         forecast = Optional.of(List.of(day(TODAY.plusDays(1), -9, 2), day(TODAY.plusDays(2), -5, -1)));
 
         ChecklistResponse r = service.find("camper01", 1L, TODAY);
 
-        ChecklistItem bag = r.items().stream().filter(i -> i.id().equals("season-autumn-bag")).findFirst().orElseThrow();
-        assertEquals("예보 최저 -9°와 침낭 쾌적온도를 비교하세요", bag.why());
+        ChecklistItem bag = r.items().stream().filter(i -> i.id().equals("wx-freeze-2")).findFirst().orElseThrow();
+        assertEquals("날씨", bag.group());
+        assertEquals("쾌적온도 비교 -9° 이하", bag.why());
     }
 
     private static long count(List<ChecklistItem> items, String text) {
@@ -291,15 +292,29 @@ class ChecklistServiceTest {
     }
 
     @Test
-    void 한파_특보가_있으면_겨울_계절의_같은_준비물은_빠진다() {
+    void 한파_특보가_있으면_온도_준비물은_특보_쪽에_한_번씩만() {
         List<ChecklistItem> items = ChecklistItems.build("겨울", false, List.of("한파주의보"));
 
         assertEquals(1, count(items, "핫팩 · 보온 매트"));
         assertEquals(1, count(items, "일산화탄소 경보기"));
         assertEquals(1, count(items, "물통 · 식수 동파 주의"));
-        assertEquals(0, count(items, "침낭"));   // 특보의 "내 침낭의 쾌적온도 확인"만 남는다
+        assertEquals(0, count(items, "침낭"));   // 특보의 "내 침낭의 쾌적온도 확인"만 있다
         assertEquals(1, count(items, "내 침낭의 쾌적온도 확인"));
-        assertTrue(items.stream().anyMatch(i -> i.id().equals("warn-cold-1")));   // 남는 것은 특보 쪽
+        assertTrue(items.stream().anyMatch(i -> i.id().equals("warn-cold-1")));
+    }
+
+    @Test
+    void 겨울에는_계절_묶음이_비고_온도_준비물은_예보가_있을_때만_날씨_묶음에_나온다() {
+        // 침낭 · 핫팩 · 일산화탄소 경보기 · 동파는 계절(겨울)이 아니라 예보 온도로 정한다
+        List<ChecklistItem> noForecast = ChecklistItems.build("겨울", false, List.of());
+        assertTrue(noForecast.stream().noneMatch(i -> i.group().equals("계절")));
+        assertEquals(0, count(noForecast, "핫팩 · 보온 매트") + count(noForecast, "침낭")
+                + count(noForecast, "일산화탄소 경보기") + count(noForecast, "물통 · 식수 동파 주의"));
+
+        List<ChecklistItem> cold = ChecklistItems.build("겨울", false, List.of(),
+                List.of(day(TODAY.plusDays(1), -13, -2)));
+        assertEquals(List.of("핫팩 · 보온 매트", "일산화탄소 경보기", "물통 · 식수 동파 주의", "내 침낭의 쾌적온도 확인"),
+                cold.stream().filter(i -> i.group().equals("날씨")).map(ChecklistItem::text).toList());
     }
 
     @Test
@@ -362,9 +377,9 @@ class ChecklistServiceTest {
         List<ChecklistItem> w = weatherItemsOf(service.find("camper01", 1L, TODAY));
 
         assertTrue(w.stream().anyMatch(i -> i.text().equals("핫팩 · 보온 매트")
-                && i.why().contains("한파주의보 발표 기준(-12° 이하)에 해당")));
+                && i.why().contains("한파주의보 기준 이하")));
         assertTrue(w.stream().anyMatch(i -> i.text().equals("물통 · 식수 동파 주의")));   // -12 는 0 이하이기도 하다
-        assertEquals("11.19 예보 최저 -12° · 한파주의보 발표 기준(-12° 이하)에 해당", w.get(0).why());  // 처음 해당하는 날
+        assertEquals("11.19 예보 최저 -12° · 한파주의보 기준 이하", w.get(0).why());  // 처음 해당하는 날
     }
 
     @Test
@@ -374,8 +389,8 @@ class ChecklistServiceTest {
 
         List<ChecklistItem> w = weatherItemsOf(service.find("camper01", 1L, TODAY));
 
-        assertEquals(List.of("물통 · 식수 동파 주의"), w.stream().map(ChecklistItem::text).toList());
-        assertTrue(w.get(0).why().contains("0° 이하면 물이 얼어요"));
+        assertEquals(List.of("물통 · 식수 동파 주의", "내 침낭의 쾌적온도 확인"), w.stream().map(ChecklistItem::text).toList());
+        assertEquals("11.19 예보 최저 -11° · 0° 이하", w.get(0).why());
     }
 
     @Test
@@ -438,14 +453,12 @@ class ChecklistServiceTest {
     }
 
     @Test
-    void 예보가_없으면_침낭_항목은_기존_문구() {
+    void 예보가_없으면_침낭_항목은_없다_온도를_모르면_권하지_않는다() {
         plan(1, 10L, 1);
         forecast = Optional.empty();
 
-        ChecklistItem bag = service.find("camper01", 1L, TODAY).items().stream()
-                .filter(i -> i.id().equals("season-autumn-bag")).findFirst().orElseThrow();
-
-        assertEquals("내 침낭의 쾌적온도를 확인하세요", bag.why());
+        assertTrue(service.find("camper01", 1L, TODAY).items().stream()
+                .noneMatch(i -> i.text().contains("침낭")));
     }
 
     @Test
