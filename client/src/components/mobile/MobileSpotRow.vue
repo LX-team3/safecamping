@@ -1,7 +1,7 @@
 <script setup>
 // 차박 목록 한 줄 (탐색 목록 CampRow 와 같은 틀): 순위 · 사진 · 이름 · 판정 딱지 + 지역 · 안전 배지 · 응급실 시간 · ›
 //  - 등록 야영장: 고캠핑 사진, "응급실 차로 N분" (camp.er_drive_min — 캠핑장 목록과 같은 값)
-//  - 차박 후보지: 사진이 없어 그 자리 스카이뷰(카카오 정적 지도, 위성사진), "응급실 약 N분" (직선거리 어림)
+//  - 차박 후보지: 사진이 없어 그 자리 스카이뷰(카카오 정적 지도, 위성사진). 응급실 시간은 직선거리 어림값이라 줄에 안 보임
 // 줄을 누르면 open → 화면이 지도를 그 자리로 옮기고 판정 카드를 띄운다
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { loadKakaoMap } from '@/utils/kakaoMap'
@@ -69,9 +69,8 @@ onBeforeUnmount(() => observer?.disconnect())
           <span class="badge" :class="item.grade ?? 'unknown'">
             <i />{{ item.score != null ? `${GRADE_LABEL[item.grade]} ${item.score}` : '점수 없음' }}
           </span>
-          <span v-if="item.erDriveMin != null">
-            응급실 {{ item.kind === 'camp' ? '차로' : '약' }} {{ item.erDriveMin }}분
-          </span>
+          <!-- 응급실 시간은 등록 야영장만 (카카오 차 소요시간). 후보지는 직선거리 어림값이라 보이지 않고, 안전 점수에는 이미 들어 있다 -->
+          <span v-if="item.kind === 'camp' && item.erDriveMin != null">응급실 차로 {{ item.erDriveMin }}분</span>
         </span>
       </span>
       <span class="arrow" aria-hidden="true">›</span>

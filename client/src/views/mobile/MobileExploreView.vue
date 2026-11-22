@@ -24,6 +24,7 @@ import { vHscroll } from '@/utils/hscroll'
 import { shortLabel } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
+import { campTypeOf } from '@/utils/webSurvey'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTripStore } from '@/stores/trip'
 
@@ -60,12 +61,8 @@ const loading = ref(false)
 const error = ref('')
 
 // 1분 진단 답 (없으면 유형으로 거르지 않음)
-const diagnosis = computed(() => survey.answers || {})
-const campType = computed(() =>
-  ({ auto: 'auto', glamping: 'glamping', wild: 'backpacking' })[diagnosis.value.campType] || '')
-
-//const diagnosis = computed(() => survey.answers.diagnosis || {})
-//const campType = computed(() => diagnosis.value.camp_type?.[0] || '')
+// 진단의 "어디서 주무세요?" 답을 서버 캠핑 유형으로 바꾼다 (글램핑 → glamping, 오토캠핑·차박 → auto, utils/webSurvey.js)
+const campType = computed(() => campTypeOf(survey.answers))
 
 async function load() {
   loading.value = true
@@ -211,17 +208,13 @@ const title = computed(() => {
   return '캠핑장 목록'
 })
 
-// 제목 아래 문구: 진단 답에서 무엇을 먼저 봤는지
-const NEARBY_LABEL = { er: '응급실', fire: '소방서', police: '파출소', store: '편의점', toilet: '공중화장실', cctv: 'CCTV', light: '보안등', house: '인근 주택' }
+// 제목 아래 문구: 진단 답에서 실제로 반영한 것 (캠핑 유형으로 거르고, 안전점수 높은 순) — 진단의 다른 답은 추천에 쓰지 않으므로 말하지 않는다
+const CAMP_TYPE_LABEL = { auto: '오토캠핑·차박', glamping: '글램핑·카라반' }
 const reason = computed(() => {
   if (showExcluded.value) return '안전점수가 낮아 추천하지 않는 곳이에요'
   if (!matchMine.value) return '' // 내 유형 맞춤을 끄면 안내 문구 없이 목록만
-  const parts = []
-  const heating = diagnosis.value.heating || []
-  if (heating.includes('fuel') || heating.includes('wood')) parts.push('난방 안전')
-  const first = diagnosis.value.facilities?.[0]
-  if (first) parts.push(`${NEARBY_LABEL[first]} 가까운 곳`)
-  return parts.length ? `${parts.join(' · ')}을 먼저 봤어요` : '안전점수가 높은 곳부터 보여 드려요'
+  const label = CAMP_TYPE_LABEL[campType.value]
+  return label ? `${label} 중 안전점수가 높은 곳부터 보여 드려요` : '안전점수가 높은 곳부터 보여 드려요'
 })
 
 const hasDummy = computed(() => allCamps.value.some((c) => c.dummy))

@@ -1,12 +1,13 @@
 <script setup>
 // 웹 메인 (설계 1-1 · 1-1' · 1-2 · 1-5): 히어로 검색 · 기상특보 띠 · 전국 안전 캠핑장 순위 · 메인 기능 · 공지사항
-// 캠핑장 이름·점수·공지사항은 설계의 예시 데이터다 (더미) → 서버 데이터를 연결할 때 바꾼다
+// "전국 안전 캠핑장 순위"는 실제 데이터(서버 /api/camps). "내 근처" 캠핑장·공지사항은 아직 설계의 예시 데이터다 (더미) → 서버 데이터를 연결할 때 바꾼다
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import WebGuideModal from '@/components/web/WebGuideModal.vue'
 import WebTripModal from '@/components/web/WebTripModal.vue'
 import { useTripStore } from '@/stores/trip'
+import { api } from '@/utils/api'
 import { shortLabel } from '@/utils/date'
 import { shortSido } from '@/utils/place'
 import { loadSavedResult } from '@/utils/webSurvey'
@@ -32,16 +33,6 @@ const MY_CAMPS = [
   { name: '북면 솔숲캠핑장', score: 88, meta: '글램핑 · 북면' },
   { name: '내린천 오토캠핑장', score: 85, meta: '오토캠핑 · 인제읍' },
   { name: '기린 계곡캠핑장', score: 82, meta: '카라반 · 기린면' },
-]
-const NATION = [
-  { name: '화성시 향남 오토캠핑장', score: 94 },
-  { name: '달궁자동차야영장', score: 92 },
-  { name: '덕신야영장', score: 90 },
-  { name: '초막골생태공원 느티나무야영장', score: 89 },
-  { name: '자라섬 캠핑장', score: 87 },
-  { name: '왕송호수 캠핑장', score: 86 },
-  { name: '망상오토캠핑리조트', score: 85 },
-  { name: '소백산국립공원 남천야영장', score: 84 },
 ]
 const FEATURES = [
   { label: '01 고르고 · 안전점수 지도', title: '안전점수로 내 유형에 맞는 캠핑장 고르기', desc: '안전점수 지도에서 우리 가족 유형에 맞는 캠핑장을 골라요.', cta: '안전지도 보기', to: '/web/explore' },
@@ -76,6 +67,22 @@ function toggleVid() {
   paused.value = !paused.value
 }
 onMounted(() => vidA.value?.play?.()?.catch(() => {}))
+
+// ---- 전국 안전 캠핑장 순위: 실제 캠핑장 안전점수 높은 순 8곳 (서버 GET /api/camps?sort=score) ----
+// 이름·점수·사진(imageUrl)은 DB 값이다. 사진 주소가 없는 캠핑장은 회색 사진 자리만 보인다
+const nation = ref([])
+const nationState = ref('loading') // loading | ok | error
+async function loadNation() {
+  try {
+    const list = await api('/api/camps', { params: { sort: 'score' } })
+    nation.value = list.filter((c) => c.safetyScore != null).slice(0, 8)
+    nationState.value = 'ok'
+  } catch {
+    nation.value = []
+    nationState.value = 'error' // 예시 점수를 대신 보여 주지 않는다 (안전 수치를 지어내지 않음)
+  }
+}
+onMounted(loadNation)
 
 // ---- 전국 순위 가로 넘김 ----
 const nationRow = ref(null)
@@ -209,19 +216,23 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
           </button>
         </div>
       </div>
-      <div ref="nationRow" class="row">
-        <article v-for="(n, i) in NATION" :key="n.name" class="card nc nation-card">
-          <RouterLink to="/web/explore" class="photo" :aria-label="`${n.name} 전경`"></RouterLink>
+      <p v-if="nationState === 'loading'" class="nation-msg pad">불러오는 중...</p>
+      <p v-else-if="!nation.length" class="nation-msg pad">순위를 불러오지 못했어요</p>
+      <div v-else ref="nationRow" class="row">
+        <article v-for="(n, i) in nation" :key="n.id" class="card nc nation-card">
+          <RouterLink :to="`/web/camps/${n.id}`" class="photo" :aria-label="`${n.name} 전경`">
+            <img v-if="n.imageUrl" :src="n.imageUrl" :alt="`${n.name} 전경`" loading="lazy" />
+          </RouterLink>
           <span class="rank">{{ i + 1 }}위</span>
           <button type="button" class="heart" :aria-pressed="!!fav[i]" :aria-label="n.name + (fav[i] ? ' 찜 해제' : ' 찜하기')"
             @click="toggleFav(i)">
             <svg width="22" height="22" viewBox="0 0 24 24" :class="{ on: fav[i] }" stroke-width="2" stroke-linejoin="round"
               aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></svg>
           </button>
-          <RouterLink to="/web/explore" class="info">
+          <RouterLink :to="`/web/camps/${n.id}`" class="info">
             <span class="name ellipsis">{{ n.name }}</span>
             <span class="score-row">
-              <span class="muted">안전점수</span><span class="score">{{ n.score }}</span><span class="muted">/ 100</span>
+              <span class="muted">안전점수</span><span class="score">{{ n.safetyScore }}</span><span class="muted">/ 100</span>
             </span>
           </RouterLink>
         </article>
@@ -300,7 +311,7 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
           </div>
 
           <div class="nudge-cta">
-            <span class="bubble">10문항 · 약 1분 · 로그인 없이<i aria-hidden="true"></i></span>
+            <span class="bubble">8문항 · 약 1분 · 로그인 없이<i aria-hidden="true"></i></span>
             <RouterLink to="/web/survey" class="start">진단 시작하기</RouterLink>
           </div>
         </div>
@@ -574,7 +585,18 @@ h2 {
 .photo {
   display: block;
   height: 250px;
-  background: var(--web-photo); /* 사진 자리 (사진은 데이터 연결 후) */
+  background: var(--web-photo); /* 사진 자리 (사진 주소가 없는 캠핑장은 이 회색 칸 그대로) */
+}
+.photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.nation-msg {
+  margin: 0;
+  color: var(--web-text-sub);
+  font-size: 15px;
 }
 .rank {
   position: absolute;

@@ -6,6 +6,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import WebSubPage from '@/components/web/WebSubPage.vue'
+import WeatherIcon from '@/components/common/WeatherIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { fromIso, labelWithDay } from '@/utils/date'
@@ -61,7 +62,7 @@ function toggle(id) {
 // ---- 묶음 ----
 const open = ref({ 특보: true, 날씨: true, 차박: true, 계절: true, 공통: true })
 const GROUPS = ['특보', '날씨', '차박', '계절', '공통']
-const groupTitle = (g) => ({ 특보: '특보 대응', 날씨: '날씨 대응', 차박: '차박 준비', 계절: `${data.value?.season ?? ''} 준비물`, 공통: '공통 준비물' })[g]
+const groupTitle = (g) => ({ 특보: '특보 대비', 날씨: '날씨 대비', 차박: '차박 준비', 계절: '계절 대비', 공통: '공통 준비물' })[g]
 const groups = computed(() =>
   GROUPS.map((g) => ({ key: g, title: groupTitle(g), items: (data.value?.items ?? []).filter((i) => i.group === g) })).filter((g) => g.items.length),
 )
@@ -92,7 +93,7 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
     </template>
 
     <div v-if="!auth.isLoggedIn" class="card center">
-      <p>출발 준비는 로그인하면 쓸 수 있어요.</p>
+      <p>출발 준비는 로그인하면 쓸 수 있습니다.</p>
       <RouterLink to="/web/login" class="primary">로그인</RouterLink>
     </div>
     <p v-else-if="error" class="state">{{ error }} <button type="button" class="retry" @click="load">다시 시도</button></p>
@@ -109,22 +110,22 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
       </section>
 
       <!-- 특보 · 날씨: 출발 3일 전부터 -->
-      <div v-if="data.past" class="notice">지난 캠핑이에요. 준비물은 참고용으로만 보세요.</div>
+      <div v-if="data.past" class="notice">지난 캠핑입니다. 준비물은 참고용으로만 보십시오.</div>
       <template v-else-if="data.near">
         <div v-for="w in data.warnings" :key="w.category" class="alert" :class="warnClass(w.category)" role="alert">
           <b>{{ w.category }} 발효 중</b> {{ w.message }}
         </div>
-        <div v-if="!data.warningsAvailable" class="notice"><b>특보 정보를 지금 받지 못했어요</b> 잠시 뒤 다시 확인하거나 기상청 날씨누리에서 확인해 주세요.</div>
-        <div v-else-if="!data.warnings.length" class="notice"><b>지금 이 지역에 발효 중인 특보가 없어요</b> 시·도 단위 기상청 특보 현황 기준이에요.</div>
+        <div v-if="!data.warningsAvailable" class="notice"><b>특보 정보를 지금 받지 못했습니다</b> 잠시 뒤 다시 확인하거나 기상청 날씨누리에서 확인해 주십시오.</div>
+        <div v-else-if="!data.warnings.length" class="notice"><b>지금 이 지역에 발효 중인 특보가 없습니다</b> 시·도 단위 기상청 특보 현황 기준입니다.</div>
 
         <section v-if="data.forecast" class="card wx" aria-label="캠핑 기간 날씨">
           <h2>캠핑 기간 날씨</h2>
-          <p v-if="!data.forecast.available" class="wx-empty">날씨 예보를 지금 받지 못했어요. 출발 전에 기상청 날씨누리에서 직접 확인해 주세요.</p>
+          <p v-if="!data.forecast.available" class="wx-empty">날씨 예보를 지금 받지 못했습니다. 출발 전에 기상청 날씨누리에서 직접 확인해 주십시오.</p>
           <ul v-else class="days">
             <li v-for="d in data.forecast.days" :key="d.date">
               <span class="wd">{{ labelWithDay(d.date) }}</span>
               <template v-if="hasForecast(d)">
-                <span class="sky">{{ skyText(d) }}</span>
+                <span class="sky"><WeatherIcon :sky="d.sky" :precip="d.precip" :size="26" />{{ skyText(d) }}</span>
                 <span class="tp">{{ temp(d.minTemp) }}<small> / {{ temp(d.maxTemp) }}</small></span>
                 <span class="meta">
                   <template v-if="d.pop != null">강수확률 {{ d.pop }}%</template>
@@ -137,7 +138,7 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
           <p v-if="data.forecast.available" class="wx-foot">기상청 단기예보 · 캠핑장 위치 기준 · 아침 최저 / 낮 최고</p>
         </section>
       </template>
-      <div v-else class="notice"><b>특보와 날씨는 {{ openText }}부터 보여요</b> 출발 3일 전부터 그 지역의 기상특보와 날씨 예보를 알려 드려요. 그때까지는 준비물을 미리 챙겨 두세요.</div>
+      <div v-else class="notice"><b>특보와 날씨는 {{ openText }}부터 보입니다</b> 출발 3일 전부터 그 지역의 기상특보와 날씨 예보를 알려 드립니다. 그때까지는 준비물을 미리 챙겨 두십시오.</div>
 
       <!-- 항목 묶음 -->
       <section v-for="g in groups" :key="g.key" class="card grp">
@@ -157,7 +158,7 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
         </ul>
       </section>
 
-      <p class="foot">체크한 항목은 이 기기(브라우저)에만 저장돼요 · 특보는 기상청 특보 현황 기준 참고용이에요</p>
+      <p class="foot">체크한 항목은 이 기기(브라우저)에만 저장됩니다 · 특보는 기상청 특보 현황 기준 참고용입니다</p>
     </template>
   </WebSubPage>
 </template>
@@ -284,6 +285,11 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
 }
 .wd {
   font-weight: 700;
+}
+.sky {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .tp {
   font-weight: 800;
