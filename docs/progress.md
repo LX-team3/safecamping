@@ -1,5 +1,17 @@
 # 진행 상황
 
+## 2026-11-22 메타버스를 client 안으로 합침 (브랜치 `hjs-metaverse-merge`)
+- 아래 "client 주소 아래로 연결"(서버 2개 + proxy, 브랜치 `hjs-metaverse-proxy`) 다음 단계. 개발 서버·빌드를 하나로 하려고 메타버스를 client의 화면 하나로 옮김. 느려지면 다시 생각하기로 함 (되돌릴 때는 `hjs-metaverse-proxy`)
+- 옮긴 곳: 3D 코드 `client/src/metaverse/`, 화면 `client/src/views/metaverse/MetaverseView.vue`, 데이터 `client/public/metaverse/data/`
+- 주소 `/metaverse` (`router/index.js`). 새 layout `full`(`App.vue`) = 웹·모바일 틀 없이 전체 화면. three.js는 이 화면에 들어올 때만 불러옴
+- client에 `three` 추가 (`package.json`). client `vite.config.js`의 `/metaverse` proxy 삭제 (원래대로)
+- 링크: `webLinks.js`의 `METAVERSE_URL` → `METAVERSE_PATH = '/metaverse'`. PC 3곳·모바일 내 정보 링크와 돌아가기 버튼을 RouterLink로 (새로고침 없이 이동)
+- `metaverse/` 폴더: 따로 앱이던 뼈대(Vue 기본 템플릿, index.html, package.json, vite.config.js 등)는 삭제. `gis/`(QGIS 원본), `docs/`, `CLAUDE.md`는 남김. `gis/export_geojson.py`는 `client/public/metaverse/data/`로 내보내게 고침
+- 비교(client `npm run build`): 첫 화면 JS 104.5KB → 104.8KB, 빌드 약 3.5초(같음), 메타버스 화면 덩어리 약 652KB(들어갈 때만 받음), 배포 폴더 26MB → 27MB
+- 확인: `npm run build` 통과. 브라우저 PC·모바일(375px)에서 링크 → `/metaverse` 3D 캠핑장·지형 나옴, 돌아가기로 PC `/web`·모바일 `/app/explore`, 나갔다 다시 들어와도 3D 화면이 하나만 남음(정리 잘 됨), 재난지도(`/web/disaster`) 열림
+- 확인 못 함: 실제 휴대폰·Capacitor 앱에서 열기, 퀴즈 DB(서버에 `/api/quizzes` 없음 → 예비 파일)
+- 참고: `MetaverseView.vue`는 원래 hex 색을 직접 써서 client CSS 규칙(`tokens.css` 변수만)과 다름. 옮기기만 하고 색은 안 바꿈
+
 ## 2026-11-22 메타버스를 client 주소 아래로 연결 (브랜치 `hjs-metaverse-proxy`)
 - 목표: client 개발 서버(5173) 하나로 `/` client · `/api` Spring(8080) · `/metaverse/` 메타버스(5174)를 모두 열기. 주소가 하나라서 로그인 쿠키가 공유되고, 나중에 앱(Capacitor)으로 감쌀 때 메타버스가 앱 안에서 그대로 열림
 - 메타버스

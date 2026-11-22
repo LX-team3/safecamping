@@ -3,9 +3,8 @@
     <!-- 3D 화면 -->
     <div ref="container" class="metaverse"></div>
 
-    <!-- client 로 돌아가기: 메타버스 라우터가 아니라 client 주소라서 RouterLink 가 아닌 일반 <a> -->
-    <!-- '/' 로 가면 client 가 화면 폭을 보고 PC(/web) · 모바일(/app/explore) 으로 보내 준다 -->
-    <a href="/" class="back">← 캠핑 앱으로</a>
+    <!-- 캠핑 앱 화면으로 돌아가기. '/' 로 가면 화면 폭을 보고 PC(/web) · 모바일(/app/explore) 으로 보내 준다 -->
+    <RouterLink to="/" class="back">← 캠핑 앱으로</RouterLink>
 
     <!-- 위쪽 정보줄: 시간, 점수, 찾은 개수 -->
     <div v-if="phase === 'play'" class="hud">
@@ -94,7 +93,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { createScene } from '../metaverse/scene.js'
+import { createScene } from '@/metaverse/scene.js'
 
 const TIME_LIMIT = 300 // 제한 시간(초)
 

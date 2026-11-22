@@ -12,7 +12,7 @@ import WebConfirmModal from '@/components/web/WebConfirmModal.vue'
 import WebReviewModal from '@/components/web/WebReviewModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
-import { DISASTER_PATH, METAVERSE_URL } from '@/utils/webLinks'
+import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
 
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
@@ -282,7 +282,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
                 </RouterLink>
                 <div class="tools">
                   <RouterLink :to="b.campId ? `/web/nearby?camp=${b.campId}` : '/web/nearby'" class="main-tool"><span aria-hidden="true">📍</span>주변 안전시설 · 길찾기</RouterLink>
-                  <a :href="METAVERSE_URL" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</a>
+                  <RouterLink :to="METAVERSE_PATH" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</RouterLink>
                   <RouterLink :to="DISASTER_PATH" class="sub-tool"><span aria-hidden="true">🌊</span>3D 재난 대피 지도</RouterLink>
                 </div>
               </div>

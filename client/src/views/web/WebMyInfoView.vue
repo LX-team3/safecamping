@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { useSurveyStore } from '@/stores/survey'
 import { loadSavedResult } from '@/utils/webSurvey'
-import { DISASTER_PATH, METAVERSE_URL } from '@/utils/webLinks'
+import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
@@ -32,7 +32,7 @@ const GROUPS = [
     title: '안전',
     rows: [
       { name: '알림', sub: '기상특보 · 재난문자', to: '/web/alerts' },
-      { name: '메타버스 안전 탐험', sub: '3D 캠핑장에서 안전 퀴즈', href: METAVERSE_URL },
+      { name: '메타버스 안전 탐험', sub: '3D 캠핑장에서 안전 퀴즈', to: METAVERSE_PATH },
       { name: '3D 재난 대피 지도', sub: '재난 위험 지역 보기', to: DISASTER_PATH },
     ],
   },
