@@ -1,0 +1,144 @@
+/* 웹(PC) 전용 디자인 토큰 — 색 값은 PC 화면설계(CAMPINE PC 화면설계)에서 가져왔다
+   모바일 tokens.css 는 건드리지 않고, 웹 화면(layouts/WebLayout · views/web · components/web)만 이 변수를 쓴다
+   (사용자 승인: 2026-11-19 "웹 전용 토큰 파일 추가") */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600&display=swap');
+
+:root {
+  --web-green: #1f3a1e;        /* 메인 진한 초록 (버튼 · 강조 글씨 · 테두리) */
+  --web-terracotta: #bb6949;   /* 포인트 주황 (기상특보 배지 · 찜 하트 · 로그아웃) */
+  --web-text: #1c1d1b;         /* 본문 */
+  --web-text-sub: #5f615c;     /* 보조 글씨 */
+  --web-text-light: #c9cac4;   /* 어두운 띠 안의 보조 글씨 */
+  --web-arrow: #9a9c96;        /* 메뉴 줄 오른쪽 화살표 */
+  --web-placeholder: #8a8c86;  /* 입력칸 안내 글씨 */
+  --web-bg: #ffffff;           /* 기본 배경 */
+  --web-bg-beige: #f1eee6;     /* 내 유형 영역 배경 */
+  --web-bg-soft: #f3f3f0;      /* 기능 카드 · 하단 배경 */
+  --web-bg-field: #f7f7f5;     /* 입력 안내 상자 배경 */
+  --web-bg-page: #e9eae6;      /* 로그인 · 가입 바탕 */
+  --web-dark: #121412;         /* 기상특보 띠 */
+  --web-photo: #dcd9cf;        /* 사진 자리(회색 칸) */
+  --web-border: #e3ded3;       /* 카드 테두리 */
+  --web-line: #ecebe6;         /* 구분선 */
+  --web-line-input: #d6d7d1;   /* 입력칸 · 원형 버튼 테두리 */
+  --web-line-btn: #dcddd8;     /* 헤더 아이콘 버튼 테두리 */
+  --web-line-soft: #e6e6e1;    /* 카드 안 가는 줄 */
+  --web-line-ghost: #c9cac4;   /* 보조 버튼 테두리 */
+  --web-tint: #e0e8de;         /* 일러스트 연한 초록 */
+  --web-tint-2: #c9d6c4;       /* 일러스트 중간 초록 */
+  --web-sky: #d2dde1;          /* 진단 팝업 바탕 */
+  --web-sky-bar: #dfe4e6;      /* 진단 팝업 쪽지 줄 */
+  --web-sky-box: #c3cacd;      /* 진단 팝업 쪽지 빈 체크칸 */
+  --web-sky-track: #e7ebec;    /* 진단 팝업 대비도 막대 바탕 */
+  --web-dim: rgba(12, 31, 9, 0.5);   /* 팝업 뒤 어두운 막 */
+  --web-dim-soft: rgba(12, 31, 9, 0.45); /* 전체 메뉴 뒤 어두운 막 */
+  --web-white: #ffffff;
+  --web-font-serif: 'Noto Serif KR', serif;
+}
+
+/* ---- 탐색 지도 화면(왼쪽 패널 + 지도) 전용: PC 화면설계 4-1 에서 가져온 색 (사용자 승인: 웹 전용 토큰) ---- */
+:root {
+  --web-bg-map: #ecebe4;           /* 지도 바탕 · 지도 화면 배경 */
+  --web-line-panel: #d8d6cf;       /* 왼쪽 패널 · 지도 위 버튼 테두리 */
+  --web-line-panel-soft: #eceae4;  /* 왼쪽 패널 안 구분선 */
+  --web-text-mute: #8a8c86;        /* 흐린 글씨 */
+  --web-row-selected: #f2f1ea;     /* 고른 목록 줄 */
+  --web-link-blue: #3e6fa8;        /* 정보 카드 링크 */
+  --web-phone-green: #2f6b2c;      /* 정보 카드 전화번호 */
+  --web-photo-empty: #e4e2da;      /* 정보 카드 사진 자리 */
+  /* 안전 등급 (안심 · 보통 · 유의) */
+  --web-grade-safe: #1f6c53;
+  --web-grade-safe-bg: #e1ede7;
+  --web-grade-caution: #6f803d;
+  --web-grade-caution-bg: #ecefdd;
+  --web-grade-caution-fg: #55652b;
+  --web-grade-danger: #b5862b;
+  --web-grade-danger-bg: #faf0d4;
+  --web-grade-danger-fg: #8a6a1e;
+  /* 추천(내 유형 TOP 5): 금빛 → 초록 → 진초록 그라데이션 */
+  --web-rec-from: #f2c24e;
+  --web-rec-mid: #2a9468;
+  --web-rec-to: #145238;
+  --web-rec-tint: #fbf1d6;
+  --web-rec-selected: #e4e9d6;
+  --web-rec-badge-fg: #17462e;
+  /* 지도 위 시설 칩 종류별 색 */
+  --web-fac-shelter: #4f7c8a;
+  --web-fac-shelter-tint: #e4eef0;
+  --web-fac-hospital: #8a5a78;
+  --web-fac-hospital-tint: #f1e6ee;
+  --web-fac-pharmacy: #6f6a9e;
+  --web-fac-pharmacy-tint: #ecebf5;
+  --web-fac-fire: #bb6949;
+  --web-fac-fire-tint: #f6e7df;
+  --web-fac-police: #4a5a78;
+  --web-fac-police-tint: #e6e9f0;
+  --web-fac-store: #9c7a4e;
+  --web-fac-store-tint: #f3ece1;
+}
+
+/* ---- 내 주변 · 저장 화면(4-2 · 4-3 · 4-4)에서 추가 ---- */
+:root {
+  --web-weather-bg: rgba(40, 57, 33, 0.8);  /* 지도 아래 기상특보 띠 */
+  --web-weather-badge: #e8bc50;             /* 기상특보 배지 */
+  --web-weather-badge-fg: #0c342c;          /* 기상특보 배지 글씨 */
+  --web-me-bg: #e6eefb;                     /* 현재 내 위치 아이콘 바탕 */
+  --web-me: #2f6fd6;                        /* 현재 내 위치 아이콘 */
+  --web-bg-row: #f6f5f1;                    /* 고른 캠핑장 요약 상자 */
+  --web-bg-pale: #f3f2ee;                   /* 작은 안내 배지 */
+  --web-bg-gray: #eeeeee;                   /* 저장 화면 오른쪽 바탕 */
+  --web-text-warn: #8a4a33;                 /* 한도 초과 안내 */
+  --web-check-line: #b9b7ae;                /* 체크 칸 테두리 */
+  --web-best: #e0e8de;                      /* 비교표에서 가장 좋은 값 칸 */
+  --web-cell: #f6f6f4;                      /* 비교표 일반 칸 */
+  --web-text-cell: #333333;                 /* 비교표 일반 칸 글씨 */
+}
+
+/* ---- 캠핑장 상세 · 시설 상세 · 차박지 찾기 패널(4-1-1 · 4-1-2 · 4-1-5)에서 추가 ---- */
+:root {
+  --web-bg-prep: #f5f4ef;       /* 차박 준비 안내 상자 */
+  --web-text-prep: #3a3b37;     /* 차박 준비 안내 글씨 */
+  --web-bg-selected: #f1f0ea;   /* 고른 줄 · 작은 칩 바탕 */
+  --web-bg-chip: #f1f0ea;       /* 탭 안 작은 칩 · 정렬 바탕 */
+  --web-bg-hero: #dddcd6;       /* 상세 대표 사진 자리 */
+  --web-text-photo: #6b6a63;    /* 사진 자리 글씨 */
+  --web-line-info: #eeeeea;     /* 정보 표 줄 */
+  --web-bg-tag: #f1f1ee;        /* 시설 종류 태그 */
+  --web-bg-close: #f1f1ee;      /* 팝업 닫기 버튼 */
+  --web-warn-bg: #fbe5e2;       /* 시설 안내(위험할 땐) 상자 */
+  --web-dim-plan: rgba(20, 24, 20, 0.35); /* 일정 등록 뒤 어두운 막 */
+}
+
+/* ---- 진단 · 내 예약 · 예약 확인(2-1 · 2-2 · 1-7 · 5-1)에서 추가 ---- */
+:root {
+  --web-bg-quiet: #f3f3ef;        /* 진단 화면 본문 바탕 */
+  --web-bg-booking: #f7f7f4;      /* 내 예약 · 예약 확인 본문 바탕 */
+  --web-bg-card: #faf9f5;         /* 결과 카드 안쪽 */
+  --web-border-card: #e6e4dd;     /* 내 예약 카드 테두리 */
+  --web-line-card: #efeee9;       /* 내 예약 카드 안 구분선 */
+  --web-bg-check: #f4f6f2;        /* 캠핑 전 안전 체크 상자 */
+  --web-green-deep: #415027;      /* 체크리스트 진행 막대 · 진한 버튼 */
+  --web-border-btn: #dad8cf;      /* 보조 버튼 테두리 */
+  --web-text-mid: #3a3c37;        /* 결과 본문 글씨 */
+  --web-text-faint: #8a887f;      /* 흐린 안내 글씨 */
+  --web-warn-ink: #8a4a33;        /* 주의 글씨(갈색) */
+  --web-warn-ink-bg: #fbeedd;     /* 주의 칩 바탕 */
+  --web-prep: #a0782e;            /* 대피 준비형 · 119 상자 테두리 */
+  --web-prep-bg: #f3ebd9;
+  --web-water: #3e5a66;           /* 물가 낙관형 */
+  --web-track: #e3ded3;           /* 진행 막대 바탕 · 비활성 탭 */
+  --web-bar-bg: #efeeea;          /* 분야 점수 막대 바탕 */
+  --web-rule-icon-bg: #f3ece4;    /* 조심할 것 아이콘 바탕 */
+  --web-rule-tag-bg: #ece6da;     /* 조심할 것 태그 */
+  --web-hash-bg: #ecebe6;         /* 해시태그 */
+  --web-brand-1: #d6be5e;         /* 점수 막대 그라데이션: 낮으면 금빛 → 높을수록 초록 */
+  --web-brand-2: #8fa765;
+  --web-brand-3: #649769;
+  --web-brand-4: #4c805e;
+  --web-brand-5: #34573f;
+  --web-report-bg: #f3eae0;       /* 119 안내 아이콘 바탕 */
+  --web-toast: #1c1d1b;
+  --web-toast-fg: #faf9f5;
+  --web-disabled: #9ea89c;        /* 비활성 큰 버튼 */
+  --web-lock-warn: #f2c24e;       /* 알림 안 링크 (금빛) */
+}

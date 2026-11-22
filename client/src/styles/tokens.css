@@ -31,6 +31,14 @@
   --color-caution: #b45a09;      /* 주의 */
   --color-caution-bg: #fbeedd;   /* 주의 안내 상자 배경 */
   --color-map-bg: #e9eae4;       /* 카카오 키가 없을 때 임시 지도 바탕 */
+  /* 1분 진단 안내 팝업(MobileSurveyNudge) — 웹 홈 팝업과 같은 디자인이라 tokens-web.css 의 값을 그대로 옮김 (사용자 요청, 2026-11-20) */
+  --color-nudge-bg: #d2dde1;     /* 팝업 바탕 */
+  --color-nudge-bar: #dfe4e6;    /* 쪽지 줄 */
+  --color-nudge-box: #c3cacd;    /* 쪽지 빈 체크칸 */
+  --color-nudge-track: #e7ebec;  /* 대비도 막대 바탕 */
+  --color-nudge-green: #1f3a1e;  /* 진한 초록 (글씨 · 시작 버튼) */
+  --color-nudge-accent: #bb6949; /* 포인트 주황 (말풍선 · 체크) */
+  --color-nudge-dim: rgba(12, 31, 9, 0.5); /* 팝업 뒤 어두운 막 */
   /* 경로 지도의 길 선 (형광 파랑). 바깥 빛은 같은 색을 옅게 겹쳐 그린다 — 사용자 요청으로 추가 (2026-11-08) */
   --color-route: #1e7bff;        /* 길 선 */
   --color-route-core: #bfe0ff;   /* 고른 길 선 안쪽의 밝은 심 */
@@ -57,7 +65,7 @@
   --color-stage-0: #5fc795;        /* 안전 */
   --color-stage-1: #f2c14e;        /* 준비 (호우주의보) */
   --color-stage-2: #f28c3b;        /* 대피 (호우경보) */
-  --color-stage-3: #ef5b4c;        /* 즉시 대피 (50년에 한 번 올 큰비) */
+  --color-stage-3: #ef5b4c;        /* 경보 빨강 (재난지도 특보 칸 "호우경보"). 2026-11-21 부터 단계 색으로는 안 씀 */
   --color-flood-water: #1f6bb8;    /* 홍수 때 차오르는 3D 물 */
   --color-flood-water-hi: #8cc7f2; /* 물결의 밝은 줄 */
   --color-flood-wet: #5c9ad6;      /* 잠기는 범위 안 건물 */

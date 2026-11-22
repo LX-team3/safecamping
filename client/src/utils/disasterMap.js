@@ -23,17 +23,25 @@ const DEFAULT_CRIT = {
     { from: 0, label: '안전', color: '--color-stage-0', level: 0, flood: 0 },
     { from: 60, label: '준비', color: '--color-stage-1', level: 1, flood: 0, alert: '주의보' },
     { from: 90, label: '대피', color: '--color-stage-2', level: 2, flood: 0, alert: '경보' },
-    { from: 114, label: '즉시 대피', color: '--color-stage-3', level: 3, flood: 1, alert: '큰비' },
+    { from: 114, label: '대피', color: '--color-stage-2', level: 3, flood: 1, alert: '캠핑장 잠김' },
   ],
 }
 
 // 단계별 안내 문구 (level 0~3). 단계 이름은 disaster-map/rag 단계 문서의 "판단" 과 같게 맞춤
 // head 는 "지금 무엇을 하면 되나"를 바로 알 수 있게 할 일로 씀 (2026-11-21, 발표 슬라이드의 단계별 할 일과 같음)
+// 2026-11-21 화면 단계는 안전·준비·대피 셋. level 3(114mm, 50년 큰비)은 이름은 '대피' 그대로, 캠핑장까지 잠겨 할 일만 더 급하게
+// 높은 곳: 도로로는 1.5km 를 더 낮은 강가로 돌아가야 해서(데이터 폴더 road_route.py) 가장 가까운 산으로 안내. 실제 길은 현장 확인 전
+// {dir} 은 캠핑장에서 높은 곳 쪽 방향(남서 등)으로 바꿔 넣는다
+// todo: 단계별 행동요령 3줄 (아래 시트 "○○ 단계 행동요령")
 const LV = {
-  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피 경로 미리 보기' },
-  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피 길안내 시작' },
-  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 높은 곳으로 가세요', cta: '대피 길안내 시작' },
-  3: { badge: '즉시 대피', color: cssVar('--color-stage-3'), head: '짐 두고 바로 높은 곳으로 가세요', cta: '대피 길안내 시작' },
+  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피 경로 미리 보기',
+    todo: ['대피소 가는 길과 산으로 오르는 방향을 미리 봐 둡니다.', '강가·계곡 가까이에 텐트를 치지 않습니다.', '기상특보와 재난문자를 확인합니다.'] },
+  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피 길안내 시작',
+    todo: ['짐을 싸고 바로 나갈 수 있게 둡니다.', '손전등·비옷을 챙기고 휴대폰을 충전합니다.', '강물이 불어나는지 자주 살핍니다.'] },
+  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 {dir}쪽 산으로 올라가세요', cta: '대피 길안내 시작',
+    todo: ['짐은 가볍게, 걸어서 산 쪽으로 갑니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '혼자 가지 말고 함께 움직입니다.'] },
+  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 {dir}쪽 산으로', cta: '대피 길안내 시작',
+    todo: ['짐 두고 지금 바로 산으로 올라갑니다.', '흐르는 물은 얕아 보여도 건너지 않습니다.', '도착하면 119에 위치를 알립니다.'] },
 }
 
 // 화면이 읽는 상태의 처음 모양
@@ -41,22 +49,23 @@ export function initialState() {
   return {
     loading: true, error: '',
     alert: { title: '기상특보 확인 중', time: '', area: '', body: '', src: '', warn: false, off: true },
-    // 실시간(기상청 실황) 상태. status: loading → ok(받음) · none(못 받음). on: 지금 실시간 값을 보여 주는 중(슬라이더를 만지면 false = 시뮬레이션)
-    live: { status: 'loading', on: false, time: '', reasons: [], water: '' },   // water: 상류 반월촌교 수위 한 줄 (실제 값, 시뮬레이션 중에도 보임)
+    // 실시간(기상청 실황) 상태. status: loading → ok(받음) · none(못 받음). on: 지금 실시간 값을 보여 주는 중(막대를 만지면 false = 미리 보기)
+    live: { status: 'loading', on: false, time: '', reasons: [] },
     rain: 60, maxRain: DEFAULT_CRIT.max, stages: DEFAULT_CRIT.stages.map(s => ({ ...s, color: cssVar(s.color) })),
     stage: { label: '준비', color: cssVar('--color-stage-1'), ai: false },
     lv: { ...LV[1] },
-    routeKey: 'base', baseDisabled: false, baseLabel: '대피소', hasBase: true,
+    routeKey: 'base', baseDisabled: false, baseLabel: '대피소',
     dest: { name: '', meta: '', distNum: '', distUnit: 'km', min: '', sum: '' },
     mode: 'overview',
     nav: { count: '', left: '', no: '', head: '', caution: '', sub: '', bar: 0, prevDisabled: true, nextLabel: '다음' },
     detourBtn: false,
+    noRoute: false,   // 캠핑장 잠김: 경로·목적지·길안내 숨김
     sheetOpen: false,
     tourOn: false,
     // 대피 길의 높낮이 그래프 (RouteProfile.vue 가 그림). pts: [{ m, g, deck, w }] — 거리(m)·땅·다리 상판·홍수 물 높이
     profile: { pts: [], L: 1, dest: '', gain: '', note: '', flooded: false, bridge: '' },
     meU: 0,   // 캐릭터가 경로에서 간 비율 (그래프 위 점)
-    todo: ['차보다 걸어서 이동합니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '대피 후 119에 위치를 알립니다.'],
+    todo: [...LV[1].todo],
   }
 }
 
@@ -380,9 +389,12 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     const tourSec = Math.max(20, L * 16 / 1000)   // 1.5km → 약 24초
     const sphere = Cesium.BoundingSphere.fromPoints(pts.filter((_, i) => i % 5 === 0).map(p => P3(p[0], p[1])))
     return { def, L, at, pts, main, mat, tourSec, kmh, sphere, min: Math.max(1, Math.round(L / (kmh * 1000) * 60)), vis: true,
-      show(v) { this.vis = v; outline.show = prim.show = v && !routeOver; out3.show = arr3.show = v && routeOver } }
+      show(v) { this.vis = v; const on = v && !noRoute; outline.show = prim.show = on && !routeOver; out3.show = arr3.show = on && routeOver } }
   }
   let routeOver = false   // 물이 찼으면 true → 대피로를 물 위로 그림
+  // 캠핑장 잠김(level 3, 114mm 이상): 대피 경로·목적지·길안내를 지도와 시트에서 뺀다 (2026-11-21 사용자 결정).
+  // 이때는 물이 캠핑장까지 찬 모습과 "짐 두고 바로 산으로" 할 일만 보여 준다. 길 안내는 대피 단계(90mm)에서 한다
+  let noRoute = false
   function setRouteOver(on) { if (routeOver === on) return; routeOver = on; Object.values(ROUTES).forEach(r => r.show(r.vis)) }
   // 대피소 길: 평지 걸음(시속 4km). 높은 곳: 오르막이라 시속 2km 로 계산
   const ROUTES = { detour: makeRoute(detourDef, '--color-evac', 2) }
@@ -395,7 +407,6 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const showRoute = (k, v) => { if (ROUTES[k]) ROUTES[k].show(v) }
   let routeKey = ROUTES.base ? 'base' : 'detour', RT = ROUTES[routeKey]
   if (ROUTES.base) ROUTES.detour.show(false)
-  state.hasBase = !!ROUTES.base
   state.baseLabel = ROUTES.base ? `대피소 (${ROUTES.base.main.name})` : '대피소 (없음)'
 
   /* ============ 캐릭터 (다리를 번갈아 들며 걷고, 가는 방향을 바라봄) ============ */
@@ -445,12 +456,12 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const meTag = tag('내 위치', 'me', null)
   const dLabel = r => r.L >= 1000 ? (r.L / 1000).toFixed(1) + 'km' : Math.round(r.L / 10) * 10 + 'm'
   if (ROUTES.base) tag(`대피소 · ${shelterName} ${dLabel(ROUTES.base)}`, 'shelter', P3(shelter[0], shelter[1], 80), { baseOnly: true })
-  tag(`높은 곳 · 참고 방향 ${dLabel(ROUTES.detour)}`, 'shelter', P3(hEnd[0], hEnd[1], 60), { detourOnly: true })
+  tag(`산 위 높은 곳 · 길 확인 전 ${dLabel(ROUTES.detour)}`, 'shelter', P3(hEnd[0], hEnd[1], 60), { detourOnly: true })
   const scratch = new Cesium.Cartesian2()
   function placeTags() {
     const W = viewer.canvas.clientWidth, H = viewer.canvas.clientHeight, camPos = camera.positionWC
     tags.forEach(t => {
-      let off = !t.p || (t.detourOnly && routeKey !== 'detour') || (t.baseOnly && routeKey !== 'base')
+      let off = !t.p || (t.detourOnly && (routeKey !== 'detour' || noRoute)) || (t.baseOnly && (routeKey !== 'base' || noRoute))
       if (!off) {
         const c = scene.cartesianToCanvasCoordinates(t.p, scratch)
         off = !c || c.x < -40 || c.y < 0 || c.x > W + 40 || c.y > H || Cesium.Cartesian3.distance(camPos, t.p) > 9000
@@ -474,7 +485,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       duration: reduce ? 0 : 2.4, easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT })
   }
 
-  /* ============ 단계(안전~심각)와 경로 ============ */
+  /* ============ 단계(안전·준비·대피)와 경로 ============ */
   const ST = CRIT.stages, MAXR = CRIT.max || 160
   // criteria.json 의 color 는 tokens.css 변수 이름 → 화면에는 var(...) 로 넘김
   const stageColor = s => s.color && s.color.startsWith('--') ? cssVar(s.color) : s.color
@@ -499,17 +510,17 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const STEPS = {
     base: baseSteps,
     detour: [
-      { m: Math.min(40, LD * 0.2), head: `캠핑장 ${hDir}쪽 높은 곳으로 가세요`, caution: () => '강·계곡 쪽으로 가지 마세요' },
-      { m: Math.round(LD * 0.55), head: '비탈을 따라 위로 올라가세요', caution: () => '지형으로 계산한 참고 방향이에요. 실제 길과 다를 수 있어요' },
+      { m: Math.min(40, LD * 0.2), head: `캠핑장 ${hDir}쪽 산으로 가세요`, caution: () => '강·계곡 쪽으로 가지 마세요' },
+      { m: Math.round(LD * 0.55), head: '비탈을 따라 위로 올라가세요', caution: () => '정해진 길은 확인 전이에요. 오를 수 있는 곳으로 올라가세요' },
       { m: LD, head: '높은 곳에 도착했습니다', sub: `캠핑장보다 약 ${hillGain}m 높은 곳 · 119에 위치를 알리세요` },
     ],
   }
-  const DEST = { base: shelterName, detour: '높은 곳' }
+  const DEST = { base: shelterName, detour: '산 위 높은 곳' }
 
   function setRoute(key) {
     routeKey = key; RT = ROUTES[key]
     showRoute('base', key === 'base'); showRoute('detour', key === 'detour')
-    detourGroup.show = key === 'detour'; baseGroup.show = key === 'base'
+    detourGroup.show = key === 'detour' && !noRoute; baseGroup.show = key === 'base' && !noRoute
     const short = RT.L < 1000
     state.routeKey = key
     state.dest = {
@@ -569,7 +580,14 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   }
   function setLevel(lv) {
     level = lv
-    state.lv = { ...LV[lv], head: lv === 1 && !ROUTES.base ? '높은 곳으로 피할 준비를 하세요' : LV[lv].head }
+    state.lv = { ...LV[lv], head: (lv === 1 && !ROUTES.base ? '높은 곳으로 피할 준비를 하세요' : LV[lv].head).replace('{dir}', hDir) }
+    state.todo = [...LV[lv].todo]
+    if (noRoute !== (lv >= 3)) {
+      noRoute = lv >= 3; state.noRoute = noRoute
+      Object.values(ROUTES).forEach(r => r.show(r.vis))
+      detourGroup.show = routeKey === 'detour' && !noRoute; baseGroup.show = routeKey === 'base' && !noRoute
+      if (noRoute) { stopTour(false); stopNavWalk(); state.mode = 'overview' }
+    }
     buildRiver(lv)
     syncZone()
     // 안전·주의: 대피소 경로. 경계 이상: 다리 경로는 고를 수 없고 바로 높은 곳으로
@@ -801,7 +819,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   /* ============ 시작 ============ */
   setRoute(routeKey)
   buildRiver(1)
-  // 처음에는 시뮬레이션 60mm(준비)로 보여 주고, 화면(DisasterMapView)이 서버 실황을 받으면 setLive 로 바꾼다
+  // 처음에는 미리 보기 60mm(준비)로 보여 주고, 화면(DisasterMapView)이 서버 실황을 받으면 setLive 로 바꾼다
   applyStage(stageFromTable(state.rain))
   {
     const other = shelter || hEnd, cx = (camp[0] + other[0]) / 2, cy = (camp[1] + other[1]) / 2
@@ -821,7 +839,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
 
   /* ============ 화면(Vue)이 부르는 동작 ============ */
   return {
-    // 시뮬레이션: 슬라이더 값(최근 3시간 비)으로 단계를 정한다
+    // 미리 보기: 막대 값(3시간 강수량)으로 단계를 정한다
     setRain(mm) { state.rain = mm; state.live.on = false; applyStage(stageFromTable(mm)) },
     // 실시간: 단계는 서버가 3·12·24시간 기준으로 정한 level 을 그대로 쓰고, 슬라이더에는 3시간 비만 보여 준다
     setLive(level, mm) {

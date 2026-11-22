@@ -1,5 +1,18 @@
 # 진행 상황
 
+## 2026-11-21 재난지도 3단계 · 산 대피 · 단계별 행동요령 · 119 전화 (브랜치 `hjs-disaster-live`)
+- 화면 단계는 **안전 · 준비 · 대피** 셋. 114mm(서화 50년 큰비)는 단계 이름을 따로 두지 않고 막대 눈금에 "캠핑장 잠김"으로만 표시 (`criteria.json`, `disasterMap.js` DEFAULT_CRIT). 내부 level 3 은 그대로 둬서 물은 캠핑장까지 차고, 할 일 문장만 더 급하게. 서버 `DisasterRules` 는 바꾸지 않음 (level 3 = 화면에선 "대피")
+- 높은 곳 안내를 "남서쪽 산으로 올라가세요"로 (방향은 코드가 계산한 `hDir`). 이유: 도로만 따라 다리 없이 물보다 높은 곳(311m, 100년 범위 밖)까지 가면 1,520m · 약 30분이고 캠핑장(290m)보다 낮은 285m 강가와 범람 범위 안을 약 460m 지나감 → 쓸 수 없음 (계산: 데이터 폴더 `road_route.py`, 그림 `도로경로_비교.png`). 산길은 지형 계산 방향이고 실제 길은 확인 못 함 → 이름표·길안내에 "길 확인 전"
+- 아래 시트 행동요령을 단계별 3줄로 (`LV[lv].todo`, 제목 "○○ 단계 행동요령"). 수치 없는 일반 행동만 씀
+- 긴급 신고 119 를 `tel:119` 링크로 (휴대폰에서 누르면 전화 걸기 화면)
+- 캠핑장 잠김(level 3, 114mm 이상)에서는 대피 경로·목적지 이름표·핀·대피소 칸·경로 고르기·길안내 버튼·높낮이 그래프를 숨김 (`noRoute`). 할 일 문장·행동요령·119 만 남김. 길안내 중에 이 단계가 되면 길안내를 끝냄
+- 화면 위 위치 줄을 "인북천 물빛테마공원 캠핑장"만 남김 (모바일). 웹 `WebDisasterPanel.vue` 는 팀원 파일이라 그대로
+- 안 쓰는 코드 정리: `state.hasBase`, `state.live.water`, 막대 눈금 `.ref`(기준표에 ref 단계 없음) 삭제. "시뮬레이션"·"즉시 대피"·"심각" 등 옛 이름 주석을 지금 이름(미리 보기 · 캠핑장 잠김)으로 (`disasterMap.js`, `MobileDisasterMapView.vue`, `MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse` 주석, `tokens.css` 주석). 동작은 그대로. `stage.ai` 는 팀원 웹 화면이 써서 남김
+- 확인 못 함 / 남은 것: `data.json` 의 `osmBuildings`(157동)는 지도에서 한 번도 안 그림 (그리는 건 `buildings` 803동뿐). 발표 11페이지 "건물 960동"과 다름 → 그릴지, 빼고 803동으로 고칠지 정해야 함
+- 막대 눈금 글자가 길면(캠핑장 잠김) 왼쪽 맞춤해 90 경보와 안 겹치게 (`MobileRainSlider.vue`)
+- 확인: `npm run build` 통과, 브라우저(375px)에서 120mm 때 문구 · 행동요령 · tel:119 · 눈금 확인. 팀원 웹 화면(`WebDisasterPanel.vue`)은 행동요령은 자동으로 따라오고 버튼 글자("높은 곳 (참고)")는 팀원 파일이라 그대로
+- 확인 못 함: 실제 휴대폰에서 전화 연결, 서버 켠 실시간 화면
+
 ## 2026-11-21 재난지도 화면 단순하게 (브랜치 `hjs-disaster-live`)
 - 비 막대(`RainSlider.vue`)
   - 글자를 "최근 3시간 비"에서 "3시간 강수량"으로 바꿈 (기상청 특보 기준과 같은 말이고, 실황이든 미리 보기든 맞는 표현)
@@ -37,6 +50,15 @@
 - 확인함(사용자 터미널): 반월촌교 info·10분 자료 응답 (2026-11-20 14:30 수위 4.77m). 확인 못 함: 서버를 통한 /api/disaster/now 의 water 칸, 화면 표시. 유량(fw) 값은 이상해 보여 안 씀
 - 서버에서 수위가 null 이던 원인: JDK 17 기본 신뢰 목록에 api.hrfco.go.kr 의 루트(OISTE WISeKey Global Root GB CA)가 없어 "PKIX path building failed". 공개 루트 인증서를 `server/src/main/resources/certs/` 에 두고 `HrfcoWaterClient` 에서만 추가로 믿게 함 (JDK 폴더·다른 호출은 그대로). Java 로 확인: 기본은 SSLHandshakeException, 루트 추가 시 HTTP 200
 - 대피 출발점 변경: 고캠핑 원본 좌표(128.2061766, 38.2258503) → QGIS 위성 사진에서 찍은 **캠핑장 안쪽**(128.2060817, 38.2252365, 땅 290.1m, 50·80·100년 범람 범위 안). 거기서 캠핑장 안 길 150m(QGIS 에서 그림)로 "세 갈래 길 끝"(128.206146, 38.2239962)까지 간 뒤 기존 경로. `data.json` campsite 점·두 경로(대피소 1,516→1,411m, 언덕 924→819m), `HILL_PTS` 다시 계산(108m·+21m·약 3분, 도착 311.2m), 서버 `CAMP_LAT/LNG`(서버 다시 켜야 반영). 계산 스크립트는 데이터 폴더 `hill_fastest.py`·`flood_fill_riverzone.py`, 정리 기록은 데이터 폴더 `레이어_정리_기록.md`. 포스터 이미지는 아직 예전 출발점 기준
+
+## 2026-11-20 웹 내 예약 · 지난 캠핑 후기 (클라이언트 ↔ 서버, 브랜치 `lyh-record`)
+- DB: `db/schema_06.sql` — `camp_review`(일정 하나에 후기 하나, 별점 없음, 일정 · 회원 지우면 CASCADE) · `camp_review_photo`(파일 이름 · 순서) — **DB 에 직접 실행해야 함**
+- 서버 `mycamping/`: `CampReview*` · `ReviewPhotoStore`(인터페이스) · `LocalReviewPhotoStore`(서버 폴더 `{CAMPIN_UPLOAD_DIR 또는 uploads}/reviews`, `.gitignore` 에 `uploads/`). API 3개(목록 · 작성/수정 multipart POST · 사진 파일) — 표는 `server/CLAUDE.md`
+  - 규칙: 체크아웃 지난 일정만 · 글이나 사진 하나는 꼭 · 글 1000자 · 사진 9장 · 한 장 10MB · 이미지는 파일 앞부분으로 판별 · 파일 이름은 UUID
+  - 일정 삭제 때 후기 사진 파일도 지움(`CampPlanService.delete`). 업로드 크기 초과는 `GlobalExceptionHandler` 에서 400. `application.properties` 에 multipart 크기 두 줄 추가
+- 클라이언트: `components/web/WebReviewModal.vue`(새로 — 이전 브랜치 작업이 커밋 전에 사라져 다시 만듦) · `WebMyBookingView` 지난 캠핑 카드에 후기(사진 줄 → 글 3줄 더보기 → 작성/수정 날짜), 사진 크게 보기, 날짜 줄 "N박" 뺌. 저장 실패 문구는 팝업 안에 보이고 쓰던 내용은 그대로
+- 확인: `mvnw test` 166개 통과 (새 `CampReviewServiceTest` 11개, `CampPlanServiceTest` 에 사진 파일 삭제 1개), `npm run build` 통과
+- 확인 못 함: 실제 DB · 서버를 켜서 업로드 · 사진 보기 (schema_06 미실행), 브라우저 화면. 회원 탈퇴(CASCADE) 때는 사진 파일이 서버 폴더에 남음 (탈퇴 기능이 생기면 함께 지워야 함)
 
 ## 2026-11-19 재난 대피 3D 지도 → 최신 main 위로 합침 (브랜치 `hjs-disaster-map-v2`)
 - `hjs-disaster-map` 를 main(b0b8272) 에서 새로 판 브랜치에 merge. 충돌 3곳(tokens.css 색 변수 · router 경로 · 이 파일)은 양쪽을 모두 남김. 차박·가족방 위치·메타버스 작업은 그대로
@@ -602,3 +624,48 @@
 - CSRF 방어 켬 (`csrf.spa()`) — curl 로 토큰 없으면 403, 있으면 통과 확인
 - 로그인할 때 세션 id·CSRF 토큰 새로 발급 (`sessionAuthenticationStrategy`), requestCache 끔 → 로그인 안 한 요청에 세션 안 생김 (curl 확인). 토큰 교체는 member 테이블이 없어 확인 못 함
 - 남은 일: 주소 검색 연결(지금은 직접 입력), 오류 문구 색(토큰에 없음 → 정해야 함), ①-1 메인
+
+## 2026-11-20 웹(PC) 화면 (브랜치 `bgh-split-layout`, 주소 `/web/...`)
+- 구조: 웹은 `router/webRoutes.js` + `views/web/` + `components/web/` + `styles/tokens-web.css`(`--web-*`)로 따로 둔다. 모바일 화면·`tokens.css` 는 그대로. 좁은 화면은 `/web/...` → 모바일 주소로 보낸다
+- 설계서(CAMPINE PC 화면설계) 25장 구현: 홈, 로그인·가입, 1분 진단(6유형), 탐색·캠핑장 상세·시설 상세·차박지, 내 주변(카카오 도로 경로), 저장(비교표), 내 예약, 예약 확인, 전체 메뉴
+- 설계서에 없던 화면(모바일 기능을 웹 모양으로): 지역·날짜 선택 팝업(`WebTripModal`, 홈 검색칸·탐색 칩), 관광지 상세, 알림, 출발 준비 체크리스트, 모임방(모일 곳·아이 카드·일정), 내 정보
+- 모임방의 가족 위치(지도) 탭은 웹에 없음. 내 정보의 비상연락처·여행 취향·가족·공지는 "준비 중"
+- 확인: `npm run build` 통과. 확인 못 함: 브라우저에서 새 화면 직접 보기(지도·로그인 화면 포함)
+
+## 2026-11-20 웹·앱 주소 분리: 모바일을 `/app` 으로
+- 모바일 라우트를 `router/mobileRoutes.js` 로 옮기고 주소에 `/app` 접두사를 붙임 (`/explore` → `/app/explore`). 화면 파일 위치·라우트 이름은 그대로
+- 옛 주소(`/explore`, `/camps/12?tab=tour` 등)는 쿼리를 유지한 채 `/app/...` 으로 자동 이동 (`legacyRedirects`) → 이미 공유한 링크·북마크 보호
+- `/` 는 화면 폭으로 `/web` 또는 `/app/explore`. 좁은 화면에서 `/web/...` 로 오면 같은 모바일 화면으로 보냄 (웹에만 있는 이름은 대응표로: alerts→my-info/alerts, family→my-camping/family, my-booking→my-camping, checklist/:id→my-camping/:id/checklist)
+- 모바일 화면·부품 25개 파일의 링크 69곳을 `/app/...` 으로 바꿈. 서버에는 화면 주소를 쓰는 곳이 없어 변경 없음
+- 확인: `npm run build` 통과, 라우터만 따로 돌려 옛 주소 8개가 `/app` 으로 넘어가는 것 확인
+- 확인 못 함: 브라우저에서 모바일 화면을 직접 눌러 보기 (특히 하단 탭, 뒤로가기, 로그인 후 이동)
+
+## 2026-11-20 클라이언트 폴더·이름 규칙 통일 (웹 `Web…` / 모바일 `Mobile…`)
+- 모바일 화면을 `views/mobile/Mobile○○View.vue`, 부품을 `components/mobile/Mobile○○.vue` 로 한 폴더에 모음 (웹의 `views/web/Web○○View.vue`, `components/web/Web○○.vue` 와 같은 규칙). `git mv` 로 옮겨 이력 유지, 파일 48개
+- 컴포넌트 이름과 `import` 경로, 라우터(`mobileRoutes.js`)를 함께 고침. 화면 주소(`/app/...`)와 라우트 이름은 그대로
+- 안 쓰던 Vue 기본 템플릿 파일(HelloWorld · TheWelcome · WelcomeItem · AboutView · HomeView · components/icons)은 삭제
+- 위 옛 기록의 `views/camp/…` 같은 경로는 당시 이름이다 → 지금은 `views/mobile/Mobile…View.vue`
+- 확인: `npm run build` 통과, 모바일 화면 13개 주소를 실제 브라우저로 열어 정상 표시 확인. 확인 못 함: 로그인 후 화면
+
+## 2026-11-20 앱 비상연락처·함께 가는 가족 화면 삭제 / 웹 메뉴 정리
+- 앱에서 `MobileEmergencyContactView`(비상연락처)와 `MobileTravelFamilyView`(함께 가는 가족) 화면, 라우트(`/app/my-info/emergency-contacts`, `/app/my-info/family`), 내 정보 메뉴 항목을 삭제
+- `stores/family.js` 의 아이 카드 함수·`children` 목록 삭제 (이 화면만 쓰던 것). 모임방 기능은 그대로
+- 문구 수정: 인원·날짜 시트의 "내 정보 › 함께 가는 가족에 저장됩니다" → "아이 나이대는 내 정보에 저장됩니다", 여행 취향 화면의 "함께 가는 가족에서 바꿀 수 있어요" 문장 삭제
+- 웹: 전체 메뉴의 "공지사항 · 문의하기", 내 정보의 비상연락처 · 함께 가는 가족 · 공지사항 · 문의 항목 삭제 (최근 본 캠핑장 · 내 안전 설정은 앞서 삭제)
+- 서버 API(`/api/member/emergency-contacts`, `/api/family/children`)와 DB 테이블(`emergency_contact`, `child_card`)은 그대로 둠 (삭제는 따로 정할 일)
+- 확인: `npm run build` 통과, 삭제한 화면 이름이 코드에 남아 있지 않음. 확인 못 함: 브라우저에서 앱 내 정보 화면 직접 열어 보기
+
+## 2026-11-20 웹 재난 대피 3D 지도 / 앱 공지사항·문의 삭제
+- 웹 `/web/disaster` 추가 (`views/web/WebDisasterMapView.vue` + `components/web/WebDisasterPanel.vue`). 지도는 앱과 같은 `utils/disasterMap.js`(CesiumJS)를 그대로 쓰고, 앱에서 지도 위·아래에 흩어져 있던 제목·기상특보·비 슬라이더·대피 안내를 왼쪽 400px 패널 한 칸에 모음. 높낮이 그래프만 앱의 `MobileRouteProfile` 을 그대로 가져다 씀(화면 배치가 없는 그림이라)
+- 웹 메뉴·내 정보·내 예약의 "3D 재난 대피 지도" 링크를 `/web/disaster` 로 연결 (`utils/webLinks.js`). 좁은 화면에서 `/web/disaster` 로 오면 기존 규칙대로 `/app/disaster` 로 감
+- 앱 내 정보의 "공지사항 · 문의" 항목 삭제 (로그인 전·후 모두)
+- 확인: `npm run build` 통과. 실제 Chrome(1400px)에서 지도·패널·비 슬라이더·높낮이 그래프 표시, "대피 길안내 시작" 눌러 단계 안내로 바뀜, 콘솔 오류 없음, 390px 에서 `/app/disaster` 로 이동
+- 확인 못 함: 길안내 단계에서 지도 바탕이 하얗게 보인 것이 테스트용 Chrome(소프트웨어 그래픽)의 타일 로딩 때문인지 (앱에도 같은 코드라 코드 문제는 아닐 것으로 보임), 사람 손으로 지도 돌리기·확대, 비 슬라이더로 물 차오르는 모양
+
+## 2026-11-20 1분 진단 안내 팝업: 웹 위치·바탕 닫기, 앱에 같은 디자인 적용
+- 웹 홈 팝업(`WebHomeView`): 위에서 150px 띄우던 배치를 가로·세로 정중앙으로 바꿈(화면이 낮으면 스크롤, 아래가 잘리지 않음). 어두운 바탕을 누르면 닫힘(카드 안쪽은 안 닫힘)
+- 앱 탐색 화면의 진단 안내 팝업을 웹 디자인으로 교체: 새 `components/mobile/MobileSurveyNudge.vue`(390px 틀에 맞춰 줄임). 문구는 앱 진단이 5문항이라 "5문항 · 약 1분 · 로그인 없이". 버튼은 진단 시작하기 / 오늘 하루 보지 않기 / 닫기, 바탕 누르면 닫힘
+- "닫기"·바탕 누르기는 이 탭에서만 안 뜸(sessionStorage), "오늘 하루 보지 않기"는 오늘 하루 안 뜸(localStorage 날짜). 뜨는 조건(진단 전에만)은 그대로
+- 색은 `tokens.css` 에 `--color-nudge-*` 7개 추가 (웹 `tokens-web.css` 의 진단 팝업 값과 같음, 사용자 요청)
+- 옛 앱 팝업 그림(`assets/illust/camping.svg`)은 이제 쓰는 곳이 없다 (파일은 남겨 둠)
+- 확인: `npm run build` 통과, 실제 Chrome 에서 웹(1400×700)·앱(390×800) 팝업 표시와 바탕 클릭으로 닫힘 확인. 확인 못 함: "오늘 하루 보지 않기" 다음 날 다시 뜨는지, 아주 낮은 화면(400px 이하 높이)에서의 스크롤
