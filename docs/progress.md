@@ -8,7 +8,7 @@
 - 캠핑장 잠김(level 3, 114mm 이상)에서는 대피 경로·목적지 이름표·핀·대피소 칸·경로 고르기·길안내 버튼·높낮이 그래프를 숨김 (`noRoute`). 할 일 문장·행동요령·119 만 남김. 길안내 중에 이 단계가 되면 길안내를 끝냄
 - 화면 위 위치 줄을 "인북천 물빛테마공원 캠핑장"만 남김 (모바일). 웹 `WebDisasterPanel.vue` 는 팀원 파일이라 그대로
 - 안 쓰는 코드 정리: `state.hasBase`, `state.live.water`, 막대 눈금 `.ref`(기준표에 ref 단계 없음) 삭제. "시뮬레이션"·"즉시 대피"·"심각" 등 옛 이름 주석을 지금 이름(미리 보기 · 캠핑장 잠김)으로 (`disasterMap.js`, `MobileDisasterMapView.vue`, `MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse` 주석, `tokens.css` 주석). 동작은 그대로. `stage.ai` 는 팀원 웹 화면이 써서 남김
-- 확인 못 함 / 남은 것: `data.json` 의 `osmBuildings`(157동)는 지도에서 한 번도 안 그림 (그리는 건 `buildings` 803동뿐). 발표 11페이지 "건물 960동"과 다름 → 그릴지, 빼고 803동으로 고칠지 정해야 함
+- `osmBuildings`(OpenStreetMap 건물 157동) 삭제 (2026-11-22): 지도에서 한 번도 안 그리던 자료라 `client/public/disaster-map/data.json`·옛 단독 앱 `disaster-map/app/data.js` 에서 빼고(각 약 51KB 줄어듦), `disaster-map/qgis/export_data.py` 도 다시 내보낼 때 안 만들게 고침. 건물은 건물통합정보 803동만 (발표 11페이지도 803동). 확인: `npm run build` 통과, 화면 열림·콘솔 오류 없음
 - 막대 눈금 글자가 길면(캠핑장 잠김) 왼쪽 맞춤해 90 경보와 안 겹치게 (`MobileRainSlider.vue`)
 - 확인: `npm run build` 통과, 브라우저(375px)에서 120mm 때 문구 · 행동요령 · tel:119 · 눈금 확인. 팀원 웹 화면(`WebDisasterPanel.vue`)은 행동요령은 자동으로 따라오고 버튼 글자("높은 곳 (참고)")는 팀원 파일이라 그대로
 - 확인 못 함: 실제 휴대폰에서 전화 연결, 서버 켠 실시간 화면
