@@ -1,5 +1,6 @@
 // 재난 대피 3D 지도의 실시간 부분: 앱(MobileDisasterMapView)과 웹(WebDisasterMapView)이 함께 쓴다
-// 실시간: GET /api/disaster/now (기상청 초단기실황 3·12·24시간 비 + 상류 반월촌교 수위 + 인제군 기상특보 → 서버가 단계 판단). 10분마다 다시 받는다
+// 실시간: GET /api/disaster/now (기상청 초단기실황 3·12·24시간 비 + 상류 반월촌교 수위 + 인제군 호우특보 → 서버가 셋 중 높은 단계로 판단). 10분마다 다시 받는다
+//   호우특보(주의보 → 준비, 경보 → 대피)는 비가 오기 전에 내리는 예보 기반 경고라, 실제 비가 기준에 닿기 전에 단계가 오른다 (2026-11-23)
 //   받지 못하면(키 없음·기상청 장애) 예시 값을 쓰지 않고 미리 보기(막대)만 보여 준다
 // 쓰는 법: const live = useDisasterLive(state, map)
 //   지도를 만들기 전에 live.start(), 지도를 만든 뒤 live.mapReady(), 화면을 떠날 때 live.stop()
@@ -61,7 +62,7 @@ export function useDisasterLive(state, map) {
     return PREVIEW_ALERT[state.stage.level ?? 0] || PREVIEW_ALERT[0]
   })
 
-  // 실황 비·수위 → 지도 단계 (비를 못 받아도 수위로 단계가 정해지면 실시간으로 본다)
+  // 서버 단계(비·수위·호우특보 중 높은 쪽) → 지도 단계 (비를 못 받아도 수위나 특보로 단계가 정해지면 실시간으로 본다)
   function showRain(res) {
     if (!res || res.level == null) {
       state.live.status = 'none'; state.live.on = false
