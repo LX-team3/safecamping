@@ -32,16 +32,18 @@ const DEFAULT_CRIT = {
 // 2026-11-21 화면 단계는 안전·준비·대피 셋. level 3(114mm, 50년 큰비)은 이름은 '대피' 그대로, 캠핑장까지 잠겨 할 일만 더 급하게
 // 높은 곳: 도로로는 1.5km 를 더 낮은 강가로 돌아가야 해서(데이터 폴더 road_route.py) 가장 가까운 산으로 안내. 실제 길은 현장 확인 전
 // {dir} 은 캠핑장에서 높은 곳 쪽 방향(남서 등)으로 바꿔 넣는다
+// 2026-11-23: 산길은 현장 확인 전이라 "남서쪽 산으로"처럼 길을 정해 주지 않고, 공식 호우 행동요령처럼 "가까운 높은 곳으로"라고 한다.
+//   지도 위 방향(hDir)은 지형으로 계산한 참고 방향으로만 보여 준다
 // todo: 단계별 행동요령 3줄 (아래 시트 "○○ 단계 행동요령")
 const LV = {
   0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피경로 보기',
-    todo: ['대피소 가는 길과 산으로 오르는 방향을 미리 봐 둡니다.', '강가·계곡 가까이에 텐트를 치지 않습니다.', '기상특보와 재난문자를 확인합니다.'] },
+    todo: ['대피소 가는 길과 가까운 높은 곳을 미리 봐 둡니다.', '강가·계곡 가까이에 텐트를 치지 않습니다.', '기상특보와 재난문자를 확인합니다.'] },
   1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피경로 보기',
     todo: ['짐을 싸고 바로 나갈 수 있게 둡니다.', '손전등·비옷을 챙기고 휴대폰을 충전합니다.', '강물이 불어나는지 자주 살핍니다.'] },
-  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 {dir}쪽 산으로 올라가세요', cta: '대피경로 보기',
-    todo: ['짐은 가볍게, 걸어서 산 쪽으로 갑니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '혼자 가지 말고 함께 움직입니다.'] },
-  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 {dir}쪽 산으로', cta: '대피경로 보기',
-    todo: ['짐 두고 지금 바로 산으로 올라갑니다.', '흐르는 물은 얕아 보여도 건너지 않습니다.', '도착하면 119에 위치를 알립니다.'] },
+  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 가까운 높은 곳으로 대피하세요', cta: '대피경로 보기',
+    todo: ['짐은 가볍게, 걸어서 높은 곳으로 갑니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '혼자 가지 말고 함께 움직입니다.'] },
+  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 높은 곳으로', cta: '대피경로 보기',
+    todo: ['짐 두고 지금 바로 높은 곳으로 올라갑니다.', '흐르는 물은 얕아 보여도 건너지 않습니다.', '도착하면 119에 위치를 알립니다.'] },
 }
 
 // 화면이 읽는 상태의 처음 모양
@@ -399,7 +401,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   }
   let routeOver = false   // 물이 찼으면 true → 대피로를 물 위로 그림
   // 침수(level 3, 114mm 이상): 대피 경로·목적지·길안내를 지도와 시트에서 뺀다 (2026-11-21 사용자 결정).
-  // 이때는 물이 캠핑장까지 찬 모습과 "짐 두고 바로 산으로" 할 일만 보여 준다. 길 안내는 대피 단계(90mm)에서 한다
+  // 이때는 물이 캠핑장까지 찬 모습과 "짐 두고 바로 높은 곳으로" 할 일만 보여 준다. 길 안내는 대피 단계(90mm)에서 한다
   let noRoute = false
   function setRouteOver(on) { if (routeOver === on) return; routeOver = on; Object.values(ROUTES).forEach(r => r.show(r.vis)) }
   // 대피소 길: 평지 걸음(시속 4km). 높은 곳: 오르막이라 시속 2km 로 계산
@@ -462,7 +464,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const meTag = tag('내 위치', 'me', null)
   const dLabel = r => r.L >= 1000 ? (r.L / 1000).toFixed(1) + 'km' : Math.round(r.L / 10) * 10 + 'm'
   if (ROUTES.base) tag(`대피소 · ${shelterName} ${dLabel(ROUTES.base)}`, 'shelter', P3(shelter[0], shelter[1], 80), { baseOnly: true })
-  tag(`산 위 높은 곳 · 길 확인 전 ${dLabel(ROUTES.detour)}`, 'shelter', P3(hEnd[0], hEnd[1], 60), { detourOnly: true })
+  tag(`가까운 높은 곳 · 참고 방향 ${dLabel(ROUTES.detour)}`, 'shelter', P3(hEnd[0], hEnd[1], 60), { detourOnly: true })
   const scratch = new Cesium.Cartesian2()
   function placeTags() {
     const W = viewer.canvas.clientWidth, H = viewer.canvas.clientHeight, camPos = camera.positionWC
@@ -516,12 +518,12 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const STEPS = {
     base: baseSteps,
     detour: [
-      { m: Math.min(40, LD * 0.2), head: `캠핑장 ${hDir}쪽 산으로 가세요`, caution: () => '강·계곡 쪽으로 가지 마세요' },
+      { m: Math.min(40, LD * 0.2), head: `가까운 높은 곳으로 가세요 (지도의 ${hDir}쪽 비탈)`, caution: () => '강·계곡 쪽으로 가지 마세요' },
       { m: Math.round(LD * 0.55), head: '비탈을 따라 위로 올라가세요', caution: () => '정해진 길은 확인 전이에요. 오를 수 있는 곳으로 올라가세요' },
       { m: LD, head: '높은 곳에 도착했습니다', sub: `캠핑장보다 약 ${hillGain}m 높은 곳 · 119에 위치를 알리세요` },
     ],
   }
-  const DEST = { base: shelterName, detour: '산 위 높은 곳' }
+  const DEST = { base: shelterName, detour: '가까운 높은 곳' }
 
   function setRoute(key) {
     routeKey = key; RT = ROUTES[key]
