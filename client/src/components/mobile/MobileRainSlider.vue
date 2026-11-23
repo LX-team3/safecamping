@@ -8,7 +8,7 @@
 import { computed } from 'vue'
 
 const props = defineProps({ state: { type: Object, required: true } })
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'live'])
 
 const pct = v => v / props.state.maxRain * 100
 // 단계 구간별 색으로 칠한 막대
@@ -28,6 +28,10 @@ const ticks = computed(() => props.state.stages.slice(1))
     </div>
     <p v-if="state.live.on" class="note">
       {{ state.live.time }} · 기상청<template v-if="state.live.reasons.length"> · {{ state.live.reasons.join(', ') }}</template>
+    </p>
+    <!-- 막대로 미리 보는 중이고 받아 둔 실황이 있으면, 실제 상황으로 돌아가는 버튼 -->
+    <p v-else-if="state.live.status === 'ok'" class="note preview">
+      미리 보기 중 <button type="button" class="golive" @click="emit('live')">↺ 현상황 보기</button>
     </p>
     <input type="range" min="0" :max="state.maxRain" step="5" :value="state.rain" aria-label="3시간 강수량"
       :style="{ '--track': track }" @input="emit('change', +$event.target.value)">
@@ -53,6 +57,9 @@ const ticks = computed(() => props.state.stages.slice(1))
 .v b { font-family: var(--dm-font-num); font-size: 15px; color: var(--dm-text); margin-right: 1px; }
 .stage { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--dm-card); }
 .stage i { width: 8px; height: 8px; border-radius: 50%; }
+.note.preview { display: flex; align-items: center; gap: 8px; overflow: visible; }
+.golive { font: inherit; font-size: 11px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 2px 9px; cursor: pointer; }
+.golive:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
 .note { margin: 2px 0 0; font-size: 10.5px; color: var(--dm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 input { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; background: transparent; margin: 0; touch-action: pan-x; cursor: pointer; }
 input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--track); }

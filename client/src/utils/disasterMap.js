@@ -34,13 +34,13 @@ const DEFAULT_CRIT = {
 // {dir} 은 캠핑장에서 높은 곳 쪽 방향(남서 등)으로 바꿔 넣는다
 // todo: 단계별 행동요령 3줄 (아래 시트 "○○ 단계 행동요령")
 const LV = {
-  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피 경로 미리 보기',
+  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피경로 보기',
     todo: ['대피소 가는 길과 산으로 오르는 방향을 미리 봐 둡니다.', '강가·계곡 가까이에 텐트를 치지 않습니다.', '기상특보와 재난문자를 확인합니다.'] },
-  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피 길안내 시작',
+  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피경로 보기',
     todo: ['짐을 싸고 바로 나갈 수 있게 둡니다.', '손전등·비옷을 챙기고 휴대폰을 충전합니다.', '강물이 불어나는지 자주 살핍니다.'] },
-  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 {dir}쪽 산으로 올라가세요', cta: '대피 길안내 시작',
+  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 {dir}쪽 산으로 올라가세요', cta: '대피경로 보기',
     todo: ['짐은 가볍게, 걸어서 산 쪽으로 갑니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '혼자 가지 말고 함께 움직입니다.'] },
-  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 {dir}쪽 산으로', cta: '대피 길안내 시작',
+  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 {dir}쪽 산으로', cta: '대피경로 보기',
     todo: ['짐 두고 지금 바로 산으로 올라갑니다.', '흐르는 물은 얕아 보여도 건너지 않습니다.', '도착하면 119에 위치를 알립니다.'] },
 }
 
@@ -55,16 +55,12 @@ export function initialState() {
     stage: { label: '준비', color: cssVar('--color-stage-1'), ai: false },
     lv: { ...LV[1] },
     routeKey: 'base', baseDisabled: false, baseLabel: '대피소',
-    dest: { name: '', meta: '', distNum: '', distUnit: 'km', min: '', sum: '' },
+    dest: { name: '', meta: '', distNum: '', distUnit: 'km', min: '', navUrl: '' },
     mode: 'overview',
     nav: { count: '', left: '', no: '', head: '', caution: '', sub: '', bar: 0, prevDisabled: true, nextLabel: '다음' },
     detourBtn: false,
     noRoute: false,   // 침수(level 3): 경로·목적지·길안내 숨김
     sheetOpen: false,
-    tourOn: false,
-    // 대피 길의 높낮이 그래프 (RouteProfile.vue 가 그림). pts: [{ m, g, deck, w }] — 거리(m)·땅·다리 상판·홍수 물 높이
-    profile: { pts: [], L: 1, dest: '', gain: '', note: '', flooded: false, bridge: '' },
-    meU: 0,   // 캐릭터가 경로에서 간 비율 (그래프 위 점)
     todo: [...LV[1].todo],
   }
 }
@@ -397,9 +393,8 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       depthFailAppearance: new Cesium.PolylineMaterialAppearance({ material: m }) }))
     const out3 = line3d(1.5, 16, Cesium.Material.fromType('Color', { color: C('--color-evac-edge', 0.9) }))
     const arr3 = line3d(1.8, 11, mat)
-    const tourSec = Math.max(20, L * 16 / 1000)   // 1.5km → 약 24초
     const sphere = Cesium.BoundingSphere.fromPoints(pts.filter((_, i) => i % 5 === 0).map(p => P3(p[0], p[1])))
-    return { def, L, at, pts, main, mat, tourSec, kmh, sphere, min: Math.max(1, Math.round(L / (kmh * 1000) * 60)), vis: true,
+    return { def, L, at, pts, main, mat, kmh, sphere, min: Math.max(1, Math.round(L / (kmh * 1000) * 60)), vis: true,
       show(v) { this.vis = v; const on = v && !noRoute; outline.show = prim.show = on && !routeOver; out3.show = arr3.show = on && routeOver } }
   }
   let routeOver = false   // 물이 찼으면 true → 대피로를 물 위로 그림
@@ -539,57 +534,14 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       meta: key === 'base' ? `대피소 · ${ROUTES.base.main.name} 경유` : `지형으로 계산한 참고 방향 · 캠핑장보다 약 ${hillGain}m 높음`,
       distNum: short ? String(Math.round(RT.L / 10) * 10) : (RT.L / 1000).toFixed(2), distUnit: short ? 'm' : 'km',
       min: `도보 약 ${RT.min}분`,
-      sum: `${DEST[key]}까지 ${short ? Math.round(RT.L / 10) * 10 + 'm' : (RT.L / 1000).toFixed(2) + 'km'} · 도보 약 ${RT.min}분`,
+      // 카카오맵 걷기 길찾기 (캠핑장 → 대피소). 산 대피는 정해진 길이 없어 연결하지 않는다
+      // 형식: map.kakao.com/link/by/walk/출발이름,위도,경도/도착이름,위도,경도 (2026-11-23 열어서 확인)
+      navUrl: key === 'base' && shelter ? `https://map.kakao.com/link/by/walk/${encodeURIComponent('캠핑장')},${camp[1]},${camp[0]}/${encodeURIComponent(shelterName)},${shelter[1]},${shelter[0]}` : '',
     }
     state.detourBtn = key !== 'detour' && !!ROUTES.base
     meU = 0
-    updateProfile()
   }
 
-  /* ============ 대피 길의 높낮이 그래프 ============ */
-  // "왜 이 길이 안전한가"를 숫자로 보여 주려고 넣음. 땅 높이는 10m DEM(heightAt),
-  // 물 높이는 홍수 범위 가장자리의 땅 높이로 계산 (3D 물 면도 같은 방법으로 그려서 화면과 그래프가 맞음)
-  const FLOOD_FC = [D.flood50, D.flood80, D.flood100]
-  const floodVerts = FLOOD_FC.map(fc => fc.features.flatMap(f => rings(f.geometry).flat()).flatMap(r => r.filter((_, i) => i % 2 === 0))
-    .map(p => [p[0], p[1], heightAt(p[0], p[1])]))
-  // 물 면 높이: 근처(250m) 가장자리 점들의 땅 높이를 거리로 가중 평균. 범위 밖이면 가장 가까운 가장자리 높이
-  function waterAt(p, k) {
-    const vs = floodVerts[k]; if (!vs || !vs.length) return null
-    let sw = 0, sh = 0, near = null, nd = Infinity
-    for (const v of vs) { const d = dist(p, v); if (d < nd) { nd = d; near = v } if (d < 250) { const w = 1 / Math.max(25, d * d); sw += w; sh += w * v[2] } }
-    return sw ? sh / sw : near[2]
-  }
-  const profCache = {}
-  function profileBase(key) {   // 경로마다 한 번만 계산
-    if (profCache[key]) return profCache[key]
-    const R = ROUTES[key], n = Math.max(40, Math.min(160, Math.round(R.L / 10))), main = key === 'base' ? R.main : null
-    const hb2 = main ? [heightAt(...R.at(main.m[0])), heightAt(...R.at(main.m[1]))] : null
-    const s = []
-    for (let i = 0; i <= n; i++) {
-      const m = R.L * i / n, p = R.at(m), g = heightAt(p[0], p[1])
-      const deck = main && m >= main.m[0] && m <= main.m[1] ? hb2[0] + (hb2[1] - hb2[0]) * (m - main.m[0]) / (main.m[1] - main.m[0] || 1) : null
-      s.push({ m, g, deck, p, wet: FLOOD_FC.map(fc => inFC(p, fc)) })
-    }
-    return (profCache[key] = s)
-  }
-  function updateProfile() {
-    const s = profileBase(routeKey), R = RT, k = Math.max(0, curFlood - 1), flooded = curFlood > 0
-    const pts = s.map(q => ({ m: q.m, g: q.g, deck: q.deck, w: q.wet[k] ? waterAt(q.p, k) : null }))
-    const wCamp = waterAt(s[0].p, k), h0 = s[0].g, h1 = s[s.length - 1].g
-    // 물에 잠기는 구간 길이와 가장 깊은 곳
-    let wetLen = 0, deep = 0
-    pts.forEach(q => { if (q.w != null && q.w > q.g) { wetLen += R.L / (pts.length - 1); deep = Math.max(deep, q.w - q.g) } })
-    const bridgeUnder = pts.some(q => q.deck != null && q.w != null && q.w > q.deck)
-    const r5 = v => Math.round(v / 5) * 5, clear = h1 - wCamp
-    // 그래프 아래 설명: 짧은 문장 여러 개로 (괄호·숫자 나열 없이 한 번에 읽히게)
-    let note = wetLen > 5
-      ? `${flooded ? '지금' : '큰 홍수가 나면'} 이 길 중 ${r5(wetLen) || 5}m 정도가 물에 잠겨요. 가장 깊은 곳은 ${Math.round(deep * 10) / 10}m예요.` + (bridgeUnder ? ` ${R.main.name}도 잠겨요.` : '')
-      : '이 길은 홍수가 나도 물에 잠기지 않아요.'
-    if (clear >= 3) note += ` 도착하는 곳은 물보다 ${r5(clear) || Math.round(clear)}m 정도 높아요.`
-    else if (clear > -3) note += ' 도착하는 곳은 물 높이와 거의 같아요.'
-    state.profile = { pts, L: R.L, dest: DEST[routeKey], gain: `${Math.round(h0)}m → ${Math.round(h1)}m`, note, flooded,
-      bridge: routeKey === 'base' && R.main ? R.main.name : '' }
-  }
   function setLevel(lv) {
     level = lv
     state.lv = { ...LV[lv], head: (lv === 1 && !ROUTES.base ? '높은 곳으로 피할 준비를 하세요' : LV[lv].head).replace('{dir}', hDir) }
@@ -598,7 +550,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       noRoute = lv >= 3; state.noRoute = noRoute
       Object.values(ROUTES).forEach(r => r.show(r.vis))
       detourGroup.show = routeKey === 'detour' && !noRoute; baseGroup.show = routeKey === 'base' && !noRoute
-      if (noRoute) { stopTour(false); stopNavWalk(); state.mode = 'overview' }
+      if (noRoute) { stopNavWalk(); state.mode = 'overview' }
     }
     buildRiver(lv)
     syncZone()
@@ -618,11 +570,10 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     setRouteOver(s.flood > 0)
     paintBuildings(s.flood)
     if (s.level !== level || !riverPrims.length) setLevel(s.level)
-    updateProfile()
   }
 
   /* ============ 길안내 ============ */
-  let navWalk = null, tour = null, camHeading = 0
+  let navWalk = null, camHeading = 0
   const NAV_SPEED = 85   // 화면에서 걷는 속도 (m/초, 실제 걸음보다 빠르게 보여 주는 값)
   function stopNavWalk() { if (!navWalk) return; navWalk = null; camera.lookAtTransform(Cesium.Matrix4.IDENTITY) }
   function showStep(i, keepCam) {
@@ -645,18 +596,6 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     navWalk = { phase: 'fly' }; camHeading = headingOf(p, q)
     fly(p, camHeading, -35, 300, () => { if (navWalk) navWalk.phase = 'walk' })
   }
-  function stopTour(home) {
-    if (!tour) return; tour = null; camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
-    state.tourOn = false
-    if (home) { meTarget = 0; goHome() }
-  }
-  function startTour() {
-    if (state.mode === 'nav') return
-    if (reduce) { meTarget = 1; fly(RT.at(RT.L), 0, -40, 500); return }
-    meU = 0; meTarget = 0; tour = { t0: performance.now() }
-    const p = RT.at(0), q = RT.at(60); camHeading = headingOf(p, q)
-    state.tourOn = true; state.sheetOpen = false
-  }
 
   /* ============ 지도 돌리기 ============
      나침반 없이 지도에서 바로 돌림. 일반 지도 앱과 같은 손동작을 기본으로 두고:
@@ -671,8 +610,8 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   cleanups.push(() => viewer.canvas.removeEventListener('contextmenu', noMenu))
   const onKey = e => {
     if (e.target.closest && e.target.closest('input, textarea, select')) return   // 강수량 막대 조작과 겹치지 않게
-    if (e.key === 'ArrowLeft') { stopTour(false); orbit(-0.2); e.preventDefault() }
-    if (e.key === 'ArrowRight') { stopTour(false); orbit(0.2); e.preventDefault() }
+    if (e.key === 'ArrowLeft') { orbit(-0.2); e.preventDefault() }
+    if (e.key === 'ArrowRight') { orbit(0.2); e.preventDefault() }
   }
   window.addEventListener('keydown', onKey)
   cleanups.push(() => window.removeEventListener('keydown', onKey))
@@ -766,7 +705,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   // 기울기 제한: 지평선 쪽으로 너무 눕히면 한 번 끌 때 수백 m씩 튀므로, 화면 가운데 지점을 중심으로 -20°까지만
   const MIN_TILT = Cesium.Math.toRadians(-20)
   cleanups.push(scene.preRender.addEventListener(() => {
-    if (tour || navWalk) return
+    if (navWalk) return
     if (camera.pitch <= MIN_TILT) return
     const ray = camera.getPickRay(new Cesium.Cartesian2(scene.canvas.clientWidth / 2, scene.canvas.clientHeight / 2))
     const t = ray && scene.globe.pick(ray, scene)
@@ -785,14 +724,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     })
     // 물이 천천히 차오르거나 빠짐 + 잔물결
     stepWater3d(dt, now / 1000)
-    if (tour) {
-      const k = Math.min(1, (now - tour.t0) / (RT.tourSec * 1000))
-      meU = meTarget = k
-      const m = k * RT.L, p = RT.at(m), q = RT.at(Math.min(RT.L, m + 60))
-      let d = headingOf(p, q) - camHeading; d = Math.atan2(Math.sin(d), Math.cos(d)); camHeading += d * Math.min(1, dt * 2)
-      camera.lookAt(P3(p[0], p[1], 2), new Cesium.HeadingPitchRange(camHeading, Cesium.Math.toRadians(-24), 230))
-      if (k >= 1) { stopTour(false); fly(RT.at(RT.L), camHeading, -35, 420) }
-    } else if (navWalk) {
+    if (navWalk) {
       // 길안내: 일정한 속도로 걸어가고, 카메라는 뒤에서 부드럽게 따라감
       if (navWalk.phase === 'walk') {
         const stepLen = NAV_SPEED * dt / RT.L, d = meTarget - meU
@@ -806,7 +738,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       meU += (meTarget - meU) * (reduce ? 1 : Math.min(1, dt * 1.6))
     }
     const mp = RT.at(meU * RT.L)
-    moving = !!tour || (navWalk ? navWalk.phase === 'walk' : Math.abs(meTarget - meU) * RT.L > 2)
+    moving = (navWalk ? navWalk.phase === 'walk' : Math.abs(meTarget - meU) * RT.L > 2)
     mePos = P3(mp[0], mp[1], 0.5)
     meTag.p = mePos
     // 화면에서 오른쪽으로 가면 좌우 반전된 그림 (얼굴이 가는 쪽을 보게)
@@ -815,24 +747,59 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       const a = scene.cartesianToCanvasCoordinates(P3(ahead[0], ahead[1])), b = scene.cartesianToCanvasCoordinates(P3(back[0], back[1]))
       if (a && b && Math.abs(a.x - b.x) > 1.5) faceRight = a.x > b.x
     }
-    // 높이 그래프의 지금 위치 점 (조금이라도 움직였을 때만 화면에 알림)
-    if (Math.abs(state.meU - meU) > 0.002) state.meU = meU
   }))
   cleanups.push(scene.postRender.addEventListener(placeTags))
 
-  // 지도를 만지면: 시트를 접고(지도가 가려지지 않게), 따라가기·길안내 걷기를 멈춤
+  // 지도를 만지면: 시트를 접고(지도가 가려지지 않게), 길안내 걷기를 멈춤
   const onCanvasDown = () => {
     state.sheetOpen = false
-    stopTour(false)
     if (navWalk) { camera.cancelFlight(); stopNavWalk() }
   }
   viewer.canvas.addEventListener('pointerdown', onCanvasDown)
+
+  /* ============ 비 효과 (화면 위 얇은 빗줄기) ============ */
+  // 막대(3시간 강수량)에 따라 빗줄기 수만 달라지게, 지도가 가려지지 않도록 옅게 그린다
+  // 5mm 미만은 없음 → 60mm 쯤 눈에 띄게 → 최대(160mm)에서 줄기 170개 정도. 움직임 줄이기 설정이면 그리지 않는다
+  // 2026-11-23 처음 값(최대 90개·투명도 0.22)이 너무 옅다고 해서 진하게 함
+  const rainFx = (() => {
+    const cv = document.createElement('canvas')
+    cv.setAttribute('aria-hidden', 'true')
+    cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none'
+    container.appendChild(cv)
+    const g = cv.getContext('2d'), color = token('--color-dm-text')
+    let drops = [], want = 0, raf = 0, last = 0
+    const fit = () => { const r = devicePixelRatio || 1; cv.width = cv.clientWidth * r; cv.height = cv.clientHeight * r; g.setTransform(r, 0, 0, r, 0, 0) }
+    const drop = (top) => ({ x: Math.random() * (cv.clientWidth + 60), y: top ? -20 : Math.random() * cv.clientHeight, v: 380 + Math.random() * 220, l: 14 + Math.random() * 12 })
+    function frame(t) {
+      const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t
+      const w = cv.clientWidth, h = cv.clientHeight
+      g.clearRect(0, 0, w, h)
+      while (drops.length < want) drops.push(drop(false))
+      if (drops.length > want) drops.length = want
+      g.strokeStyle = color; g.lineWidth = 1.3; g.globalAlpha = 0.38; g.beginPath()
+      for (const d of drops) {
+        d.y += d.v * dt; d.x -= d.v * dt * 0.18   // 살짝 비스듬히
+        if (d.y > h + 20) Object.assign(d, drop(true))
+        g.moveTo(d.x, d.y); g.lineTo(d.x + d.l * 0.18, d.y - d.l)
+      }
+      g.stroke()
+      raf = want ? requestAnimationFrame(frame) : 0
+      if (!want) g.clearRect(0, 0, w, h)
+    }
+    const ro = new ResizeObserver(fit); ro.observe(cv); fit()
+    cleanups.push(() => { cancelAnimationFrame(raf); ro.disconnect(); cv.remove() })
+    return mm => {
+      want = reduce || mm < 5 ? 0 : Math.round(30 + 140 * Math.min(1, (mm - 5) / (MAXR - 5)))
+      if (want && !raf) { last = 0; raf = requestAnimationFrame(frame) }
+    }
+  })()
 
   /* ============ 시작 ============ */
   setRoute(routeKey)
   buildRiver(1)
   // 처음에는 미리 보기 60mm(준비)로 보여 주고, 화면(DisasterMapView)이 서버 실황을 받으면 setLive 로 바꾼다
   applyStage(stageFromTable(state.rain))
+  rainFx(state.rain)
   {
     const other = shelter || hEnd, cx = (camp[0] + other[0]) / 2, cy = (camp[1] + other[1]) / 2
     camera.setView({ destination: Cesium.Cartesian3.fromDegrees(cx, cy - 0.03, 4000), orientation: { heading: 0, pitch: Cesium.Math.toRadians(-45) } })
@@ -853,22 +820,21 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   /* ============ 화면(Vue)이 부르는 동작 ============ */
   return {
     // 미리 보기: 막대 값(3시간 강수량)으로 단계를 정한다
-    setRain(mm) { state.rain = mm; state.live.on = false; applyStage(stageFromTable(mm)) },
+    setRain(mm) { state.rain = mm; state.live.on = false; applyStage(stageFromTable(mm)); rainFx(mm) },
     // 실시간: 단계는 서버가 3·12·24시간 기준으로 정한 level 을 그대로 쓰고, 슬라이더에는 3시간 비만 보여 준다
     setLive(level, mm) {
       const k = ST.findIndex(s => s.level === level)
       if (k < 0) return
       state.rain = Math.min(Math.round(mm), MAXR); state.live.on = true
-      applyStage(k)
+      applyStage(k); rainFx(state.rain)
     },
     selectRoute(key) { if (key === 'base' && state.baseDisabled) return; setRoute(key); meTarget = 0; goHome() },
     where() { state.sheetOpen = false; fly(routeKey === 'base' ? shelter : hEnd, camera.heading, -35, 520) },
-    startNav() { stopTour(false); meU = meTarget = 0; state.mode = 'nav'; state.sheetOpen = true; showStep(0) },
+    startNav() { meU = meTarget = 0; state.mode = 'nav'; state.sheetOpen = true; showStep(0) },
     prev() { showStep(step - 1) },
     next() { if (step === STEPS[routeKey].length - 1) this.endNav(); else showStep(step + 1) },
     endNav() { stopNavWalk(); state.mode = 'overview'; meTarget = 0; state.detourBtn = routeKey !== 'detour' && !!ROUTES.base; goHome() },
     detour() { setRoute('detour'); meU = 0; showStep(0) },
-    toggleTour() { if (tour) stopTour(true); else startTour() },
     destroy() {
       if (destroyed) return; destroyed = true
       cleanups.forEach(fn => fn())
