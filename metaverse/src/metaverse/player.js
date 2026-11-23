@@ -6,6 +6,8 @@ import { pointInRing, hitsCollider } from './geo.js'
 const WALK_SPEED = 6   // 걷는 속도 (m/초)
 const RUN_SPEED = 10   // Shift 누르고 달리는 속도
 const TURN_SPEED = 10  // 몸을 돌리는 빠르기
+const JUMP_SPEED = 6   // 스페이스바를 눌렀을 때 위로 뛰어오르는 빠르기 (m/초). 키우면 더 높이 뛰어요
+const GRAVITY = 18     // 아래로 끌어당기는 힘. 키우면 더 빨리 떨어져요 (지금 값이면 약 1m 높이로 뛰어요)
 const PLAYER_RADIUS = 0.5 // 캐릭터 몸 반지름(m). 부딪힘 계산에 써요
 const TURTLE_SCALE = 0.8 // 거북이 크기 (1 = 약 1.8m, 0.8 = 약 1.45m)
 
@@ -21,9 +23,6 @@ const CHARACTER_IMAGE = '' // 예: '/models/character.png'
 // 시작 위치 고르기
 const START_CLEAR = 1.5 // 건물·나무·텐트에서 이만큼(m) 떨어진 곳에서 시작해요
 const START_FAR = 8     // 퀴즈 지점에서 이만큼(m) 떨어진 곳에서 시작해요 (시작하자마자 퀴즈가 열리지 않게)
-
-// 클릭 이동: 바닥에서 이 높이(m)보다 높은 곳(지붕·나무·텐트)을 누르면 무시해요
-const CLICK_MAX_HEIGHT = 0.8
 
 // 캐릭터가 시작할 빈자리를 찾아요.
 // 기준점(QGIS facilities의 type: start 점, 없으면 캠핑장 가운데)에서 시작해서
@@ -158,7 +157,7 @@ function loadCharacterImage(holder, url) {
 
 // ---------- 플레이어 ----------
 // camp: buildCampsite가 돌려준 값 (ring: 캠핑장 테두리, center: 가운데)
-export function createPlayer({ scene, camera, controls, terrain, camp, domElement }) {
+export function createPlayer({ scene, camera, controls, terrain, camp }) {
   const turtle = makeTurtle()
   if (CHARACTER_URL) loadCharacterFile(turtle, CHARACTER_URL)
   else if (CHARACTER_IMAGE) loadCharacterImage(turtle, CHARACTER_IMAGE)
@@ -169,7 +168,8 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
   controls.enablePan = false // 화면 끌기로 카메라가 캐릭터에서 벗어나지 않게
   controls.minPolarAngle = 0.2 // 카메라가 캐릭터 바로 위(수직)까지는 못 올라가게
 
-  let goal = null // 클릭해서 걸어갈 목표 지점
+  let jumpY = 0   // 점프로 땅에서 떠 있는 높이 (m). 0이면 땅에 서 있어요
+  let jumpV = 0   // 지금 위아래로 움직이는 빠르기 (위쪽이 +)
 
   // 캐릭터를 시작 위치에 세우고 카메라를 뒤 위쪽에 둬요. 처음과 "다시 하기" 때 불러요
   // avoid: 피할 지점들 (퀴즈 위치)
@@ -177,7 +177,8 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
     const [sx, sz] = findStart(camp, avoid)
     turtle.position.set(sx, terrain.heightAt(sx, sz), sz)
     turtle.rotation.y = 0
-    goal = null
+    jumpY = 0
+    jumpV = 0
     clearKeys()
     controls.target.copy(turtle.position).add(new THREE.Vector3(0, 1, 0))
     camera.position.copy(controls.target).add(new THREE.Vector3(0, 10, -18))
@@ -185,7 +186,14 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
 
   // ----- 키보드 -----
   const keys = {}
-  const onKeyDown = (e) => { keys[e.code] = true }
+  const onKeyDown = (e) => {
+    keys[e.code] = true
+    // 스페이스바: 땅에 서 있을 때만 뛰어요 (공중에서 또 뛰지 못해요)
+    if (e.code === 'Space' && api.enabled) {
+      e.preventDefault() // 스페이스바로 화면이 내려가거나 버튼이 눌리는 것을 막아요
+      if (jumpY === 0) jumpV = JUMP_SPEED
+    }
+  }
   const onKeyUp = (e) => { keys[e.code] = false }
   // 키를 누른 채 다른 창·탭으로 가면 "키를 뗐다"는 신호를 못 받아요.
   // 그러면 계속 걸어가니까, 창을 벗어날 때 눌린 키를 모두 지워요
@@ -197,38 +205,24 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
   window.addEventListener('blur', clearKeys)
   document.addEventListener('visibilitychange', clearKeys)
 
-  // ----- 클릭/터치한 곳으로 걷기 -----
-  const raycaster = new THREE.Raycaster()
-  const pointer = new THREE.Vector2()
-  let downAt = null
-  const onPointerDown = (e) => { downAt = { x: e.clientX, y: e.clientY } }
-  const onPointerUp = (e) => {
-    if (!downAt) return
-    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y)
-    downAt = null
-    if (moved > 6) return // 끌었으면 카메라 돌리기였던 거예요
-    const rect = domElement.getBoundingClientRect()
-    pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-    pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-    raycaster.setFromCamera(pointer, camera)
-    const hit = raycaster.intersectObjects([terrain.mesh, camp.group], true)[0]
-    if (!hit) return
-    const { x, z } = hit.point
-    // 바닥을 눌렀을 때만 걸어가요. 지붕·나무·텐트를 누르면 그 안으로 가려다 벽에 막히니까 무시해요
-    if (hit.point.y - terrain.heightAt(x, z) > CLICK_MAX_HEIGHT) return
-    if (!pointInRing(x, z, camp.ring) || hitsCollider(x, z, camp.colliders || [], PLAYER_RADIUS)) return
-    goal = hit.point.clone()
-  }
-  domElement.addEventListener('pointerdown', onPointerDown)
-  domElement.addEventListener('pointerup', onPointerUp)
-
   // ----- 매 프레임 -----
   const forward = new THREE.Vector3()
   const right = new THREE.Vector3()
   const move = new THREE.Vector3()
   let walkTime = 0
 
-  const api = { object: turtle, update, reset, dispose, enabled: true }
+  // 캐릭터를 정해 준 자리(x, z)로 바로 옮겨요. 카메라도 같이 따라가요 (침수 미션 "다시 대피하기"에서 써요)
+  function moveTo(x, z) {
+    const old = turtle.position.clone()
+    jumpY = 0
+    jumpV = 0
+    turtle.position.set(x, terrain.heightAt(x, z), z)
+    const delta = turtle.position.clone().sub(old)
+    camera.position.add(delta)
+    controls.target.add(delta)
+  }
+
+  const api = { object: turtle, update, reset, moveTo, dispose, enabled: true }
 
   function update(dt) {
     dt = Math.min(dt, 0.05) // 탭을 다녀오면 dt가 커지는 것 방지
@@ -236,9 +230,12 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
     // 퀴즈 중이거나 게임 시작 전에는 못 움직여요
     if (!api.enabled) {
       clearKeys()
-      goal = null
       for (const { joint } of turtle.userData.limbs || []) joint.rotation.x = 0
       if (turtle.userData.body) turtle.userData.body.position.y = 0
+      // 뛰는 중에 퀴즈가 열리면 공중에 멈춰 있지 않게 바로 땅에 내려놔요
+      jumpY = 0
+      jumpV = 0
+      turtle.position.y = terrain.heightAt(turtle.position.x, turtle.position.z)
       return
     }
 
@@ -254,21 +251,12 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
     if (keys.KeyD || keys.ArrowRight) move.add(right)
     if (keys.KeyA || keys.ArrowLeft) move.sub(right)
 
-    if (move.lengthSq() > 0) {
-      goal = null // 키보드를 누르면 클릭 목표는 취소
-    } else if (goal) {
-      move.set(goal.x - turtle.position.x, 0, goal.z - turtle.position.z)
-      if (move.length() < 0.5) {
-        goal = null
-        move.set(0, 0, 0)
-      }
-    }
-
     const moving = move.lengthSq() > 0
     if (moving) {
       move.normalize()
       const speed = keys.ShiftLeft || keys.ShiftRight ? RUN_SPEED : WALK_SPEED
       const old = turtle.position.clone()
+      old.y -= jumpY // 점프 높이는 빼고 계산해요 (카메라가 점프를 따라 위아래로 흔들리지 않게)
       let nx = old.x + move.x * speed * dt
       let nz = old.z + move.z * speed * dt
 
@@ -282,7 +270,7 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
       if (!canGo(nx, nz)) {
         if (canGo(nx, old.z)) nz = old.z
         else if (canGo(old.x, nz)) nx = old.x
-        else { nx = old.x; nz = old.z; goal = null }
+        else { nx = old.x; nz = old.z }
       }
 
       turtle.position.set(nx, terrain.heightAt(nx, nz), nz)
@@ -301,6 +289,18 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
       walkTime += dt * speed
     }
 
+    // 점프: 위로 뛰어올랐다가 중력으로 내려와요. 땅에 닿으면 멈춰요.
+    // 모양만 뛰는 것이라 건물이나 텐트를 뛰어넘지는 못해요 (부딪힘 계산은 그대로예요)
+    if (jumpV !== 0 || jumpY > 0) {
+      jumpV -= GRAVITY * dt
+      jumpY += jumpV * dt
+      if (jumpY <= 0) {
+        jumpY = 0
+        jumpV = 0
+      }
+    }
+    turtle.position.y = terrain.heightAt(turtle.position.x, turtle.position.z) + jumpY
+
     // 2D 이미지 캐릭터는 걸을 때 통통 튀게
     const sprite = turtle.userData.sprite
     if (sprite) sprite.position.y = CHARACTER_HEIGHT / 2 + (moving ? Math.abs(Math.sin(walkTime * 2)) * 0.15 : 0)
@@ -318,8 +318,6 @@ export function createPlayer({ scene, camera, controls, terrain, camp, domElemen
     window.removeEventListener('keyup', onKeyUp)
     window.removeEventListener('blur', clearKeys)
     document.removeEventListener('visibilitychange', clearKeys)
-    domElement.removeEventListener('pointerdown', onPointerDown)
-    domElement.removeEventListener('pointerup', onPointerUp)
   }
 
   reset()

@@ -3,31 +3,37 @@
     <!-- 3D 화면 -->
     <div ref="container" class="metaverse"></div>
 
-    <!-- 위쪽 정보줄: 시간, 점수, 찾은 개수 -->
+    <!-- 위쪽 정보줄: 지금 낮·밤, 푼 문제 수, 나가기 (점수는 없앴어요) -->
     <div v-if="phase === 'play'" class="hud">
-      <span :class="{ hurry: timeLeft <= 30 }">⏱ {{ timeText }}</span>
-      <span>⭐ {{ score }}점</span>
-      <span>✅ {{ doneCount }} / {{ total }}</span>
+      <span>{{ timeOfDay === 'night' ? '🌙 밤' : '☀️ 낮' }}</span>
+      <span>✅ {{ doneCount }}문제</span>
+      <button class="exit" @click="finish">나가기</button>
     </div>
-    <div v-if="phase === 'play' && !quiz" class="help">
-      WASD·방향키 이동 · Shift 달리기 · 땅을 클릭해도 걸어가요 · 머리 위 <b>빨간 화살표</b>를 따라가요
+    <div v-if="phase === 'play' && !quiz && !flood" class="help">
+      WASD·방향키 이동 · Shift 달리기 · Space 점프 · 머리 위 <b>빨간 화살표</b>를 따라가요
+    </div>
+
+    <!-- 돌발 미션: 비가 와서 물이 차오르는 동안 보이는 알림 -->
+    <div v-if="phase === 'play' && flood === 'run'" class="alert">
+      🌧️ 비가 많이 와요! 물이 차오르기 전에 <b>초록 화살표</b>를 따라 <b>출구</b>로 대피해요 (Shift 달리기)
     </div>
 
     <!-- 시작 화면 -->
     <div v-if="phase === 'loading' || phase === 'ready'" class="dim">
       <div class="panel">
         <h1>⛺ 캠핑장 안전 탐험</h1>
-        <p>인북천 물빛테마공원 캠핑장 곳곳에 <b>위험 상황 {{ total || 4 }}곳</b>이 숨어 있어요.</p>
+        <p>인북천 물빛테마공원 캠핑장에 <b>위험 상황</b>이 하나씩 나타나요.</p>
         <ul>
-          <li>머리 위 <b>빨간 화살표</b>가 가장 가까운 위험 지점을 가리켜요.</li>
-          <li>노란 고리 안으로 들어가면 퀴즈가 열려요.</li>
-          <li>한 번에 맞히면 <b>25점</b>, 다시 풀어서 맞히면 <b>15점</b>이에요.</li>
-          <li>제한 시간은 <b>5분</b>! 퀴즈를 푸는 동안에는 시간이 멈춰요.</li>
+          <li>머리 위 <b>빨간 화살표</b>가 위험 지점을 가리켜요.</li>
+          <li>노란 고리 안으로 들어가면 퀴즈가 열려요. 풀면 다음 문제가 다른 곳에 나타나요.</li>
+          <li>낮과 밤이 <b>2분마다</b> 바뀌어요. 낮에는 낮 문제, 밤에는 밤 문제가 나와요.</li>
+          <li>갑자기 <b>비</b>가 오면 물이 차오르기 전에 <b>출구</b>로 대피해요.</li>
+          <li>제한 시간은 없어요. 그만하고 싶을 때 <b>나가기</b>를 눌러요.</li>
         </ul>
-        <!-- 낮·밤 고르기: 누르면 뒤에 보이는 캠핑장이 바로 바뀌어요 -->
-        <div class="time-pick">
-          <button :class="{ on: timeOfDay === 'day' }" @click="pickTime('day')">☀️ 낮</button>
-          <button :class="{ on: timeOfDay === 'night' }" @click="pickTime('night')">🌙 밤</button>
+        <!-- 아이·어른 고르기: 고른 쪽에 맞는 문제가 나와요 -->
+        <div class="who-pick">
+          <button :class="{ on: audience === 'child' }" @click="pickAudience('child')">🧒 아이</button>
+          <button :class="{ on: audience === 'adult' }" @click="pickAudience('adult')">🧑 어른</button>
         </div>
         <button class="main" :disabled="phase === 'loading'" @click="start">
           {{ phase === 'loading' ? '캠핑장 불러오는 중…' : '탐험 시작!' }}
@@ -62,7 +68,7 @@
 
         <div v-if="answered" class="feedback" :class="correct ? 'ok' : 'no'">
           <template v-if="correct">
-            <b>정답이에요! +{{ gained }}점</b>
+            <b>정답이에요!</b>
             <p>{{ quiz.explain }}</p>
             <button class="main" @click="closeQuiz">계속 탐험하기</button>
           </template>
@@ -74,38 +80,56 @@
       </div>
     </div>
 
+    <!-- 돌발 미션 결과: 대피 성공 / 물에 잠김 -->
+    <div v-if="phase === 'play' && (flood === 'safe' || flood === 'drowned')" class="dim">
+      <div class="panel">
+        <template v-if="flood === 'safe'">
+          <h1>🎉 대피 성공!</h1>
+          <p class="situation">
+            비가 많이 오면 강물은 아주 빨리 불어나요. 짐을 챙기지 말고 바로 출구나 높은 곳으로 피해요.
+            우리 캠핑장의 출구가 어디인지 도착했을 때 미리 봐 두면 좋아요.
+          </p>
+          <button class="main" @click="floodContinue">계속 탐험하기</button>
+        </template>
+        <template v-else>
+          <h1>🌊 물에 잠겼어요</h1>
+          <p class="situation">
+            물이 차오르기 시작하면 걸어서는 늦을 수 있어요. 비가 오면 바로 출구 쪽으로 달려요.
+            얕아 보여도 물살에 넘어질 수 있어서 물속을 걸어가면 안 돼요.
+          </p>
+          <button class="main" @click="floodRetry">다시 대피하기</button>
+        </template>
+      </div>
+    </div>
+
     <!-- 결과 화면 -->
     <div v-if="phase === 'end'" class="dim">
       <div class="panel">
-        <h1>{{ resultTitle }}</h1>
-        <p class="big">{{ score }}점</p>
-        <p>위험 상황 {{ total }}곳 중 <b>{{ doneCount }}곳</b>을 해결했어요.</p>
-        <p v-if="timeLeft > 0">남은 시간 {{ timeText }}</p>
-        <p v-else>시간이 다 됐어요.</p>
-        <button class="main" @click="restart">다시 하기 (새 문제)</button>
+        <h1>👏 탐험을 마쳤어요</h1>
+        <p class="big">{{ doneCount }}문제</p>
+        <p>위험 상황을 이만큼 해결했어요.</p>
+        <button class="main" @click="restart">처음으로</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { createScene } from '../metaverse/scene.js'
-
-const TIME_LIMIT = 300 // 제한 시간(초)
 
 const container = ref(null)
 const phase = ref('loading') // loading → ready → play → end (불러오기 실패는 error)
-const total = ref(0)
-const score = ref(0)
-const doneCount = ref(0)
-const timeLeft = ref(TIME_LIMIT)
-const timeOfDay = ref('day') // 'day' 낮, 'night' 밤
+const doneCount = ref(0)     // 푼 문제 수
+const timeOfDay = ref('day') // 'day' 낮, 'night' 밤. 게임이 2분마다 바꿔서 알려줘요
+const audience = ref('child') // 'child' 아이, 'adult' 어른
+// 돌발 미션 상태: '' 없음 / 'run' 대피 중 / 'safe' 대피 성공 / 'drowned' 물에 잠김
+const flood = ref('')
 
-// 낮·밤 고르기 ("다시 하기"를 해도 고른 것이 그대로 남아요)
-function pickTime(mode) {
-  timeOfDay.value = mode
-  game?.setTime(mode)
+// 아이·어른 고르기 ("처음으로"를 해도 고른 것이 그대로 남아요)
+function pickAudience(who) {
+  audience.value = who
+  game?.setAudience(who)
 }
 
 // 퀴즈 상태
@@ -114,16 +138,23 @@ const answered = ref(false) // 답을 골랐는지
 const correct = ref(false)  // 맞혔는지
 const picked = ref(-1)      // 고른 번호
 const wrongs = ref([])      // 틀린 번호들 (다시 풀 때 못 고르게)
-const gained = ref(0)       // 이번 문제로 얻은 점수
 
 let game = null
-let timer = null
 
 function mountGame() {
   game = createScene(container.value, {
-    onReady: ({ total: n }) => {
-      total.value = n
+    onReady: () => {
+      game.setAudience(audience.value) // 불러오는 동안 고른 대상(아이/어른)을 맞춰요
       phase.value = 'ready'
+    },
+    onTime: (mode) => {
+      timeOfDay.value = mode
+    },
+    // 침수 미션: 'start' 비 시작 / 'safe' 출구 도착 / 'drowned' 물에 잠김 / 'end' 끝
+    onFlood: (state) => {
+      if (state === 'start') flood.value = 'run'
+      else if (state === 'end') flood.value = ''
+      else flood.value = state
     },
     onMission: (m) => {
       quiz.value = m
@@ -139,34 +170,20 @@ function mountGame() {
 
 onMounted(mountGame)
 onUnmounted(() => {
-  clearInterval(timer)
   if (game) game.dispose()
 })
 
 function start() {
-  score.value = 0
   doneCount.value = 0
-  timeLeft.value = TIME_LIMIT
   phase.value = 'play'
   game.start()
-  clearInterval(timer)
-  timer = setInterval(() => {
-    if (quiz.value) return // 퀴즈 중에는 시간이 멈춰요
-    timeLeft.value--
-    if (timeLeft.value <= 0) finish()
-  }, 1000)
 }
 
 function answer(i) {
   picked.value = i
   answered.value = true
   correct.value = i === quiz.value.answer
-  if (correct.value) {
-    gained.value = wrongs.value.length ? 15 : 25
-    score.value += gained.value
-  } else {
-    wrongs.value.push(i)
-  }
+  if (!correct.value) wrongs.value.push(i)
 }
 
 function retry() {
@@ -174,23 +191,33 @@ function retry() {
   picked.value = -1
 }
 
+// 문제를 맞히고 "계속 탐험하기"를 눌렀을 때: 다음 문제가 다른 곳에 나타나요
 function closeQuiz() {
   game.completeMission(quiz.value.id)
   quiz.value = null
   doneCount.value++
-  if (doneCount.value >= total.value) finish()
 }
 
+// 대피 성공 뒤 계속 탐험하기 / 물에 잠긴 뒤 다시 대피하기
+function floodContinue() {
+  flood.value = ''
+  game.floodContinue()
+}
+function floodRetry() {
+  game.floodRetry()
+}
+
+// 나가기: 제한 시간이 없어서, 그만하고 싶을 때 직접 눌러서 끝내요
 function finish() {
-  clearInterval(timer)
   quiz.value = null
+  flood.value = ''
   phase.value = 'end'
   game.stop()
 }
 
-// 다시 하기: 3D 화면은 그대로 두고, 새 문제와 캐릭터 위치만 새로 준비해요
+// 처음으로: 3D 화면은 그대로 두고, 새 문제와 캐릭터 위치만 새로 준비해요
 function restart() {
-  total.value = game.restart()
+  game.restart()
   phase.value = 'ready'
 }
 
@@ -199,17 +226,6 @@ function choiceClass(i) {
   if (wrongs.value.includes(i)) return 'wrong'
   return ''
 }
-
-const timeText = computed(() => {
-  const t = Math.max(0, timeLeft.value)
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
-})
-
-const resultTitle = computed(() => {
-  if (score.value >= 100) return '🏅 캠핑 안전 박사!'
-  if (score.value >= 70) return '👍 든든한 안전 지킴이'
-  return '🌱 조금만 더 연습해요'
-})
 </script>
 
 <style scoped>
@@ -222,10 +238,21 @@ const resultTitle = computed(() => {
   background: rgba(20, 40, 30, 0.8); color: #fff; border-radius: 999px;
   font-size: 18px; font-weight: 700;
 }
-.hud .hurry { color: #ff8a65; }
+.hud { align-items: center; }
+.hud .exit {
+  padding: 4px 14px; border: 0; border-radius: 999px;
+  background: #fff; color: #1f4d2b; font-size: 15px; font-weight: 700; cursor: pointer;
+}
 .help {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
   padding: 8px 16px; background: rgba(255, 255, 255, 0.85); border-radius: 10px; font-size: 14px;
+}
+
+.alert {
+  position: absolute; top: 66px; left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 92vw; padding: 10px 18px;
+  background: rgba(190, 40, 40, 0.92); color: #fff; border-radius: 12px;
+  font-size: 16px; font-weight: 700; text-align: center;
 }
 
 .dim {
@@ -241,12 +268,12 @@ const resultTitle = computed(() => {
 .panel ul { padding-left: 20px; line-height: 1.7; }
 .big { font-size: 44px; font-weight: 800; margin: 6px 0; color: #2f7d4f; }
 
-.time-pick { display: flex; gap: 10px; margin-top: 12px; }
-.time-pick button {
+.who-pick { display: flex; gap: 10px; margin-top: 12px; }
+.who-pick button {
   flex: 1; padding: 10px; border: 2px solid #d9e2d4; border-radius: 12px;
   background: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
 }
-.time-pick button.on { border-color: #2f7d4f; background: #e3f4e8; }
+.who-pick button.on { border-color: #2f7d4f; background: #e3f4e8; }
 
 button.main {
   display: block; width: 100%; margin-top: 14px; padding: 12px;

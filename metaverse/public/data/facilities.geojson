@@ -14,6 +14,7 @@
 { "type": "Feature", "properties": { "fid": 9, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061773.2, 2025274.3 ] } },
 { "type": "Feature", "properties": { "fid": 10, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061788.0, 2025277.8 ] } },
 { "type": "Feature", "properties": { "fid": 11, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061801.2, 2025280.9 ] } },
-{ "type": "Feature", "properties": { "fid": 12, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061815.1, 2025284.1 ] } }
+{ "type": "Feature", "properties": { "fid": 12, "name": null, "type": "lamp" }, "geometry": { "type": "Point", "coordinates": [ 1061815.1, 2025284.1 ] } },
+{ "type": "Feature", "properties": { "fid": 13, "name": null, "type": "exit" }, "geometry": { "type": "Point", "coordinates": [ 1061809.6, 2025089.3 ] } }
 ]
 }
