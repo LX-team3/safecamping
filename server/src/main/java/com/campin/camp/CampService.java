@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.campin.common.DriveTone;
 import com.campin.common.InvalidRequestException;
 import com.campin.place.PlaceMapper;
+import com.campin.score.ScoreRules;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,7 +23,7 @@ public class CampService {
     static final int CAUTION_MIN = 40; // 40~69: 주의, 40 미만: 위험
 
     private static final Set<String> CAMP_TYPES = Set.of("auto", "glamping", "backpacking");
-    private static final Set<String> SORTS = Set.of("score", "er");
+    private static final Set<String> SORTS = Set.of("score", "er", "bonus");
     private static final int MAX_LIMIT = 20;
 
     private final CampMapper campMapper;
@@ -64,7 +65,7 @@ public class CampService {
         return new CampDetailResponse(c.getId(), c.getName(), c.getSido(), c.getSigungu(), c.getEupmyeon(),
                 c.getCampType(), c.getLat(), c.getLng(), c.getSafetyScore(), grade, headlineOf(grade),
                 c.getImageUrl(), c.getReservationUrl(), c.isDummy(), facilities,
-                placeMapper.findInfos(PlaceMapper.CAMP, id));
+                placeMapper.findInfos(PlaceMapper.CAMP, id), ScoreRules.erBonus(c.getErDriveMin()));
     }
 
     // 관광지 탭: 내 취향(prefer: 여행 취향 선택지 code)과 맞는 곳이 앞, 그다음 인기순
@@ -119,19 +120,32 @@ public class CampService {
         String s = blankToNull(sort);
         if (s == null) return "score";
         if (!SORTS.contains(s)) {
-            throw new InvalidRequestException("정렬은 score 또는 er 만 됩니다.");
+            throw new InvalidRequestException("정렬은 score · er · bonus 만 됩니다.");
         }
         return s;
     }
 
     // score: 안전점수 높은 순 (같으면 응급실 가까운 순) / er: 응급실 가까운 순 (같으면 점수 높은 순)
+    // bonus: 안전점수 + 진단 유형 가산점(ScoreRules.erBonus) 높은 순 — 지도 "내 유형 기준" 을 켰을 때 (같으면 응급실 가까운 순)
     // 값이 없는(null) 캠핑장은 맨 뒤로
     private Comparator<Camp> comparatorOf(String sort) {
         Comparator<Camp> byScore = Comparator.comparing(Camp::getSafetyScore,
                 Comparator.nullsLast(Comparator.reverseOrder()));
         Comparator<Camp> byEr = Comparator.comparing(Camp::getErDriveMin,
                 Comparator.nullsLast(Comparator.naturalOrder()));
-        return sort.equals("er") ? byEr.thenComparing(byScore) : byScore.thenComparing(byEr);
+        Comparator<Camp> byBonus = Comparator.comparing(CampService::withBonus,
+                Comparator.nullsLast(Comparator.reverseOrder()));
+        return switch (sort) {
+            case "er" -> byEr.thenComparing(byScore);
+            case "bonus" -> byBonus.thenComparing(byEr);
+            default -> byScore.thenComparing(byEr);
+        };
+    }
+
+    // 안전점수 + 가산점 (100점 상한). 점수가 없으면 null → 맨 뒤
+    static Integer withBonus(Camp c) {
+        if (c.getSafetyScore() == null) return null;
+        return Math.min(100, c.getSafetyScore() + ScoreRules.erBonus(c.getErDriveMin()));
     }
 
     private static String blankToNull(String s) {

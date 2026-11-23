@@ -12,6 +12,10 @@ import { api } from '@/utils/api'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import MobileReviewSheet from '@/components/mobile/MobileReviewSheet.vue'
+import { METAVERSE_PATH } from '@/utils/webLinks'
+
+// 재난 대피 3D 지도 앱 주소 (router/mobileRoutes.js 의 /disaster 에 /app 이 붙는다). 웹은 /web/disaster
+const DISASTER_PATH = '/app/disaster'
 
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
@@ -30,7 +34,32 @@ async function load() {
   // 끝나지 않은 일정마다 출발 준비 요약(특보·안전점수)을 받는다. 못 받아도 카드는 그대로 (줄에 글자만 빠짐)
   myCamping.plans.filter((p) => p.checkOut >= todayIso()).forEach((p) => myCamping.loadChecklist(p.id).catch(() => {}))
   loadReviews()
+  loadFamilyPlans()
 }
+
+// ---- 가족 캠핑: 같은 가족방 사람이 등록한 캠핑 (GET /api/family/camp-plans, 보기만) ----
+// 가족방이 없으면 서버가 빈 목록을 준다 → 묶음 자체가 안 보인다. 못 받아도 내 캠핑은 그대로
+const familyPlans = ref([])
+const familyError = ref('')
+async function loadFamilyPlans() {
+  familyError.value = ''
+  try {
+    familyPlans.value = await api('/api/family/camp-plans')
+  } catch (e) {
+    familyError.value = `모임방 캠핑을 불러오지 못했어요. ${e.message}`
+  }
+}
+// 지난 캠핑은 빼고 다가오는·진행 중인 것만 (D-day 표시는 내 카드와 같은 규칙)
+const familyCards = computed(() => {
+  const today = todayIso()
+  return familyPlans.value
+    .filter((p) => p.checkOut >= today)
+    .map((p) => ({
+      ...p,
+      badge: p.checkIn <= today ? '캠핑 중' : `D-${nightsBetween(today, p.checkIn)}`,
+      range: `${labelWithDay(p.checkIn)} – ${labelWithDay(p.checkOut)} · ${nightsBetween(p.checkIn, p.checkOut)}박`,
+    }))
+})
 onMounted(load)
 
 // ---- 지난 캠핑 후기 ----
@@ -190,6 +219,11 @@ async function remove(p) {
             <RouterLink v-if="!p.past && p.campId != null" :to="`/app/booking-check?camp=${p.campId}&plan=${p.id}`" class="check-link">
               예약 정보 확인 ›
             </RouterLink>
+            <!-- 웹 내 예약 카드와 같은 바로가기: 메타버스 안전 탐험 · 3D 재난 대피 지도 (지난 캠핑에는 없음) -->
+            <div v-if="!p.past" class="tools">
+              <RouterLink :to="METAVERSE_PATH" class="tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</RouterLink>
+              <RouterLink :to="DISASTER_PATH" class="tool"><span aria-hidden="true">🌊</span>3D 재난 대피 지도</RouterLink>
+            </div>
 
             <!-- 지난 캠핑: 후기 쓰기 · 수정, 작성한 후기 (사진 → 글 → 작성 날짜) -->
             <template v-if="p.past">
@@ -220,6 +254,41 @@ async function remove(p) {
           등록한 캠핑이 없어요.<br />캠핑장 상세나 차박 지도에서 '내 캠핑에 일정 등록'을 눌러 보세요.
         </p>
 
+        <!-- 가족 캠핑: 가족방 사람이 등록한 캠핑 (보기만, 삭제·출발 준비 없음) -->
+        <section v-if="familyCards.length || familyError" class="family-plans" aria-label="모임방 캠핑">
+          <h2>모임방 캠핑</h2>
+          <p v-if="familyError" class="placeholder">
+            {{ familyError }} <button type="button" class="retry" @click="loadFamilyPlans">다시 시도</button>
+          </p>
+          <ul v-else class="plans">
+            <li v-for="p in familyCards" :key="p.id" class="plan">
+              <div class="plan-head">
+                <span class="tags">
+                  <span class="badge">{{ p.badge }}</span>
+                  <span v-if="p.campId == null" class="kind">차박지</span>
+                </span>
+                <span class="owner">{{ p.ownerName }}님이 등록</span>
+              </div>
+              <RouterLink v-if="p.campId != null" :to="`/app/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
+              <RouterLink v-else :to="{ path: '/app/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
+                {{ p.campName }}
+              </RouterLink>
+              <p class="plan-place">{{ p.place }}</p>
+              <p class="plan-range">{{ p.range }}</p>
+              <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
+              <!-- 가족 일정의 출발 준비도 같은 화면으로 (서버가 같은 가족방이면 보여 준다). 체크 표시는 보는 사람 브라우저에 따로 저장 -->
+              <RouterLink :to="`/app/my-camping/${p.id}/checklist`" class="prep">
+                <span class="prep-text"><b>출발 준비</b><small>특보 · 날씨 · 준비물 같이 보기</small></span>
+                <span class="arrow" aria-hidden="true">›</span>
+              </RouterLink>
+              <div class="tools">
+                <RouterLink :to="METAVERSE_PATH" class="tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</RouterLink>
+                <RouterLink :to="DISASTER_PATH" class="tool"><span aria-hidden="true">🌊</span>3D 재난 대피 지도</RouterLink>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <RouterLink to="/app/my-camping/family" class="family-btn">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -228,8 +297,8 @@ async function remove(p) {
             <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c.6-.3 1.3-.5 2-.5 2.8 0 4.5 2.2 4.5 5" />
           </svg>
           <span class="text">
-            <b>가족 모임방</b>
-            <small>모일 곳 · 일정을 가족과 함께 봐요</small>
+            <b>모임방</b>
+            <small>함께 가는 사람과 캠핑 일정 · 모일 곳을 같이 봐요</small>
           </span>
           <span aria-hidden="true">›</span>
         </RouterLink>
@@ -341,6 +410,42 @@ h1 {
   font-weight: 700;
   color: var(--color-text);
   text-decoration: underline;
+}
+.family-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.family-plans h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+.owner {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+}
+.tools {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.tool {
+  min-height: 44px; /* 손가락으로 누르기 쉬운 높이 */
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
 }
 .review-btn {
   margin-top: 10px;

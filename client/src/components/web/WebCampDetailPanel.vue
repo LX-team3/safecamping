@@ -1,6 +1,6 @@
 <script setup>
 // 캠핑장 상세 (설계 4-1-1): 왼쪽 패널 안. 위 막대(목록 · 이름 · 공유 · 찜) → 사진 → 이름 → 탭 4개 → 아래 고정 버튼
-// 탭: 캠핑장 정보 · 주변 안전시설(누르면 지도에 길을 그린다) · 관광지 · 리뷰(서버 기능이 없어 준비 중)
+// 탭: 캠핑장 정보 · 주변 안전시설(누르면 지도에 길을 그린다) · 관광지 (리뷰 탭은 기능이 없어 뺐다 — 후기는 내 캠핑의 지난 캠핑에서 쓴다)
 // 데이터: GET /api/camps/{id}, /api/camps/{id}/tours, /api/camps/{id}/routes (카카오 도로 경로)
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
@@ -13,6 +13,8 @@ import { useMyCampingStore } from '@/stores/myCamping'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
 import { useTripStore } from '@/stores/trip'
 import { useReservationReturnStore } from '@/stores/reservationReturn'
+import { useSurveyStore } from '@/stores/survey'
+import { erBonusReasons } from '@/utils/webSurvey'
 
 const visit = useReservationReturnStore() // 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업
 
@@ -27,7 +29,6 @@ const TABS = [
   { key: 'info', label: '캠핑장 정보' },
   { key: 'near', label: '주변 안전시설' },
   { key: 'tour', label: '관광지' },
-  { key: 'review', label: '리뷰' },
 ]
 const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
 const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의', unknown: '점수 없음' }
@@ -40,6 +41,13 @@ const favorite = useFavoriteStore()
 const myCamping = useMyCampingStore()
 const preference = useTourPreferenceStore()
 const trip = useTripStore()
+// 내 유형 점수 (응급실 가산점): 탐색 목록과 같은 켜짐 상태 · 같은 규칙. 켜져 있고 해당 답이 있으면 "71 +5" 로 따로 보여 준다
+const survey = useSurveyStore()
+const bonusReasons = computed(() => erBonusReasons(survey.answers))
+// 가산점이 붙는 사람 · 캠핑장인지 (켜고 끄는 줄을 보일지). camp 는 아래에서 불러온 상세
+const bonusApplies = computed(() => bonusReasons.value.length > 0 && !!camp.value?.erBonus)
+const bonus = computed(() => (survey.bonusOn && bonusApplies.value ? camp.value.erBonus : 0))
+const shownScore = computed(() => (camp.value?.safetyScore == null ? '-' : Math.min(100, camp.value.safetyScore + bonus.value)))
 
 const camp = ref(null)
 const tours = ref([])
@@ -231,10 +239,25 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
         <!-- 탭 1: 캠핑장 정보 -->
         <template v-if="tab === 'info'">
           <div class="why">
-            <span class="circle" :class="tier"><b>{{ camp.safetyScore ?? '-' }}</b><span>{{ GRADE_LABEL[camp.grade] }}</span></span>
+            <!-- 내 유형 점수가 붙는 사람 · 캠핑장이면 원이 켜고 끄는 버튼 (켜면 76, 끄면 71 — 숫자 자체가 바뀜). 색 · 등급 글자는 저장된 점수 그대로 -->
+            <span v-if="bonusApplies" class="circle-wrap">
+              <button type="button" class="circle tap" :class="tier" :aria-pressed="survey.bonusOn"
+                :aria-label="survey.bonusOn ? `내 유형 점수 ${shownScore}점 (안전점수 ${camp.safetyScore} + 응급실 ${bonus}). 누르면 끄기` : `안전점수 ${camp.safetyScore}점. 누르면 내 유형 점수 켜기`"
+                @click="survey.bonusOn = !survey.bonusOn">
+                <b>{{ shownScore }}</b>
+                <span>{{ GRADE_LABEL[camp.grade] }}</span>
+              </button>
+              <span class="tap-tag" aria-hidden="true">내 유형 {{ survey.bonusOn ? 'ON' : 'OFF' }}</span>
+            </span>
+            <span v-else class="circle" :class="tier"><b>{{ camp.safetyScore ?? '-' }}</b><span>{{ GRADE_LABEL[camp.grade] }}</span></span>
             <span class="why-text">
               <b>{{ camp.headline || '안전점수' }}</b>
               <span v-if="summary">차로 {{ summary }}</span>
+              <!-- 켜고 끄기는 왼쪽 원을 누른다 -->
+              <span v-if="bonusApplies" class="bonus-line">
+                <template v-if="bonus">내 유형 점수예요 · {{ bonusReasons.join(' · ') }}에 해당해 응급실 거리를 더 따졌어요 (안전점수 {{ camp.safetyScore }})</template>
+                <template v-else>내 유형 점수 꺼짐 · 원을 누르면 켜져요</template>
+              </span>
             </span>
           </div>
           <dl class="infos">
@@ -286,8 +309,6 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
           </div>
         </template>
 
-        <!-- 탭 4: 리뷰 -->
-        <p v-else class="state small">후기 기능은 아직 준비 중이에요.</p>
       </div>
 
       <!-- 알림 -->
@@ -944,5 +965,31 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
 }
 .plan-go:disabled {
   opacity: 0.6;
+}
+.bonus-line {
+  font-size: 13px;
+  color: var(--web-green);
+}
+.bonus-line b {
+  font-weight: 800;
+}
+.circle-wrap {
+  flex: 0 0 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.circle.tap {
+  width: 72px;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--web-bg-soft), 0 0 0 4px var(--web-green); /* 누를 수 있는 원이라는 표시 (바깥 테두리) */
+}
+.tap-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--web-green);
 }
 </style>

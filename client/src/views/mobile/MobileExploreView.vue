@@ -24,7 +24,7 @@ import { vHscroll } from '@/utils/hscroll'
 import { shortLabel } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
-import { campTypeOf } from '@/utils/webSurvey'
+import { campTypeOf, erBonusReasons } from '@/utils/webSurvey'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTripStore } from '@/stores/trip'
 
@@ -48,7 +48,12 @@ const sheetOpen = computed({
   set: (open) => (sheetSnap.value = open ? 'list' : 'map'),
 })
 const query = ref('') // 검색어 (이름·지역)
-const matchMine = ref(true) // "내 유형 맞춤" 켜짐
+// "내 유형" 칩 하나로 추천 TOP 5(유형 거름) + 내 유형 점수(응급실 가산점)를 같이 켜고 끈다 (예전 "내 유형 맞춤" · "내 유형 점수" 두 칩을 합침)
+// 상태는 stores/survey 의 bonusOn 하나 → 캠핑장 상세의 점수 원을 눌러 끄면 여기도 꺼진다. 진단을 마치면 켜짐
+const matchMine = computed({
+  get: () => survey.bonusOn,
+  set: (on) => (survey.bonusOn = on),
+})
 const openSheet = ref(null) // null | 'region' | 'trip' | 'layers' — 열려 있는 아래 시트
 const sort = ref('score') // score | er
 const showExcluded = ref(false) // "따로 보기": 추천에서 뺀 위험 등급 보기
@@ -64,10 +69,22 @@ const error = ref('')
 // 진단의 "어디서 주무세요?" 답을 서버 캠핑 유형으로 바꾼다 (글램핑 → glamping, 오토캠핑·차박 → auto, utils/webSurvey.js)
 const campType = computed(() => campTypeOf(survey.answers))
 
+// ---- 내 유형 점수 (응급실 가산점) ----
+// 진단에서 아이·어르신·차박·겨울·걸어서 중 하나를 골랐으면 칩이 보인다. 켜면 점수에 가산점을 더해 보여 주고
+// 안전점수순 정렬을 "안전점수 + 가산점" 순(서버 sort=bonus)으로 바꾼다. 등급(색)은 그대로
+const bonusReasons = computed(() => erBonusReasons(survey.answers))
+const bonusActive = computed(() => bonusReasons.value.length > 0 && survey.bonusOn)
+// 웹과 같이 "+5" 를 따로 붙이지 않고 점수 숫자 자체를 바꿔 보여 준다 (등급 · 색은 저장된 점수 그대로)
+const withBonus = (c) =>
+  bonusActive.value && c.erBonus && c.safetyScore != null
+    ? { ...c, baseScore: c.safetyScore, safetyScore: Math.min(100, c.safetyScore + c.erBonus) }
+    : c
+
 async function load() {
   loading.value = true
   error.value = ''
-  const params = { sido: trip.state.sido?.name, sigungu: trip.state.sigungu?.name, sort: sort.value }
+  const effectiveSort = sort.value === 'score' && bonusActive.value ? 'bonus' : sort.value
+  const params = { sido: trip.state.sido?.name, sigungu: trip.state.sigungu?.name, sort: effectiveSort }
   try {
     const [all, rec] = await Promise.all([
       api('/api/camps', { params }),
@@ -132,7 +149,7 @@ onMounted(async () => {
 
 onMounted(load)
 onMounted(loadLayers) // 켜짐 기본값을 미리 받아 둔다 (시트를 열기 전에도 지도에 맞게 보이도록)
-watch([() => trip.state.sido, () => trip.state.sigungu, sort], load)
+watch([() => trip.state.sido, () => trip.state.sigungu, sort, bonusActive], load)
 watch(matchMine, () => (showExcluded.value = false))
 
 // 검색어로 거르기 (서버를 다시 부르지 않고 받은 목록 안에서)
@@ -147,10 +164,10 @@ const listCamps = computed(() => {
   if (showExcluded.value) list = recommend.value.excluded
   else if (matchMine.value) list = recommend.value.camps
   else list = allCamps.value
-  return list.filter(matches)
+  return list.filter(matches).map(withBonus)
 })
 // 지도에는 위험 등급까지 전부 보여 준다 (안전 정보라 숨기지 않음)
-const mapCamps = computed(() => allCamps.value.filter(matches))
+const mapCamps = computed(() => allCamps.value.filter(matches).map(withBonus))
 
 // ---- 지도 레이어 (안전 시설) ----
 // 줄 목록은 내 주변과 같은 서버 목록(GET /api/nearby/layers)을 쓴다 → 두 화면의 시트가 늘 같다
@@ -216,6 +233,10 @@ const reason = computed(() => {
   const label = CAMP_TYPE_LABEL[campType.value]
   return label ? `${label} 중 안전점수가 높은 곳부터 보여 드려요` : '안전점수가 높은 곳부터 보여 드려요'
 })
+// 가산점을 켰을 때 왜 점수가 붙었는지 한 줄 (예: 아이 동반 · 겨울에 해당해 응급실이 가까울수록 최대 +5점)
+const bonusNote = computed(() =>
+  bonusActive.value ? `${bonusReasons.value.join(' · ')}에 해당해 응급실이 가까운 곳의 점수를 올려 보여 드려요 (등급은 그대로)` : '',
+)
 
 const hasDummy = computed(() => allCamps.value.some((c) => c.dummy))
 
@@ -282,7 +303,7 @@ function onMarker(id) {
           </button>
           <button type="button" class="chip mine" :class="{ on: matchMine }" :aria-pressed="matchMine"
             @click="matchMine = !matchMine">
-            <i />내 유형 맞춤
+            <i />내 유형
           </button>
           <button type="button" class="chip" aria-haspopup="dialog" @click="openSheet = 'region'">
             {{ regionLabel }} ▾
@@ -298,6 +319,7 @@ function onMarker(id) {
             <div>
               <h1>{{ title }}</h1>
               <p v-if="reason" class="reason">{{ reason }}</p>
+              <p v-if="bonusNote" class="reason">{{ bonusNote }}</p>
             </div>
             <label class="sort">
               <select v-model="sort" aria-label="정렬">

@@ -181,7 +181,7 @@ function pinEl(person) {
     <!-- 서버에 묻는 중: 안내창을 먼저 띄웠다가 곧바로 지도로 바뀌는 깜빡임을 막는다 -->
     <p v-else-if="agreed === null" class="map-msg">{{ error ? '' : '위치 공유 상태를 확인하는 중...' }}</p>
     <section v-else class="consent-card" :role="asking ? 'dialog' : undefined" aria-labelledby="consent-msg">
-      <p v-if="asking" id="consent-msg">내 위치가 이 가족방 구성원에게 보여요.<br />위치 공유에 동의하시겠습니까?</p>
+      <p v-if="asking" id="consent-msg">내 위치가 이 모임방 구성원에게 보여요.<br />위치 공유에 동의하시겠습니까?</p>
       <p v-else id="consent-msg">위치 공유에 동의하면<br />가족 위치를 볼 수 있어요.</p>
       <div class="consent-actions">
         <button v-if="asking" type="button" class="secondary" :disabled="busy" @click="decline">동의 안 함</button>

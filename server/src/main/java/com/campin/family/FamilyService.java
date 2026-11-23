@@ -118,14 +118,14 @@ public class FamilyService {
 
     private void ensureNoRoom(Long memberId) {
         if (familyMapper.findRoomByMember(memberId) != null) {
-            throw new InvalidRequestException("이미 들어가 있는 가족방이 있습니다.");
+            throw new InvalidRequestException("이미 들어가 있는 모임방이 있습니다.");
         }
     }
 
     // 위 확인과 INSERT 사이에 다른 요청으로 먼저 들어갔으면 0줄 → 같은 문구로 알린다
     private void joinOrFail(Long roomId, Long memberId) {
         if (familyMapper.insertMember(roomId, memberId) == 0) {
-            throw new InvalidRequestException("이미 들어가 있는 가족방이 있습니다.");
+            throw new InvalidRequestException("이미 들어가 있는 모임방이 있습니다.");
         }
     }
 
@@ -135,11 +135,18 @@ public class FamilyService {
         return new MyRoom(me.getId(), me.getName(), myRoom(me.getId()).getId());
     }
 
+    // requireMyRoom 과 같지만 방이 없으면 404 대신 null (가족 캠핑 목록처럼 "없으면 빈 목록"인 곳에서 쓴다)
+    public MyRoom findMyRoomOrNull(String loginId) {
+        Member me = member(loginId);
+        FamilyRoom room = familyMapper.findRoomByMember(me.getId());
+        return room == null ? null : new MyRoom(me.getId(), me.getName(), room.getId());
+    }
+
     // 가족방이 없는데 모일 장소 등을 부르면 404
     private FamilyRoom myRoom(Long memberId) {
         FamilyRoom room = familyMapper.findRoomByMember(memberId);
         if (room == null) {
-            throw new NotFoundException("가족방이 없습니다.");
+            throw new NotFoundException("모임방이 없습니다.");
         }
         return room;
     }

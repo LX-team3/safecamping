@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { mobileRoutes, legacyRedirects, APP_PREFIX } from './mobileRoutes'
 import { webRoutes } from './webRoutes'
+import { webToAppPath } from '@/utils/webLinks'
 
 // 주소 규칙: 웹(PC)은 /web/..., 모바일(앱)은 /app/... (화면 틀은 App.vue 가 route.meta.layout 으로 고른다)
 //   - 모바일 라우트: router/mobileRoutes.js   - 웹 라우트: router/webRoutes.js
@@ -35,15 +36,9 @@ const router = createRouter({
 // 모바일에 같은 이름의 화면이 없으면(/web/my-booking 등) 탐색으로 보낸다
 router.beforeEach((to) => {
   if (/^\/web(\/|$)/.test(to.path) && !isWideScreen()) {
-    // 웹에만 있는 이름은 모바일의 같은 화면으로 바꿔 준다 (예: /web/alerts → /app/my-info/alerts)
-    const rest = to.path
-      .replace(/^\/web/, '')
-      .replace(/^\/alerts$/, '/my-info/alerts')
-      .replace(/^\/family$/, '/my-camping/family')
-      .replace(/^\/my-booking$/, '/my-camping')
-      .replace(/^\/checklist\/(\d+)$/, '/my-camping/$1/checklist')
-    const target = `${APP_PREFIX}${rest}`
-    if (rest && router.resolve(target).matched.length) return { path: target, query: to.query, hash: to.hash }
+    // 웹에만 있는 이름은 모바일의 같은 화면으로 바꿔 준다 (대응표는 utils/webLinks.js 의 webToAppPath 한곳)
+    const target = webToAppPath(to.path)
+    if (target && router.resolve(target).matched.length) return { path: target, query: to.query, hash: to.hash }
     return `${APP_PREFIX}/explore`
   }
 })

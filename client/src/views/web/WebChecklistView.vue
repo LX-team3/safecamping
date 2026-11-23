@@ -89,7 +89,7 @@ const warnClass = (category) => (category.includes('경보') ? 'danger' : 'cauti
 <template>
   <WebSubPage eyebrow="출발 준비" :title="plan ? plan.name : '안전 점검 체크리스트'" :desc="plan ? `${range}${isSpot ? ' · 차박지' : ''}` : ''" narrow>
     <template #actions>
-      <RouterLink to="/web/my-booking" class="back">‹ 내 예약</RouterLink>
+      <RouterLink to="/web/my-booking" class="back">‹ 내 캠핑</RouterLink>
     </template>
 
     <div v-if="!auth.isLoggedIn" class="card center">

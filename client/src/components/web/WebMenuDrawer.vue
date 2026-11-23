@@ -41,7 +41,7 @@ async function logout() {
 
       <div class="body">
         <span class="group">내 활동</span>
-        <RouterLink to="/web/my-booking" class="row strong" @click="emit('close')"><span>내 예약</span><i class="arrow"></i></RouterLink>
+        <RouterLink to="/web/my-booking" class="row strong" @click="emit('close')"><span>내 캠핑</span><i class="arrow"></i></RouterLink>
         <RouterLink to="/web/my-info" class="row" @click="emit('close')"><span>내 정보</span><i class="arrow"></i></RouterLink>
         <RouterLink to="/web/saved" class="row"><span>찜한 캠핑장</span><i class="arrow"></i></RouterLink>
         <RouterLink to="/web/survey" class="row"><span>내 캠핑 유형</span><span class="sub">저장된 검사 결과 ›</span></RouterLink>
@@ -50,7 +50,7 @@ async function logout() {
         <RouterLink to="/web/family" class="row" @click="emit('close')"><span>모임방</span><span class="sub">함께 가는 사람과 안전 공유 ›</span></RouterLink>
         <RouterLink :to="METAVERSE_PATH" class="row" @click="emit('close')"><span>메타버스 안전 탐험</span><i class="arrow"></i></RouterLink>
         <RouterLink :to="DISASTER_PATH" class="row" @click="emit('close')"><span>3D 재난 대피 지도</span><i class="arrow"></i></RouterLink>
-        <RouterLink to="/web/my-booking" class="row" @click="emit('close')"><span>안전 점검 체크리스트</span><span class="sub">내 예약에서 열려요 ›</span></RouterLink>
+        <RouterLink to="/web/my-booking" class="row" @click="emit('close')"><span>안전 점검 체크리스트</span><span class="sub">내 캠핑에서 열려요 ›</span></RouterLink>
       </div>
 
       <div class="bottom">

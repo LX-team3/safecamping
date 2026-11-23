@@ -52,6 +52,7 @@ class CampPlanServiceTest {
                 return table.stream().filter(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId))
                         .findFirst().orElse(null);
             }
+            @Override public CampPlan findVisible(Long memberId, Long planId) { return findById(memberId, planId); }  // 이 테스트에서는 가족 없음
             @Override public boolean exists(Long memberId, Long campId, LocalDate checkIn) {
                 return table.stream().anyMatch(p -> p.getMemberId().equals(memberId)
                         && campId.equals(p.getCampId()) && p.getCheckIn().equals(checkIn));

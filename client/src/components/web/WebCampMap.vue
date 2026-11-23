@@ -91,7 +91,7 @@ function pinEl(camp) {
   drop.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 24 30" aria-hidden="true"><path d="${PIN_PATH}" class="body"/></svg>`
   const score = document.createElement('b')
   score.style.cssText = `top:${top}px;font-size:${fs}px`
-  score.textContent = camp.safetyScore ?? '-'
+  score.textContent = camp.safetyScore ?? '-' // 내 유형 점수를 켜면 탐색 화면이 가산점을 더한 값을 넘겨 준다
   drop.appendChild(score)
   const name = document.createElement('span')
   name.className = 'pin-name'

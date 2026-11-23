@@ -14,6 +14,10 @@ const keep = ref(true) // 설계에서 기본 체크
 const error = ref('')
 const loading = ref(false)
 
+// 웹 ⇄ 앱 전환 (시연용): 로그아웃 상태의 이 화면 오른쪽 위에서 웹 로그인 화면으로
+// 휴대폰처럼 좁은 화면에서는 /web 주소가 다시 앱으로 넘어오므로(router/index.js) PC 처럼 넓을 때만 보인다
+const canSwitchWeb = window.matchMedia('(min-width: 768px)').matches
+
 async function submit() {
   if (!loginId.value || !password.value) {
     error.value = '아이디와 비밀번호를 입력해 주세요.'
@@ -36,6 +40,10 @@ async function submit() {
 
 <template>
   <div class="login">
+    <RouterLink v-if="canSwitchWeb" to="/web/login" class="to-web" aria-label="같은 화면을 웹(PC)으로 보기" title="웹 화면으로 보기">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
+    </RouterLink>
     <div class="brand">
       <span class="logo">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -79,6 +87,20 @@ async function submit() {
   flex-direction: column;
   gap: 28px;
   padding: 96px 24px 96px;
+}
+.to-web {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .brand {
   display: flex;
