@@ -1,7 +1,7 @@
 <script setup>
 // 웹 예약 정보 확인 (설계 5-1): 예약 사이트에서 예약하고 돌아온 뒤, 날짜 · 인원 · 동행 · 이동 수단을 확인해 내 캠핑에 저장한다
 // 주소: /web/booking-check?camp=캠핑장id (캠핑장 상세의 "예약 사이트"에서 돌아올 때)
-// 저장: POST /api/member/camp-plans (캠핑장 · 날짜). 인원 · 동행 · 이동 수단은 일정에 저장되는 칸이 없어서 메모에 적어 둔다
+// 저장: 새 일정은 POST, 내 예약 카드에서 들어왔으면(?plan=) PUT /api/member/camp-plans/{id} 로 고친다. 인원 · 동행 · 이동 수단은 칸이 없어서 메모 글자로 (utils/bookingMemo.js)
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { api } from '@/utils/api'
@@ -10,12 +10,8 @@ import { shortSido } from '@/utils/place'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { useTripStore } from '@/stores/trip'
+import { MOVES, WITH, makeBookingMemo, parseBookingMemo } from '@/utils/bookingMemo'
 
-const WITH = ['혼자', '친구·연인', '아이 동반', '어르신 동반', '반려동물']
-const MOVES = [
-  { key: 'car', label: '자동차' }, { key: 'bus', label: '버스' }, { key: 'taxi', label: '택시' },
-  { key: 'subway', label: '지하철' }, { key: 'walk', label: '도보' },
-]
 const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
 
 const route = useRoute()
@@ -24,6 +20,9 @@ const myCamping = useMyCampingStore()
 const trip = useTripStore()
 
 const campId = Number(route.query.camp) || null
+// ?plan=일정id: 내 예약 카드의 "예약 정보 확인"에서 들어오면 저장해 둔 날짜 · 인원 · 동행 · 이동 수단을 채우고, 저장하면 그 일정을 고친다
+const planId = Number(route.query.plan) || null
+const plan = ref(null) // 고칠 일정 (없으면 새로 등록)
 const camp = ref(null)
 const error = ref('')
 
@@ -38,6 +37,7 @@ const saved = ref(false)
 const saving = ref(false)
 
 onMounted(async () => {
+  if (planId && auth.isLoggedIn) fillFromPlan()
   if (!campId) return
   try {
     camp.value = await api(`/api/camps/${campId}`)
@@ -45,6 +45,25 @@ onMounted(async () => {
     error.value = e.message
   }
 })
+
+// 저장해 둔 일정으로 칸을 채운다. 메모에서 못 찾은 값(직접 쓴 메모 등)은 기본값 그대로
+async function fillFromPlan() {
+  try {
+    if (!myCamping.plans.length) await myCamping.load()
+  } catch (e) {
+    return (error.value = e.message)
+  }
+  const p = myCamping.plans.find((x) => x.id === planId)
+  if (!p) return
+  plan.value = p
+  checkIn.value = p.checkIn
+  checkOut.value = p.checkOut
+  const m = parseBookingMemo(p.memo)
+  if (m.adults != null) adults.value = Math.max(1, m.adults)
+  if (m.kids != null) kids.value = m.kids
+  if (m.withs) withs.value = m.withs
+  if (m.move) move.value = m.move
+}
 
 const nights = computed(() => (checkIn.value && checkOut.value ? nightsBetween(checkIn.value, checkOut.value) : 0))
 const okDate = computed(() => nights.value > 0)
@@ -66,19 +85,26 @@ function toggleWith(label) {
   }
   withs.value = w
 }
-const bump = (r, d, min) => (r.value = Math.max(min, Math.min(10, r.value + d)))
+// 인원 +/− (0~10명, 성인은 1명부터). 템플릿에서 ref 를 넘기면 숫자로 풀려서 값이 안 바뀌므로 칸 이름으로 받는다
+const COUNT = { adults: [adults, 1], kids: [kids, 0] }
+const bump = (key, d) => {
+  const [r, min] = COUNT[key]
+  r.value = Math.max(min, Math.min(10, r.value + d))
+}
 
 async function save() {
   error.value = ''
   if (!auth.isLoggedIn) return (error.value = '저장하려면 로그인이 필요해요.')
   if (!camp.value) return (error.value = '캠핑장을 먼저 골라 주세요.')
   if (!okDate.value) return (error.value = '체크아웃은 체크인 다음 날부터 고를 수 있어요.')
-  if (checkIn.value < todayIso()) return (error.value = '지난 날짜는 고를 수 없어요.')
+  // 고칠 때 체크인을 그대로 두면 지난 날짜여도 된다 (이미 시작한 캠핑의 인원만 고치는 경우)
+  if (checkIn.value < todayIso() && checkIn.value !== plan.value?.checkIn) return (error.value = '지난 날짜는 고를 수 없어요.')
   saving.value = true
   try {
     // 일정에는 인원 · 동행 · 이동 수단 칸이 없어서 메모에 적어 둔다 (내 예약에서 메모로 보인다)
-    const memo = [peopleText.value, withList.value.join('·'), moveLabel.value].filter(Boolean).join(' · ')
-    await myCamping.add({ campId, lat: null, lng: null, campName: camp.value.name, place: place.value, checkIn: checkIn.value, checkOut: checkOut.value, memo })
+    const memo = makeBookingMemo({ adults: adults.value, kids: kids.value, withs: withs.value, move: move.value })
+    if (plan.value) await myCamping.update(plan.value.id, { checkIn: checkIn.value, checkOut: checkOut.value, memo })
+    else await myCamping.add({ campId, lat: null, lng: null, campName: camp.value.name, place: place.value, checkIn: checkIn.value, checkOut: checkOut.value, memo })
     trip.state.checkIn = checkIn.value
     trip.state.checkOut = checkOut.value
     trip.state.adults = adults.value
@@ -102,7 +128,7 @@ async function save() {
         <span class="step">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>예약 확인 단계
         </span>
-        <h1>{{ saved ? '예약 정보를 저장했어요' : '예약을 마치셨나요?' }}</h1>
+        <h1>{{ saved ? '예약 정보를 저장했어요' : plan ? '예약 정보 확인' : '예약을 마치셨나요?' }}</h1>
       </div>
     </section>
 
@@ -148,11 +174,11 @@ async function save() {
               <div class="two">
                 <div class="counter">
                   <span>성인</span>
-                  <button type="button" aria-label="성인 줄이기" @click="bump(adults, -1, 1)">−</button><b>{{ adults }}명</b><button type="button" class="plus" aria-label="성인 늘리기" @click="bump(adults, 1, 1)">+</button>
+                  <button type="button" aria-label="성인 줄이기" @click="bump('adults', -1)">−</button><b>{{ adults }}명</b><button type="button" class="plus" aria-label="성인 늘리기" @click="bump('adults', 1)">+</button>
                 </div>
                 <div class="counter">
-                  <span>어린이</span>
-                  <button type="button" aria-label="어린이 줄이기" @click="bump(kids, -1, 0)">−</button><b>{{ kids }}명</b><button type="button" class="plus" aria-label="어린이 늘리기" @click="bump(kids, 1, 0)">+</button>
+                  <span>어린이 <small class="age">※13세 이하</small></span>
+                  <button type="button" aria-label="어린이 줄이기" @click="bump('kids', -1)">−</button><b>{{ kids }}명</b><button type="button" class="plus" aria-label="어린이 늘리기" @click="bump('kids', 1)">+</button>
                 </div>
               </div>
             </section>
@@ -355,6 +381,12 @@ input[type='date'] {
 .counter span {
   flex: 1;
   font-size: 15px;
+}
+/* 어린이 기준 나이 (팀 결정: 13세 이하) */
+.counter .age {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--web-text-sub);
 }
 .counter b {
   min-width: 36px;

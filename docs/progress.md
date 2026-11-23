@@ -1,5 +1,41 @@
 # 진행 상황
 
+## 2026-11-23 예약 정보 확인 = 저장한 일정 고치기 (브랜치 `hjs-metaverse-merge`)
+- 내 예약 카드의 "예약 정보 확인 ›"(웹 `WebMyBookingView`, 앱 `MobileMyCampingView`) → `booking-check?camp=&plan=일정id` 로 엶
+- 예약 확인 화면(웹·앱)이 `?plan=` 이면 저장해 둔 날짜 · 인원 · 동행 · 이동 수단을 채우고 제목은 "예약 정보 확인". 저장하면 새로 등록하지 않고 그 일정을 고침
+- 인원 · 동행 · 이동 수단은 지금처럼 memo 글자 (팀 결정: DB 칸은 이 값을 쓰는 기능이 생길 때). 글자 만들기·읽기는 `client/src/utils/bookingMemo.js` 한곳 (최대 48자, memo 100자 안)
+- 서버: `PUT /api/member/camp-plans/{id}` `{ checkIn, checkOut, memo }` 추가 (`CampPlanUpdateRequest`, `CampPlanService.update`, `CampPlanMapper.update`). 체크인을 바꿀 때만 지난 날짜·중복 검사. `server/CLAUDE.md` API 목록에 추가
+- 확인: 서버 `mvnw test` 181개 통과(고치기 테스트 3개 추가), client `vite build` 통과, memo 만들기→읽기 왕복 확인
+- 확인 못 함: 브라우저에서 실제로 고치기 (로그인 계정 없음 · 켜져 있는 서버가 고치기 전 코드라 재시작 필요). 직접 쓴 메모(예: "55")가 있던 일정은 저장하면 메모가 인원·동행·이동 수단 글자로 바뀜
+
+## 2026-11-23 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업 (브랜치 `hjs-metaverse-merge`)
+- "예약 사이트 ↗"를 누르면 캠핑장(내 예약 카드면 일정 id까지)과 시각을 기억 (`stores/reservationReturn.js`, localStorage). 누르는 곳: 웹 캠핑장 상세 패널 `WebCampDetailPanel`, 앱 캠핑장 상세 `MobileCampDetailView`, 웹 내 예약 카드 `WebMyBookingView`
+- 돌아오면(새 탭에서 돌아옴 = visibilitychange, 같은 탭 뒤로 = 화면 다시 열림) 팝업 `components/common/ReservationReturnPopup.vue` (App.vue 에 한 번). 웹은 `WebConfirmModal`, 앱은 tokens.css 색의 작은 팝업
+  - 10초 안에 돌아오면 묻지 않음, 하루 지난 기록은 버림, 예약 확인 · 로그인 화면에서는 안 띄움
+  - 예약했어요 → `booking-check?camp=(&plan=)`. 로그인 안 했으면 `login?next=그 주소` → 로그인 뒤 그 화면으로 (`WebLoginView`·`MobileLoginView` 에 next 추가, 우리 사이트 주소만 받음)
+  - 아직 안 했어요 · 바깥 누르기 → 기록 지움
+- 확인: client `vite build` 통과. 브라우저 웹(1400px)·앱(375px)에서 기록을 넣고 돌아온 것처럼 해 팝업이 뜸, 예약했어요 → 로그인 화면(next 에 `&plan=` 그대로), 3초 만에 돌아오면 안 뜸
+- 팝업 설명 줄("예약했다면 ~ 저장해 둘게요.") 삭제 → 제목과 버튼만
+- 예약 확인 화면(웹·앱) 인원 +/− 버튼이 안 눌리던 것 고침: 템플릿에서 `bump(adults, …)` 로 ref 를 넘기면 숫자로 풀려서 값이 안 바뀌었음 → `bump('adults', 1)` 처럼 칸 이름으로. 브라우저에서 웹·앱 둘 다 늘리기·줄이기·최소값(성인 1, 어린이 0) 확인
+- 어린이(아이) 기준 나이 "※13세 이하" 표시 (팀 결정): 예약 확인 웹·앱 "어린이 ※13세 이하", 웹 누구와·언제 팝업 `WebTripModal` "아이 ※13세 이하", 앱 `MobileTripSheet` "만 13세 미만" → "※13세 이하". 1분 진단의 "어린이 7~12세 · 영유아 0~6세"(`webSurvey.js`)는 다른 질문이라 그대로
+- `WebTripModal` 인원 +/− 도 같은 이유(ref 를 넘김)로 안 되던 것 고침 → `bump('adults', 1, 1)`. 브라우저에서 늘리기·줄이기 확인
+- 웹 캠핑장 상세 "예약 사이트 ↗" 버튼 테두리: 연한 회색(`--web-line-input`) → 메인 초록 1.5px(`--web-green`). 흰 패널 위 흰 버튼이라 안 보였음. "예약 사이트 없음"은 연한 테두리 그대로. 앱(`.reserve`)은 이미 진한 테두리라 그대로
+- DB 저장 확인 (사용자): 예약 확인 화면에서 저장 → `camp_plan` 에 들어감
+- 확인 못 함: 실제 외부 예약 사이트를 열었다 돌아오기, 로그인한 상태에서 저장까지 (테스트할 때 8080 서버가 꺼져 있었음)
+
+## 2026-11-23 재난지도 3D 로딩 빠르게 (브랜치 `hjs-metaverse-merge`)
+- `client/src/utils/disasterMap.js` (웹·모바일 재난지도 같이 씀)
+  - 로딩 화면: 최소 2.5초를 일부러 기다리던 것 없앰. 처음 보이는 타일이 들어오면 바로 걷고, 늦어도 3초 뒤에는 걷음 (예전엔 최대 8초)
+  - `maximumScreenSpaceError` 2(Cesium 기본값) → 3: 받는 타일이 줄어드는 대신 아주 약간 흐려짐
+  - `data.json`·`criteria.json` 을 차례로가 아니라 동시에 받음
+- 작은 물길(OSM 이름 없는 개천)을 인북천과 다르게: 폭 10m → 4m, 비가 와도 넓히지 않음, 물결 없이 옅은 색 띠 (`streamLook`). 폭 10m(비 올 때 최대 약 21m)로 그려서 대피소(서화중앙교회, 개천 가운데선에서 약 14m)가 물 위에 있는 것처럼 보였음. 대피소 좌표는 그대로 (처음부터 바뀐 적 없음)
+- 높낮이 그래프 설명을 짧은 문장으로 (`updateProfile`). 예: "큰 홍수가 나면 이 길 중 570m 정도가 물에 잠겨요. 가장 깊은 곳은 1.6m예요. 도착하는 곳은 물 높이와 거의 같아요."
+- 막대 114mm 눈금 "캠핑장 잠김" → "침수" (웹에서 "90 경보"와 글자가 겹쳤음): `criteria.json`, `disasterMap.js` DEFAULT_CRIT, 주석(`MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse`)
+- 웹(`/web/disaster`)과 앱(`/app/disaster`)은 같은 `disasterMap.js`·`criteria.json` 을 써서 위 수정이 둘 다에 들어감. 옛 단독 앱(`disaster-map/app/`)은 단계·화면이 달라 손대지 않음
+- 시험용 `DevTestNav`(보라색 '🧪 시험' 버튼) 삭제: `App.vue` 3줄, `components/DevTestNav.vue`
+- 확인: `vite build` 통과. 브라우저 모바일 재난지도에서 대피소 '위치 보기' → 기둥 옆 파란 띠 없어짐. 콘솔 오류는 `/api/auth/me` 401(로그인 안 한 상태) 하나뿐
+- 확인 못 함: 비 오는 단계(준비·대피)에서 작은 물길 모습, 브라우저에서 실제로 몇 초 빨라졌는지, 지도 화질 차이. 남은 일: `data.json`(5.5MB) 나눠 받기
+
 ## 2026-11-22 메타버스를 client 안으로 합침 (브랜치 `hjs-metaverse-merge`)
 - 아래 "client 주소 아래로 연결"(서버 2개 + proxy, 브랜치 `hjs-metaverse-proxy`) 다음 단계. 개발 서버·빌드를 하나로 하려고 메타버스를 client의 화면 하나로 옮김. 느려지면 다시 생각하기로 함 (되돌릴 때는 `hjs-metaverse-proxy`)
 - 옮긴 곳: 3D 코드 `client/src/metaverse/`, 화면 `client/src/views/metaverse/MetaverseView.vue`, 데이터 `client/public/metaverse/data/`

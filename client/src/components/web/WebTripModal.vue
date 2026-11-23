@@ -151,7 +151,12 @@ function dayClass(iso, col) {
     between: checkIn.value && checkOut.value && iso > checkIn.value && iso < checkOut.value,
   }
 }
-const bump = (r, d, min) => (r.value = Math.max(min, Math.min(MAX - (r === adults ? kids.value : adults.value), r.value + d)))
+// 인원 +/− (둘을 합쳐 MAX 명까지). 템플릿에서 ref 를 넘기면 숫자로 풀려서 값이 안 바뀌므로 칸 이름으로 받는다
+const bump = (key, d, min) => {
+  const r = key === 'adults' ? adults : kids
+  const other = key === 'adults' ? kids : adults
+  r.value = Math.max(min, Math.min(MAX - other.value, r.value + d))
+}
 
 const dateFoot = computed(() => {
   if (!checkIn.value) return '체크인 날짜를 눌러 주세요'
@@ -227,11 +232,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <div class="people">
           <div class="pcol">
             <span>어른</span>
-            <div class="step"><button type="button" aria-label="어른 줄이기" :disabled="adults <= 1" @click="bump(adults, -1, 1)">−</button><b>{{ adults }}</b><button type="button" aria-label="어른 늘리기" @click="bump(adults, 1, 1)">+</button></div>
+            <div class="step"><button type="button" aria-label="어른 줄이기" :disabled="adults <= 1" @click="bump('adults', -1, 1)">−</button><b>{{ adults }}</b><button type="button" aria-label="어른 늘리기" @click="bump('adults', 1, 1)">+</button></div>
           </div>
           <div class="pcol">
-            <span>아이</span>
-            <div class="step"><button type="button" aria-label="아이 줄이기" :disabled="kids <= 0" @click="bump(kids, -1, 0)">−</button><b>{{ kids }}</b><button type="button" aria-label="아이 늘리기" @click="bump(kids, 1, 0)">+</button></div>
+            <span>아이 <small class="age">※13세 이하</small></span>
+            <div class="step"><button type="button" aria-label="아이 줄이기" :disabled="kids <= 0" @click="bump('kids', -1, 0)">−</button><b>{{ kids }}</b><button type="button" aria-label="아이 늘리기" @click="bump('kids', 1, 0)">+</button></div>
           </div>
         </div>
         <div v-if="kids" class="ages">
@@ -419,6 +424,13 @@ h2 {
   gap: 14px;
   font-size: 15px;
   font-weight: 700;
+}
+/* 아이 기준 나이 (팀 결정: 13세 이하) */
+.pcol .age {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--web-text-sub);
 }
 .step {
   display: flex;

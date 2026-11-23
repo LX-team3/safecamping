@@ -1,7 +1,7 @@
 <script setup>
 // 3시간 강수량 슬라이더: 밀면 단계와 물이 차오르는 범위가 바뀜
 // 글자는 "3시간 강수량" (기상청 특보 기준과 같은 말. 실황이든 미리 보기든 맞는 표현이라 "내린 비" 대신 씀, 2026-11-21)
-// 눈금: 60·90mm = 기상청 호우주의보·경보 기준, 114mm = 이 지역에 50년에 한 번 올 큰비 → "캠핑장 잠김" (criteria.json)
+// 눈금: 60·90mm = 기상청 호우주의보·경보 기준, 114mm = 이 지역에 50년에 한 번 올 큰비 → "침수" (criteria.json)
 // 실황을 받으면 관측 시각과, 12·24시간 기준으로 단계가 정해졌으면 그 까닭을 한 줄로 보여 준다
 // 2026-11-21 화면을 단순하게: "실시간"·"실시간 보기"·"시뮬레이션" 표시와 상류 수위 줄을 뺐다
 //   (수위는 화면에만 안 보일 뿐 서버 단계 판단에는 그대로 쓴다. 막대를 만지면 새로고침 전까지 미리 보기로 남는다)
@@ -63,6 +63,6 @@ input:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; b
 .ticks { position: relative; height: 12px; margin: -5px 10px 0; font-family: var(--dm-font-num); font-size: 9.5px; color: var(--dm-muted); }
 .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .ticks span b { font-weight: 700; color: var(--dm-text); margin-left: 2px; }
-/* 글자가 긴 눈금("캠핑장 잠김")은 왼쪽 끝을 눈금에 맞춰 옆 눈금과 겹치지 않게 */
+/* 글자가 긴 눈금(4글자 이상)은 왼쪽 끝을 눈금에 맞춰 옆 눈금과 겹치지 않게 */
 .ticks span.wide { transform: translateX(-6px); }
 </style>

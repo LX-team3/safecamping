@@ -7,7 +7,7 @@ import java.util.List;
 // 출처 (disaster-map/rag 단계 문서, client/public/disaster-map/criteria.json 과 같은 값):
 //  - 준비 1단계: 3시간 60mm 또는 12시간 110mm  = 기상청 호우주의보 기준
 //  - 대피 2단계: 3시간 90mm 또는 12시간 180mm  = 기상청 호우경보 기준
-//  - 3단계(화면 이름은 '대피', 막대 표시 '캠핑장 잠김'): 3시간 114mm 또는 24시간 310mm = 서화 관측소 50년에 한 번 올 큰비 (WAMIS 설계강수량)
+//  - 3단계(화면 이름은 '대피', 막대 표시 '침수'): 3시간 114mm 또는 24시간 310mm = 서화 관측소 50년에 한 번 올 큰비 (WAMIS 설계강수량)
 // 숫자를 바꾸려면 criteria.json · rag 문서도 같이 바꾼다 (안전 기준이라 임의로 바꾸지 않는다)
 public final class DisasterRules {
 
@@ -21,7 +21,7 @@ public final class DisasterRules {
     private DisasterRules() {
     }
 
-    // level: 0 안전 · 1 준비 · 2 대피 · 3 캠핑장 잠김(화면은 '대피'). 3시간 비를 모르면 null (판단하지 않음)
+    // level: 0 안전 · 1 준비 · 2 대피 · 3 침수(화면은 '대피'). 3시간 비를 모르면 null (판단하지 않음)
     // reasons: 그 단계가 된 까닭 (예: "최근 3시간 95mm ≥ 90mm"). 안전이면 빈 목록
     public record Judgement(Integer level, List<String> reasons) {
     }
@@ -51,7 +51,7 @@ public final class DisasterRules {
     }
 
     // 상류 수위로 본 단계. 기준수위는 한강홍수통제소 공식 값(관측소마다 다름)이고, 어느 단계에 맞출지는 팀이 정한 연결:
-    //   관심 수위 이상 → 1 준비 · 경보 수위 이상 → 2 대피 · 심각 수위 이상 → 3 캠핑장 잠김 (반월촌교는 주의보 수위가 없음)
+    //   관심 수위 이상 → 1 준비 · 경보 수위 이상 → 2 대피 · 심각 수위 이상 → 3 침수 (반월촌교는 주의보 수위가 없음)
     // 수위를 모르면 null. 기준이 없는(null) 칸은 그 조건만 빼고 본다
     public static Judgement judgeWater(String station, Double wl, Double attention, Double alarm, Double serious) {
         if (wl == null) {

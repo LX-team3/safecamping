@@ -23,7 +23,7 @@ const DEFAULT_CRIT = {
     { from: 0, label: '안전', color: '--color-stage-0', level: 0, flood: 0 },
     { from: 60, label: '준비', color: '--color-stage-1', level: 1, flood: 0, alert: '주의보' },
     { from: 90, label: '대피', color: '--color-stage-2', level: 2, flood: 0, alert: '경보' },
-    { from: 114, label: '대피', color: '--color-stage-2', level: 3, flood: 1, alert: '캠핑장 잠김' },
+    { from: 114, label: '대피', color: '--color-stage-2', level: 3, flood: 1, alert: '침수' },
   ],
 }
 
@@ -59,7 +59,7 @@ export function initialState() {
     mode: 'overview',
     nav: { count: '', left: '', no: '', head: '', caution: '', sub: '', bar: 0, prevDisabled: true, nextLabel: '다음' },
     detourBtn: false,
-    noRoute: false,   // 캠핑장 잠김: 경로·목적지·길안내 숨김
+    noRoute: false,   // 침수(level 3): 경로·목적지·길안내 숨김
     sheetOpen: false,
     tourOn: false,
     // 대피 길의 높낮이 그래프 (RouteProfile.vue 가 그림). pts: [{ m, g, deck, w }] — 거리(m)·땅·다리 상판·홍수 물 높이
@@ -78,11 +78,14 @@ export function initialState() {
  * @param {string} o.base            데이터 폴더 주소 (예: '/disaster-map/')
  */
 export async function createDisasterMap({ container, tagLayer, credits, state, base }) {
-  const D = await fetch(base + 'data.json').then(r => {
-    if (!r.ok) throw new Error('지도 데이터를 불러오지 못했어요')
-    return r.json()
-  })
-  const CRIT = await fetch(base + 'criteria.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => DEFAULT_CRIT)
+  // 두 파일을 동시에 받는다 (차례로 받으면 기다리는 시간이 더해짐)
+  const [D, CRIT] = await Promise.all([
+    fetch(base + 'data.json').then(r => {
+      if (!r.ok) throw new Error('지도 데이터를 불러오지 못했어요')
+      return r.json()
+    }),
+    fetch(base + 'criteria.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => DEFAULT_CRIT),
+  ])
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
   const cleanups = []   // destroy 때 정리할 것들
   let destroyed = false
@@ -139,7 +142,8 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   })
   const scene = viewer.scene, camera = viewer.camera
   scene.globe.depthTestAgainstTerrain = true
-  scene.globe.maximumScreenSpaceError = 2
+  // 값이 클수록 타일을 덜 받는다 (2 = Cesium 기본값). 3 이면 아주 약간 흐려지는 대신 받는 타일이 줄어든다
+  scene.globe.maximumScreenSpaceError = 3
   scene.screenSpaceCameraController.minimumZoomDistance = 40
   scene.screenSpaceCameraController.maximumZoomDistance = 30000
   // 손을 떼면 금방 멈추게 (기본 0.9 → 0.5)
@@ -247,8 +251,10 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   }
 
   /* ============ 강 (인북천) — 중심선에 폭을 줘서 물결치는 수면으로 ============ */
-  const RIVER_HALF = { river: 18, stream: 5 }          // 평소 강폭의 절반(m)
-  const RIVER_SWELL = { 0: 1, 1: 1.35, 2: 1.7, 3: 2.1 } // 비가 올수록 넓어짐
+  // 평소 강폭의 절반(m). stream = OSM 의 이름 없는 작은 물길(도랑·개천)
+  // 작은 물길을 5m(폭 10m)로 그렸더니 인북천처럼 보이고, 바로 옆 대피소(서화중앙교회)가 물 위에 있는 것처럼 보여서 2m(폭 4m)로 줄임
+  const RIVER_HALF = { river: 18, stream: 2 }
+  const RIVER_SWELL = { 0: 1, 1: 1.35, 2: 1.7, 3: 2.1 } // 비가 올수록 넓어짐 (인북천만. 작은 물길은 넓히지 않음)
   let riverPrims = []
   const riverLines = D.waterway.features.flatMap(ft => lines(ft.geometry).map(c => ({ c, river: ft.properties.waterway === 'river' })))
   const waterLook = () => new Cesium.MaterialAppearance({ material: Cesium.Material.fromType('Water', {
@@ -266,13 +272,18 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     out.push(circ(c[0], hw))
     return out
   }
+  // 작은 물길은 물결 없이 옅은 색 띠로만 그린다 (인북천과 한눈에 구분되게)
+  const streamLook = () => new Cesium.MaterialAppearance({ material: Cesium.Material.fromType('Color', { color: C('--color-river', 0.55) }) })
   function buildRiver(lv) {
     riverPrims.forEach(p => scene.groundPrimitives.remove(p))
-    const k = RIVER_SWELL[lv] || 1, polys = riverLines.flatMap(r => bufferPolys(r.c, (r.river ? RIVER_HALF.river : RIVER_HALF.stream) * k))
-    riverPrims = [scene.groundPrimitives.add(new Cesium.GroundPrimitive({
+    const k = RIVER_SWELL[lv] || 1
+    const toPrim = (polys, appearance) => scene.groundPrimitives.add(new Cesium.GroundPrimitive({
       geometryInstances: polys.map(p => new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({
         polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(p.flat())), vertexFormat: Cesium.MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) })),
-      appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN }), 0)]   // 맨 아래에 깔아서 다리 위 대피로가 강물에 덮이지 않게
+      appearance, classificationType: Cesium.ClassificationType.TERRAIN }), 0)   // 맨 아래에 깔아서 다리 위 대피로가 강물에 덮이지 않게
+    const riverPolys = riverLines.filter(r => r.river).flatMap(r => bufferPolys(r.c, RIVER_HALF.river * k))
+    const streamPolys = riverLines.filter(r => !r.river).flatMap(r => bufferPolys(r.c, RIVER_HALF.stream))
+    riverPrims = [riverPolys.length && toPrim(riverPolys, waterLook()), streamPolys.length && toPrim(streamPolys, streamLook())].filter(Boolean)
   }
   // 범람 범위 전체를 땅에 강물로 덮는 층. 위의 3D 물 면은 가장자리 높이로 판판하게 만들어서
   // 둑·둔치·캠핑장처럼 살짝 높은 땅이 물을 뚫고 나와 안 잠긴 것처럼 보였다 → 범위 안은 빠짐없이 물로 보이게
@@ -392,7 +403,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       show(v) { this.vis = v; const on = v && !noRoute; outline.show = prim.show = on && !routeOver; out3.show = arr3.show = on && routeOver } }
   }
   let routeOver = false   // 물이 찼으면 true → 대피로를 물 위로 그림
-  // 캠핑장 잠김(level 3, 114mm 이상): 대피 경로·목적지·길안내를 지도와 시트에서 뺀다 (2026-11-21 사용자 결정).
+  // 침수(level 3, 114mm 이상): 대피 경로·목적지·길안내를 지도와 시트에서 뺀다 (2026-11-21 사용자 결정).
   // 이때는 물이 캠핑장까지 찬 모습과 "짐 두고 바로 산으로" 할 일만 보여 준다. 길 안내는 대피 단계(90mm)에서 한다
   let noRoute = false
   function setRouteOver(on) { if (routeOver === on) return; routeOver = on; Object.values(ROUTES).forEach(r => r.show(r.vis)) }
@@ -570,11 +581,12 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     pts.forEach(q => { if (q.w != null && q.w > q.g) { wetLen += R.L / (pts.length - 1); deep = Math.max(deep, q.w - q.g) } })
     const bridgeUnder = pts.some(q => q.deck != null && q.w != null && q.w > q.deck)
     const r5 = v => Math.round(v / 5) * 5, clear = h1 - wCamp
+    // 그래프 아래 설명: 짧은 문장 여러 개로 (괄호·숫자 나열 없이 한 번에 읽히게)
     let note = wetLen > 5
-      ? `${flooded ? '지금' : '큰 홍수가 나면'} 이 길의 약 ${r5(wetLen) || 5}m가 물에 잠겨요 (가장 깊은 곳 약 ${Math.round(deep * 10) / 10}m)` + (bridgeUnder ? ` · ${R.main.name}도 잠겨요` : '')
-      : '이 길은 홍수 때 물 높이보다 위로만 지나요'
-    if (clear >= 3) note += `. 도착지는 물 높이보다 약 ${r5(clear) || Math.round(clear)}m 높아요`
-    else if (clear > -3) note += '. 도착지 높이는 물 높이와 비슷해요'
+      ? `${flooded ? '지금' : '큰 홍수가 나면'} 이 길 중 ${r5(wetLen) || 5}m 정도가 물에 잠겨요. 가장 깊은 곳은 ${Math.round(deep * 10) / 10}m예요.` + (bridgeUnder ? ` ${R.main.name}도 잠겨요.` : '')
+      : '이 길은 홍수가 나도 물에 잠기지 않아요.'
+    if (clear >= 3) note += ` 도착하는 곳은 물보다 ${r5(clear) || Math.round(clear)}m 정도 높아요.`
+    else if (clear > -3) note += ' 도착하는 곳은 물 높이와 거의 같아요.'
     state.profile = { pts, L: R.L, dest: DEST[routeKey], gain: `${Math.round(h0)}m → ${Math.round(h1)}m`, note, flooded,
       bridge: routeKey === 'base' && R.main ? R.main.name : '' }
   }
@@ -727,7 +739,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     }
     // 물 위에는 등고선을 그리지 않음 (종이 지형도처럼). 비가 오면 강이 최대 2.1배까지 넓어지므로 가장 넓을 때 폭 + 6m 로 자름
     const segs = riverLines.flatMap(r => {
-      const hw = (r.river ? RIVER_HALF.river : RIVER_HALF.stream) * RIVER_SWELL[3] + 6
+      const hw = (r.river ? RIVER_HALF.river * RIVER_SWELL[3] : RIVER_HALF.stream) + 6
       return r.c.slice(1).map((q, k) => { const a0 = r.c[k]   // 상자 범위로 먼저 걸러서 빠르게
         return { a: a0, q, hw, x0: Math.min(a0[0], q[0]) - hw / MX, x1: Math.max(a0[0], q[0]) + hw / MX, y0: Math.min(a0[1], q[1]) - hw / MY, y1: Math.max(a0[1], q[1]) + hw / MY } })
     })
@@ -826,14 +838,15 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     camera.setView({ destination: Cesium.Cartesian3.fromDegrees(cx, cy - 0.03, 4000), orientation: { heading: 0, pitch: Cesium.Math.toRadians(-45) } })
   }
   goHome()
-  // 첫 타일이 다 들어오면 로딩 화면 제거
+  // 처음 보이는 타일이 들어오면 바로 로딩 화면을 걷는다
+  // 예전에는 최소 2.5초를 일부러 기다렸는데, 그만큼 사용자가 빈 화면을 봐야 해서 없앴다
+  // 바깥 지도 서버가 느려도 3초가 지나면 걷는다 (나머지 타일은 지도를 보는 동안 채워짐)
   {
-    let ok = 0; const t0 = performance.now()
+    const t0 = performance.now()
     const timer = setInterval(() => {
-      const w = performance.now() - t0; ok = scene.globe.tilesLoaded ? ok + 1 : 0
-      if (w < 8000 && (w < 2500 || ok < 4)) return
+      if (!scene.globe.tilesLoaded && performance.now() - t0 < 3000) return
       clearInterval(timer); state.loading = false
-    }, 300)
+    }, 150)
     cleanups.push(() => clearInterval(timer))
   }
 
