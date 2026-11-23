@@ -1,0 +1,9 @@
+{
+  "appId": "com.campin.app",
+  "appName": "내 캠핑메이트",
+  "webDir": "dist",
+  "server": {
+    "url": "http://localhost:5173",
+    "cleartext": true
+  }
+}
