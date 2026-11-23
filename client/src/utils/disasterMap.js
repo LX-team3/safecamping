@@ -23,45 +23,49 @@ const DEFAULT_CRIT = {
     { from: 0, label: '안전', color: '--color-stage-0', level: 0, flood: 0 },
     { from: 60, label: '준비', color: '--color-stage-1', level: 1, flood: 0, alert: '주의보' },
     { from: 90, label: '대피', color: '--color-stage-2', level: 2, flood: 0, alert: '경보' },
-    { from: 114, label: '즉시 대피', color: '--color-stage-3', level: 3, flood: 1, alert: '큰비' },
+    { from: 114, label: '대피', color: '--color-stage-2', level: 3, flood: 1, alert: '침수' },
   ],
 }
 
-// 단계별 안내 문구 (level 0~3). 문구는 disaster-map/rag 단계 문서의 "판단" 과 같게 맞춤
+// 단계별 안내 문구 (level 0~3). 단계 이름은 disaster-map/rag 단계 문서의 "판단" 과 같게 맞춤
+// head 는 "지금 무엇을 하면 되나"를 바로 알 수 있게 할 일로 씀 (2026-11-21, 발표 슬라이드의 단계별 할 일과 같음)
+// 2026-11-21 화면 단계는 안전·준비·대피 셋. level 3(114mm, 50년 큰비)은 이름은 '대피' 그대로, 캠핑장까지 잠겨 할 일만 더 급하게
+// 높은 곳: 도로로는 1.5km 를 더 낮은 강가로 돌아가야 해서(데이터 폴더 road_route.py) 가장 가까운 산으로 안내. 실제 길은 현장 확인 전
+// {dir} 은 캠핑장에서 높은 곳 쪽 방향(남서 등)으로 바꿔 넣는다
+// todo: 단계별 행동요령 3줄 (아래 시트 "○○ 단계 행동요령")
 const LV = {
-  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '지금은 안전합니다', cta: '대피 경로 미리 보기' },
-  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '대피 준비하세요', cta: '대피 길안내 시작' },
-  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '지금 대피하세요', cta: '대피 길안내 시작' },
-  3: { badge: '즉시 대피', color: cssVar('--color-stage-3'), head: '바로 높은 곳으로 피하세요', cta: '대피 길안내 시작' },
-}
-
-// 기상특보: 실제로는 서버가 기상청 특보 API 를 불러 이 모양으로 넘겨 주면 된다. 지금은 화면 확인용 예시
-const SAMPLE_ALERT = {
-  kind: '호우주의보', action: '발표', level: 'watch',
-  area: '강원도 인제군', issuedAt: '2026-11-13T12:00:00+09:00',
-  body: '3시간 동안 60mm 넘는 비 예상', source: '기상청 기상특보 (예시 데이터)',
-  rain3h: 60,
+  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피 경로 미리 보기',
+    todo: ['대피소 가는 길과 산으로 오르는 방향을 미리 봐 둡니다.', '강가·계곡 가까이에 텐트를 치지 않습니다.', '기상특보와 재난문자를 확인합니다.'] },
+  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피 길안내 시작',
+    todo: ['짐을 싸고 바로 나갈 수 있게 둡니다.', '손전등·비옷을 챙기고 휴대폰을 충전합니다.', '강물이 불어나는지 자주 살핍니다.'] },
+  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 {dir}쪽 산으로 올라가세요', cta: '대피 길안내 시작',
+    todo: ['짐은 가볍게, 걸어서 산 쪽으로 갑니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '혼자 가지 말고 함께 움직입니다.'] },
+  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 {dir}쪽 산으로', cta: '대피 길안내 시작',
+    todo: ['짐 두고 지금 바로 산으로 올라갑니다.', '흐르는 물은 얕아 보여도 건너지 않습니다.', '도착하면 119에 위치를 알립니다.'] },
 }
 
 // 화면이 읽는 상태의 처음 모양
 export function initialState() {
   return {
     loading: true, error: '',
-    alert: { title: '기상특보 확인 중', time: '', area: '', body: '', src: '', warn: false },
+    alert: { title: '기상특보 확인 중', time: '', area: '', body: '', src: '', warn: false, off: true },
+    // 실시간(기상청 실황) 상태. status: loading → ok(받음) · none(못 받음). on: 지금 실시간 값을 보여 주는 중(막대를 만지면 false = 미리 보기)
+    live: { status: 'loading', on: false, time: '', reasons: [] },
     rain: 60, maxRain: DEFAULT_CRIT.max, stages: DEFAULT_CRIT.stages.map(s => ({ ...s, color: cssVar(s.color) })),
     stage: { label: '준비', color: cssVar('--color-stage-1'), ai: false },
     lv: { ...LV[1] },
-    routeKey: 'base', baseDisabled: false, baseLabel: '대피소', hasBase: true,
+    routeKey: 'base', baseDisabled: false, baseLabel: '대피소',
     dest: { name: '', meta: '', distNum: '', distUnit: 'km', min: '', sum: '' },
     mode: 'overview',
     nav: { count: '', left: '', no: '', head: '', caution: '', sub: '', bar: 0, prevDisabled: true, nextLabel: '다음' },
     detourBtn: false,
+    noRoute: false,   // 침수(level 3): 경로·목적지·길안내 숨김
     sheetOpen: false,
     tourOn: false,
     // 대피 길의 높낮이 그래프 (RouteProfile.vue 가 그림). pts: [{ m, g, deck, w }] — 거리(m)·땅·다리 상판·홍수 물 높이
     profile: { pts: [], L: 1, dest: '', gain: '', note: '', flooded: false, bridge: '' },
     meU: 0,   // 캐릭터가 경로에서 간 비율 (그래프 위 점)
-    todo: ['차보다 걸어서 이동합니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '대피 후 119에 위치를 알립니다.'],
+    todo: [...LV[1].todo],
   }
 }
 
@@ -74,11 +78,14 @@ export function initialState() {
  * @param {string} o.base            데이터 폴더 주소 (예: '/disaster-map/')
  */
 export async function createDisasterMap({ container, tagLayer, credits, state, base }) {
-  const D = await fetch(base + 'data.json').then(r => {
-    if (!r.ok) throw new Error('지도 데이터를 불러오지 못했어요')
-    return r.json()
-  })
-  const CRIT = await fetch(base + 'criteria.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => DEFAULT_CRIT)
+  // 두 파일을 동시에 받는다 (차례로 받으면 기다리는 시간이 더해짐)
+  const [D, CRIT] = await Promise.all([
+    fetch(base + 'data.json').then(r => {
+      if (!r.ok) throw new Error('지도 데이터를 불러오지 못했어요')
+      return r.json()
+    }),
+    fetch(base + 'criteria.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => DEFAULT_CRIT),
+  ])
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
   const cleanups = []   // destroy 때 정리할 것들
   let destroyed = false
@@ -135,7 +142,8 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   })
   const scene = viewer.scene, camera = viewer.camera
   scene.globe.depthTestAgainstTerrain = true
-  scene.globe.maximumScreenSpaceError = 2
+  // 값이 클수록 타일을 덜 받는다 (2 = Cesium 기본값). 3 이면 아주 약간 흐려지는 대신 받는 타일이 줄어든다
+  scene.globe.maximumScreenSpaceError = 3
   scene.screenSpaceCameraController.minimumZoomDistance = 40
   scene.screenSpaceCameraController.maximumZoomDistance = 30000
   // 손을 떼면 금방 멈추게 (기본 0.9 → 0.5)
@@ -204,7 +212,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     if (!insts.length) return null
     const prim = scene.primitives.add(new Cesium.Primitive({ geometryInstances: insts, show: false, asynchronous: true,
       appearance: new Cesium.MaterialAppearance({ translucent: false, faceForward: true, material: new Cesium.Material({ fabric: {
-        uniforms: { color: C('--color-flood-water'), hi: C('--color-flood-water-hi'), time: 0 },
+        uniforms: { color: C('--color-river'), hi: C('--color-river-blend'), time: 0 },   // 강물과 같은 색 (넘친 물 = 강물)
         source: `czm_material czm_getMaterial(czm_materialInput m) {
           czm_material o = czm_getDefaultMaterial(m);
           vec2 p = m.st * 900.0;
@@ -221,24 +229,32 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     water3d.forEach((w, i) => {
       if (!w) return
       const on = i === flood - 1
-      if (on && !w.prim.show) { w.prim.show = true; w.off = -RISE }
+      if (on && !w.prim.show && !(floodDrape[i] && floodDrape[i].show)) { w.prim.show = true; w.off = -RISE }   // 이미 다 찼으면 다시 올리지 않음
       w.target = on ? 0 : -RISE
+      // 다 차오른 뒤에는 강물과 같은 층(floodDrape)만 보여 준다. 내려갈 때는 그 층을 끄고 3D 물이 다시 가라앉는다
+      if (!on && floodDrape[i] && floodDrape[i].show) { floodDrape[i].show = false; w.prim.show = true; w.off = 0; syncZone() }
     })
   }
   function stepWater3d(dt, sec) {
-    water3d.forEach(w => {
+    water3d.forEach((w, i) => {
       if (!w || !w.prim.show) return
       w.prim.appearance.material.uniforms.time = sec
       const d = w.target - w.off
-      if (Math.abs(d) < 0.01) { if (w.target < 0) w.prim.show = false; return }
+      if (Math.abs(d) < 0.01) {
+        if (w.target < 0) w.prim.show = false
+        else if (floodDrape[i]) { floodDrape[i].show = true; w.prim.show = false; syncZone() }
+        return
+      }
       w.off += Math.sign(d) * Math.min(Math.abs(d), dt * 2.2)   // 초당 약 2.2m
       w.prim.modelMatrix = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.multiplyByScalar(w.up, w.off, new Cesium.Cartesian3()))
     })
   }
 
   /* ============ 강 (인북천) — 중심선에 폭을 줘서 물결치는 수면으로 ============ */
-  const RIVER_HALF = { river: 18, stream: 5 }          // 평소 강폭의 절반(m)
-  const RIVER_SWELL = { 0: 1, 1: 1.35, 2: 1.7, 3: 2.1 } // 비가 올수록 넓어짐
+  // 평소 강폭의 절반(m). stream = OSM 의 이름 없는 작은 물길(도랑·개천)
+  // 작은 물길을 5m(폭 10m)로 그렸더니 인북천처럼 보이고, 바로 옆 대피소(서화중앙교회)가 물 위에 있는 것처럼 보여서 2m(폭 4m)로 줄임
+  const RIVER_HALF = { river: 18, stream: 2 }
+  const RIVER_SWELL = { 0: 1, 1: 1.35, 2: 1.7, 3: 2.1 } // 비가 올수록 넓어짐 (인북천만. 작은 물길은 넓히지 않음)
   let riverPrims = []
   const riverLines = D.waterway.features.flatMap(ft => lines(ft.geometry).map(c => ({ c, river: ft.properties.waterway === 'river' })))
   const waterLook = () => new Cesium.MaterialAppearance({ material: Cesium.Material.fromType('Water', {
@@ -256,14 +272,40 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     out.push(circ(c[0], hw))
     return out
   }
+  // 작은 물길은 물결 없이 옅은 색 띠로만 그린다 (인북천과 한눈에 구분되게)
+  const streamLook = () => new Cesium.MaterialAppearance({ material: Cesium.Material.fromType('Color', { color: C('--color-river', 0.55) }) })
   function buildRiver(lv) {
     riverPrims.forEach(p => scene.groundPrimitives.remove(p))
-    const k = RIVER_SWELL[lv] || 1, polys = riverLines.flatMap(r => bufferPolys(r.c, (r.river ? RIVER_HALF.river : RIVER_HALF.stream) * k))
-    riverPrims = [scene.groundPrimitives.add(new Cesium.GroundPrimitive({
+    const k = RIVER_SWELL[lv] || 1
+    const toPrim = (polys, appearance) => scene.groundPrimitives.add(new Cesium.GroundPrimitive({
       geometryInstances: polys.map(p => new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({
         polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(p.flat())), vertexFormat: Cesium.MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) })),
-      appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN }), 0)]   // 맨 아래에 깔아서 다리 위 대피로가 강물에 덮이지 않게
+      appearance, classificationType: Cesium.ClassificationType.TERRAIN }), 0)   // 맨 아래에 깔아서 다리 위 대피로가 강물에 덮이지 않게
+    const riverPolys = riverLines.filter(r => r.river).flatMap(r => bufferPolys(r.c, RIVER_HALF.river * k))
+    const streamPolys = riverLines.filter(r => !r.river).flatMap(r => bufferPolys(r.c, RIVER_HALF.stream))
+    riverPrims = [riverPolys.length && toPrim(riverPolys, waterLook()), streamPolys.length && toPrim(streamPolys, streamLook())].filter(Boolean)
   }
+  // 범람 범위 전체를 땅에 강물로 덮는 층. 위의 3D 물 면은 가장자리 높이로 판판하게 만들어서
+  // 둑·둔치·캠핑장처럼 살짝 높은 땅이 물을 뚫고 나와 안 잠긴 것처럼 보였다 → 범위 안은 빠짐없이 물로 보이게
+  // flood50fill: 범람지도는 강 구역(강~둑 사이 낮은 땅)을 범위에서 빼서, 캠핑장만 잠기고 강 쪽은 마른 것처럼 보였다.
+  // 강에서 시작해 "가까운 범람 가장자리 물 높이보다 낮은 땅"을 이어 채운 칸들(10m DEM, 가장자리에서 300m 안). [서,남,동,북] 사각형
+  const FILL = [D.flood50fill || [], [], []]
+  const floodDrape = [D.flood50, D.flood80, D.flood100].map((fc, k) => {
+    const geo = p => new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({ polygonHierarchy: p, vertexFormat: Cesium.MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) })
+    const insts = fc.features.flatMap(ft => rings(ft.geometry).map(p => geo(hier(p))))
+      .concat(FILL[k].map(([w, s, e, n]) => geo(new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n])))))
+    return insts.length ? scene.groundPrimitives.add(new Cesium.GroundPrimitive({ geometryInstances: insts, show: false,
+      appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN })) : null
+  })
+  // 경보(대피) 단계: 강이 불어 강 구역(둔치·강~둑 사이 낮은 땅 = flood50fill)까지 찬 모습. 캠핑장 쪽 범람 범위는 아직 안 잠김
+  // 그림 표현이다: 경보 강수량 때 실제로 어디까지 차는지 계산한 자료는 없음 (수위 자료가 붙으면 바꿀 것)
+  const zoneRects = FILL[0]
+  const riverZone = zoneRects.length ? scene.groundPrimitives.add(new Cesium.GroundPrimitive({ show: false,
+    geometryInstances: zoneRects.map(([w, s, e, n]) => new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({
+      polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n])), vertexFormat: Cesium.MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) })),
+    appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN })) : null
+  // 큰비 층(floodDrape)이 켜지면 겹쳐 진해지지 않게 강 구역 층은 끈다
+  const syncZone = () => { if (riverZone) riverZone.show = level >= 2 && !(floodDrape[0] && floodDrape[0].show) }
 
   /* ============ 건물 (건축물대장) — 물에 잠기는 건물은 파랗게 ============ */
   const blds = [], bInst = []
@@ -308,9 +350,11 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   /* ============ 대피 경로 (양지교 경유 대피소 / 높은 곳) ============ */
   const evac = (D.evac ? D.evac.features : []).map(f => ({ pr: f.properties, pts: lines(f.geometry).flat() }))
   const baseDef = evac.find(r => !/없음/.test(r.pr.bridge || '')) || evac[0] || null
-  // 뒷산 산길: 캠핑장에서 바로 서쪽 산으로 올라가는 길. 도로망에 없는 길이라 10m DEM 으로 경사·침수범위·강을 피하는
-  // 최소비용 경로를 QGIS 에서 계산한 값 (evac_hill_path.geojson). 실제 길이 아니므로 현장 확인·정비가 필요
-  const HILL_PTS = [[128.2061766,38.2258503],[128.2061726,38.2258452],[128.2061645,38.2258349],[128.2061525,38.2258194],[128.2061364,38.2257988],[128.2061163,38.2257731],[128.2060922,38.2257422],[128.2060641,38.2257062],[128.2060319,38.225665],[128.2059976,38.225629],[128.205961,38.2255981],[128.2059221,38.2255724],[128.2058811,38.2255518],[128.2058377,38.2255364],[128.2057922,38.2255261],[128.2057444,38.2255209],[128.2056944,38.2255209],[128.2056491,38.2255194],[128.2056085,38.2255162],[128.2055726,38.2255116],[128.2055413,38.2255053],[128.2055148,38.2254975],[128.2054929,38.2254881],[128.2054757,38.2254772],[128.2054632,38.2254647],[128.2054523,38.2254475],[128.2054429,38.2254256],[128.2054351,38.2253991],[128.2054288,38.2253678],[128.2054241,38.2253319],[128.205421,38.2252912],[128.2054194,38.2252459],[128.2054194,38.2251959],[128.2054163,38.2251537],[128.2054101,38.2251194],[128.2054007,38.2250928],[128.2053882,38.2250741],[128.2053726,38.2250631],[128.2053538,38.22506],[128.2053319,38.2250647],[128.2053069,38.2250772],[128.2052788,38.2250834],[128.2052476,38.2250834],[128.2052132,38.2250772],[128.2051757,38.2250647],[128.2051351,38.2250459],[128.2050913,38.2250209],[128.2050444,38.2249897],[128.2049944,38.2249522],[128.2049507,38.2249194],[128.2049132,38.2248912],[128.2048819,38.2248678],[128.2048569,38.2248491],[128.2048382,38.224835],[128.2048257,38.2248256],[128.2048194,38.2248209]]
+  // 뒷산 산길 = 캠핑장에서 걸어서 가장 빨리 닿는 높은 곳 (10m DEM, 토블러 걷기 속도로 최단 시간 계산)
+  // 도착 기준: 이 지도 범람 범위에서 가장 높은 물 높이(floodZ.max 311.1m)보다 높고 100년 범람 범위 밖인 첫 칸
+  // 출발점(캠핑장 안쪽)에서 약 108m, 약 21m 높음, 걸어서 약 3분. 지형으로 계산한 방향이지 실제 길이 아니므로 현장 확인·정비가 필요
+  // 다시 계산: 데이터 폴더 hill_fastest.py (출발점을 바꾸면 이 줄도 다시 만든다)
+  const HILL_PTS = [[128.2060817,38.2252365],[128.2060194,38.2252209],[128.2059194,38.2252209],[128.2058194,38.2252209],[128.2057194,38.2252209],[128.2056194,38.2252209],[128.2055194,38.2252209],[128.2055194,38.2251209],[128.2055194,38.2250209],[128.2055194,38.2249209],[128.2055194,38.2248209],[128.2055194,38.2247209]]
   const detourDef = D.hill && D.hill.features && D.hill.features[0]
     ? { pr: D.hill.features[0].properties, pts: lines(D.hill.features[0].geometry).flat() }
     : { pr: { name: '뒷산 산길' }, pts: HILL_PTS }
@@ -356,9 +400,12 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     const tourSec = Math.max(20, L * 16 / 1000)   // 1.5km → 약 24초
     const sphere = Cesium.BoundingSphere.fromPoints(pts.filter((_, i) => i % 5 === 0).map(p => P3(p[0], p[1])))
     return { def, L, at, pts, main, mat, tourSec, kmh, sphere, min: Math.max(1, Math.round(L / (kmh * 1000) * 60)), vis: true,
-      show(v) { this.vis = v; outline.show = prim.show = v && !routeOver; out3.show = arr3.show = v && routeOver } }
+      show(v) { this.vis = v; const on = v && !noRoute; outline.show = prim.show = on && !routeOver; out3.show = arr3.show = on && routeOver } }
   }
   let routeOver = false   // 물이 찼으면 true → 대피로를 물 위로 그림
+  // 침수(level 3, 114mm 이상): 대피 경로·목적지·길안내를 지도와 시트에서 뺀다 (2026-11-21 사용자 결정).
+  // 이때는 물이 캠핑장까지 찬 모습과 "짐 두고 바로 산으로" 할 일만 보여 준다. 길 안내는 대피 단계(90mm)에서 한다
+  let noRoute = false
   function setRouteOver(on) { if (routeOver === on) return; routeOver = on; Object.values(ROUTES).forEach(r => r.show(r.vis)) }
   // 대피소 길: 평지 걸음(시속 4km). 높은 곳: 오르막이라 시속 2km 로 계산
   const ROUTES = { detour: makeRoute(detourDef, '--color-evac', 2) }
@@ -371,7 +418,6 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const showRoute = (k, v) => { if (ROUTES[k]) ROUTES[k].show(v) }
   let routeKey = ROUTES.base ? 'base' : 'detour', RT = ROUTES[routeKey]
   if (ROUTES.base) ROUTES.detour.show(false)
-  state.hasBase = !!ROUTES.base
   state.baseLabel = ROUTES.base ? `대피소 (${ROUTES.base.main.name})` : '대피소 (없음)'
 
   /* ============ 캐릭터 (다리를 번갈아 들며 걷고, 가는 방향을 바라봄) ============ */
@@ -421,12 +467,12 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const meTag = tag('내 위치', 'me', null)
   const dLabel = r => r.L >= 1000 ? (r.L / 1000).toFixed(1) + 'km' : Math.round(r.L / 10) * 10 + 'm'
   if (ROUTES.base) tag(`대피소 · ${shelterName} ${dLabel(ROUTES.base)}`, 'shelter', P3(shelter[0], shelter[1], 80), { baseOnly: true })
-  tag(`높은 곳 · 참고 방향 ${dLabel(ROUTES.detour)}`, 'shelter', P3(hEnd[0], hEnd[1], 60), { detourOnly: true })
+  tag(`산 위 높은 곳 · 길 확인 전 ${dLabel(ROUTES.detour)}`, 'shelter', P3(hEnd[0], hEnd[1], 60), { detourOnly: true })
   const scratch = new Cesium.Cartesian2()
   function placeTags() {
     const W = viewer.canvas.clientWidth, H = viewer.canvas.clientHeight, camPos = camera.positionWC
     tags.forEach(t => {
-      let off = !t.p || (t.detourOnly && routeKey !== 'detour') || (t.baseOnly && routeKey !== 'base')
+      let off = !t.p || (t.detourOnly && (routeKey !== 'detour' || noRoute)) || (t.baseOnly && (routeKey !== 'base' || noRoute))
       if (!off) {
         const c = scene.cartesianToCanvasCoordinates(t.p, scratch)
         off = !c || c.x < -40 || c.y < 0 || c.x > W + 40 || c.y > H || Cesium.Cartesian3.distance(camPos, t.p) > 9000
@@ -443,12 +489,14 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
       easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT, complete: done })
   }
   function goHome() {   // 지금 경로 전체가 보이게
-    const s = RT.sphere
-    camera.flyToBoundingSphere(s, { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(20), Cesium.Math.toRadians(routeKey === 'base' ? -38 : -32), Math.max(520, s.radius * 2.9)),
+    // 높은 곳 길은 캠핑장 서쪽 비탈을 오르는 길이라, 남남서에서 보면 산등성이에 가려진다
+    // → 동북동(강·캠핑장 쪽) 하늘에서 서남서를 내려다봐서 비탈을 오르는 모습이 보이게 한다 (2026-11-21)
+    const s = RT.sphere, base = routeKey === 'base'
+    camera.flyToBoundingSphere(s, { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(base ? 20 : 250), Cesium.Math.toRadians(base ? -38 : -45), Math.max(520, s.radius * 2.9)),
       duration: reduce ? 0 : 2.4, easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT })
   }
 
-  /* ============ 단계(안전~심각)와 경로 ============ */
+  /* ============ 단계(안전·준비·대피)와 경로 ============ */
   const ST = CRIT.stages, MAXR = CRIT.max || 160
   // criteria.json 의 color 는 tokens.css 변수 이름 → 화면에는 var(...) 로 넘김
   const stageColor = s => s.color && s.color.startsWith('--') ? cssVar(s.color) : s.color
@@ -473,17 +521,17 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   const STEPS = {
     base: baseSteps,
     detour: [
-      { m: Math.min(40, LD * 0.2), head: `캠핑장 ${hDir}쪽 높은 곳으로 가세요`, caution: () => '강·계곡 쪽으로 가지 마세요' },
-      { m: Math.round(LD * 0.55), head: '비탈을 따라 위로 올라가세요', caution: () => '지형으로 계산한 참고 방향이에요. 실제 길과 다를 수 있어요' },
+      { m: Math.min(40, LD * 0.2), head: `캠핑장 ${hDir}쪽 산으로 가세요`, caution: () => '강·계곡 쪽으로 가지 마세요' },
+      { m: Math.round(LD * 0.55), head: '비탈을 따라 위로 올라가세요', caution: () => '정해진 길은 확인 전이에요. 오를 수 있는 곳으로 올라가세요' },
       { m: LD, head: '높은 곳에 도착했습니다', sub: `캠핑장보다 약 ${hillGain}m 높은 곳 · 119에 위치를 알리세요` },
     ],
   }
-  const DEST = { base: shelterName, detour: '높은 곳' }
+  const DEST = { base: shelterName, detour: '산 위 높은 곳' }
 
   function setRoute(key) {
     routeKey = key; RT = ROUTES[key]
     showRoute('base', key === 'base'); showRoute('detour', key === 'detour')
-    detourGroup.show = key === 'detour'; baseGroup.show = key === 'base'
+    detourGroup.show = key === 'detour' && !noRoute; baseGroup.show = key === 'base' && !noRoute
     const short = RT.L < 1000
     state.routeKey = key
     state.dest = {
@@ -533,18 +581,27 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     pts.forEach(q => { if (q.w != null && q.w > q.g) { wetLen += R.L / (pts.length - 1); deep = Math.max(deep, q.w - q.g) } })
     const bridgeUnder = pts.some(q => q.deck != null && q.w != null && q.w > q.deck)
     const r5 = v => Math.round(v / 5) * 5, clear = h1 - wCamp
+    // 그래프 아래 설명: 짧은 문장 여러 개로 (괄호·숫자 나열 없이 한 번에 읽히게)
     let note = wetLen > 5
-      ? `${flooded ? '지금' : '큰 홍수가 나면'} 이 길의 약 ${r5(wetLen) || 5}m가 물에 잠겨요 (가장 깊은 곳 약 ${Math.round(deep * 10) / 10}m)` + (bridgeUnder ? ` · ${R.main.name}도 잠겨요` : '')
-      : '이 길은 홍수 때 물 높이보다 위로만 지나요'
-    if (clear >= 3) note += `. 도착지는 물 높이보다 약 ${r5(clear) || Math.round(clear)}m 높아요`
-    else if (clear > -3) note += '. 도착지 높이는 물 높이와 비슷해요'
+      ? `${flooded ? '지금' : '큰 홍수가 나면'} 이 길 중 ${r5(wetLen) || 5}m 정도가 물에 잠겨요. 가장 깊은 곳은 ${Math.round(deep * 10) / 10}m예요.` + (bridgeUnder ? ` ${R.main.name}도 잠겨요.` : '')
+      : '이 길은 홍수가 나도 물에 잠기지 않아요.'
+    if (clear >= 3) note += ` 도착하는 곳은 물보다 ${r5(clear) || Math.round(clear)}m 정도 높아요.`
+    else if (clear > -3) note += ' 도착하는 곳은 물 높이와 거의 같아요.'
     state.profile = { pts, L: R.L, dest: DEST[routeKey], gain: `${Math.round(h0)}m → ${Math.round(h1)}m`, note, flooded,
       bridge: routeKey === 'base' && R.main ? R.main.name : '' }
   }
   function setLevel(lv) {
     level = lv
-    state.lv = { ...LV[lv], head: lv === 1 && !ROUTES.base ? '높은 곳으로 피할 준비를 하세요' : LV[lv].head }
+    state.lv = { ...LV[lv], head: (lv === 1 && !ROUTES.base ? '높은 곳으로 피할 준비를 하세요' : LV[lv].head).replace('{dir}', hDir) }
+    state.todo = [...LV[lv].todo]
+    if (noRoute !== (lv >= 3)) {
+      noRoute = lv >= 3; state.noRoute = noRoute
+      Object.values(ROUTES).forEach(r => r.show(r.vis))
+      detourGroup.show = routeKey === 'detour' && !noRoute; baseGroup.show = routeKey === 'base' && !noRoute
+      if (noRoute) { stopTour(false); stopNavWalk(); state.mode = 'overview' }
+    }
     buildRiver(lv)
+    syncZone()
     // 안전·주의: 대피소 경로. 경계 이상: 다리 경로는 고를 수 없고 바로 높은 곳으로
     const bridgeOff = lv >= 2 || !ROUTES.base
     state.baseDisabled = bridgeOff
@@ -554,7 +611,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   }
   function applyStage(k) {
     const s = ST[k]
-    state.stage = { label: s.label, color: stageColor(s), ai: false }
+    state.stage = { label: s.label, color: stageColor(s), ai: false, level: s.level }   // level: 미리 보기 때 특보 칸 예시를 고를 때 씀
     if (k === curStage) return
     curStage = k; curFlood = s.flood
     setWater3d(s.flood)
@@ -682,7 +739,7 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     }
     // 물 위에는 등고선을 그리지 않음 (종이 지형도처럼). 비가 오면 강이 최대 2.1배까지 넓어지므로 가장 넓을 때 폭 + 6m 로 자름
     const segs = riverLines.flatMap(r => {
-      const hw = (r.river ? RIVER_HALF.river : RIVER_HALF.stream) * RIVER_SWELL[3] + 6
+      const hw = (r.river ? RIVER_HALF.river * RIVER_SWELL[3] : RIVER_HALF.stream) + 6
       return r.c.slice(1).map((q, k) => { const a0 = r.c[k]   // 상자 범위로 먼저 걸러서 빠르게
         return { a: a0, q, hw, x0: Math.min(a0[0], q[0]) - hw / MX, x1: Math.max(a0[0], q[0]) + hw / MX, y0: Math.min(a0[1], q[1]) - hw / MY, y1: Math.max(a0[1], q[1]) + hw / MY } })
     })
@@ -774,34 +831,36 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   /* ============ 시작 ============ */
   setRoute(routeKey)
   buildRiver(1)
-  // 기상특보 (예시) → 특보의 예상 강수량으로 시작
-  const a = SAMPLE_ALERT, t = new Date(a.issuedAt)
-  state.alert = {
-    title: `${a.kind} ${a.action}`, warn: a.level === 'warning',
-    time: `${t.getMonth() + 1}.${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')} · 인제군`,
-    area: '대상: ' + a.area, body: a.body, src: '출처: ' + a.source,
-  }
-  state.rain = a.rain3h
-  applyStage(stageFromTable(a.rain3h))
+  // 처음에는 미리 보기 60mm(준비)로 보여 주고, 화면(DisasterMapView)이 서버 실황을 받으면 setLive 로 바꾼다
+  applyStage(stageFromTable(state.rain))
   {
     const other = shelter || hEnd, cx = (camp[0] + other[0]) / 2, cy = (camp[1] + other[1]) / 2
     camera.setView({ destination: Cesium.Cartesian3.fromDegrees(cx, cy - 0.03, 4000), orientation: { heading: 0, pitch: Cesium.Math.toRadians(-45) } })
   }
   goHome()
-  // 첫 타일이 다 들어오면 로딩 화면 제거
+  // 처음 보이는 타일이 들어오면 바로 로딩 화면을 걷는다
+  // 예전에는 최소 2.5초를 일부러 기다렸는데, 그만큼 사용자가 빈 화면을 봐야 해서 없앴다
+  // 바깥 지도 서버가 느려도 3초가 지나면 걷는다 (나머지 타일은 지도를 보는 동안 채워짐)
   {
-    let ok = 0; const t0 = performance.now()
+    const t0 = performance.now()
     const timer = setInterval(() => {
-      const w = performance.now() - t0; ok = scene.globe.tilesLoaded ? ok + 1 : 0
-      if (w < 8000 && (w < 2500 || ok < 4)) return
+      if (!scene.globe.tilesLoaded && performance.now() - t0 < 3000) return
       clearInterval(timer); state.loading = false
-    }, 300)
+    }, 150)
     cleanups.push(() => clearInterval(timer))
   }
 
   /* ============ 화면(Vue)이 부르는 동작 ============ */
   return {
-    setRain(mm) { state.rain = mm; applyStage(stageFromTable(mm)) },
+    // 미리 보기: 막대 값(3시간 강수량)으로 단계를 정한다
+    setRain(mm) { state.rain = mm; state.live.on = false; applyStage(stageFromTable(mm)) },
+    // 실시간: 단계는 서버가 3·12·24시간 기준으로 정한 level 을 그대로 쓰고, 슬라이더에는 3시간 비만 보여 준다
+    setLive(level, mm) {
+      const k = ST.findIndex(s => s.level === level)
+      if (k < 0) return
+      state.rain = Math.min(Math.round(mm), MAXR); state.live.on = true
+      applyStage(k)
+    },
     selectRoute(key) { if (key === 'base' && state.baseDisabled) return; setRoute(key); meTarget = 0; goHome() },
     where() { state.sheetOpen = false; fly(routeKey === 'base' ? shelter : hEnd, camera.heading, -35, 520) },
     startNav() { stopTour(false); meU = meTarget = 0; state.mode = 'nav'; state.sheetOpen = true; showStep(0) },

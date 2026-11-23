@@ -20,10 +20,11 @@ defineProps({
         <span class="badge">{{ state.lv.badge }}</span>
         <div>
           <h2>{{ state.lv.head }}</h2>
-          <p>{{ state.dest.sum }}</p>
+          <p v-if="!state.noRoute">{{ state.dest.sum }}</p>
         </div>
       </div>
 
+      <template v-if="!state.noRoute">
       <div class="shelter">
         <span class="name">{{ state.dest.name }}</span>
         <span class="meta">{{ state.dest.meta }}</span>
@@ -37,7 +38,7 @@ defineProps({
       <div class="seg" role="group" aria-label="경로 선택">
         <button type="button" :aria-pressed="state.routeKey === 'base'" :disabled="state.baseDisabled"
           @click="map?.selectRoute('base')">{{ state.baseLabel }}</button>
-        <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">높은 곳 (참고)</button>
+        <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">산 위 높은 곳</button>
       </div>
 
       <div class="actions">
@@ -46,15 +47,17 @@ defineProps({
       </div>
 
       <MobileRouteProfile :state="state" />
+      </template>
 
       <div class="sec small">
-        <h3>침수 시 행동요령</h3>
+        <h3>{{ state.lv.badge }} 단계 행동요령</h3>
         <ul class="todo">
           <li v-for="(t, i) in state.todo" :key="i"><span>{{ i + 1 }}</span><span>{{ t }}</span></li>
         </ul>
       </div>
 
-      <div class="emergency"><span>긴급 신고</span><b>119</b></div>
+      <!-- 휴대폰에서 누르면 바로 119 전화 걸기 화면이 열린다 (tel: 링크) -->
+      <a class="emergency" href="tel:119" aria-label="119에 전화 걸기"><span>긴급 신고 · 눌러서 전화</span><b>119</b></a>
     </div>
 
     <!-- 길안내 화면 -->
@@ -72,7 +75,7 @@ defineProps({
         <button type="button" class="btn primary" @click="map?.next()">{{ state.nav.nextLabel }}</button>
       </div>
       <button v-if="state.detourBtn" type="button" class="btn ghost detour" @click="map?.detour()">
-        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 높은 곳으로
+        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 산으로
       </button>
       <button type="button" class="btn ghost" @click="map?.endNav()">길안내 종료</button>
     </div>
@@ -125,8 +128,9 @@ defineProps({
 .todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .todo li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 14px; line-height: 1.5; background: var(--dm-card); border-radius: 12px; padding: 10px 12px; }
 .todo li span:first-child { font-family: var(--dm-font-num); color: var(--lv); font-weight: 700; }
-.emergency { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dm-muted); border-top: 1px solid var(--dm-line); padding-top: 12px; }
-.emergency b { font-family: var(--dm-font-num); font-size: 20px; color: var(--dm-text); user-select: all; }
+.emergency { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dm-muted); border-top: 1px solid var(--dm-line); padding-top: 12px; text-decoration: none; min-height: 44px; }
+.emergency b { font-family: var(--dm-font-num); font-size: 20px; color: var(--dm-text); }
+.emergency:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; border-radius: 6px; }
 
 .nav-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dm-muted); }
 .progress { height: 6px; background: var(--dm-card); border-radius: 3px; overflow: hidden; }

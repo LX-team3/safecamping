@@ -54,3 +54,4 @@ frontend/src/
   - 모바일: `views/mobile/MobileXxxView.vue`, `components/mobile/MobileXxx.vue`, 라우트 `router/mobileRoutes.js`, 주소 `/app/...`, 색 `styles/tokens.css`
 - 새 화면은 해당 폴더에 만들고 해당 라우트 파일에 한 줄 추가한다. 웹과 모바일이 같이 쓰는 것은 `stores/`, `utils/`, `layouts/`
 - 옛 모바일 주소(`/explore` 등)는 `mobileRoutes.js` 의 `legacyRedirects` 가 `/app/...` 으로 넘겨 준다
+- 메타버스 안전 탐험(웹·모바일 같이 씀): 화면 `views/metaverse/MetaverseView.vue`, 3D 코드(three.js) `src/metaverse/`, 데이터 `public/metaverse/data/`, 주소 `/metaverse`(`router/index.js`, `meta.layout: 'full'` = 틀 없이 전체 화면). 자세한 설명은 `metaverse/CLAUDE.md`

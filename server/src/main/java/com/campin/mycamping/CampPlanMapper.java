@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 // camp_plan 테이블 SQL. 테이블 정의는 db/schema.sql
 // 모든 SQL 에 member_id 조건을 붙인다 → 남의 등록 id 를 보내도 보이지도 지워지지도 않는다
@@ -56,6 +57,14 @@ public interface CampPlanMapper {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(CampPlan plan);
+
+    // 날짜 · 메모만 고친다 (member_id 조건으로 남의 일정은 0줄)
+    @Update("""
+            UPDATE camp_plan
+               SET check_in = #{checkIn}, check_out = #{checkOut}, memo = #{memo}
+             WHERE id = #{id} AND member_id = #{memberId}
+            """)
+    int update(CampPlan plan);
 
     @Delete("DELETE FROM camp_plan WHERE id = #{planId} AND member_id = #{memberId}")
     int delete(@Param("memberId") Long memberId, @Param("planId") Long planId);

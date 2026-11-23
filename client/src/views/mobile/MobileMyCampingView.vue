@@ -187,7 +187,7 @@ async function remove(p) {
               <span class="arrow" aria-hidden="true">›</span>
             </RouterLink>
             <!-- 예약 사이트에서 예약한 뒤 날짜·인원을 확인해 저장하는 화면 (캠핑장 일정만, 차박 자리는 없음) -->
-            <RouterLink v-if="!p.past && p.campId != null" :to="`/app/booking-check?camp=${p.campId}`" class="check-link">
+            <RouterLink v-if="!p.past && p.campId != null" :to="`/app/booking-check?camp=${p.campId}&plan=${p.id}`" class="check-link">
               예약 정보 확인 ›
             </RouterLink>
 

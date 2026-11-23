@@ -76,7 +76,7 @@
   --color-stage-0: #5fc795;        /* 안전 */
   --color-stage-1: #f2c14e;        /* 준비 (호우주의보) */
   --color-stage-2: #f28c3b;        /* 대피 (호우경보) */
-  --color-stage-3: #ef5b4c;        /* 즉시 대피 (50년에 한 번 올 큰비) */
+  --color-stage-3: #ef5b4c;        /* 경보 빨강 (재난지도 특보 칸 "호우경보"). 2026-11-21 부터 단계 색으로는 안 씀 */
   --color-flood-water: #1f6bb8;    /* 홍수 때 차오르는 3D 물 */
   --color-flood-water-hi: #8cc7f2; /* 물결의 밝은 줄 */
   --color-flood-wet: #5c9ad6;      /* 잠기는 범위 안 건물 */

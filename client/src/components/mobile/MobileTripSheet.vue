@@ -162,7 +162,7 @@ async function apply() {
         </div>
       </div>
       <div class="counter">
-        <div><b>아이</b><small>만 13세 미만</small></div>
+        <div><b>아이</b><small>※13세 이하</small></div>
         <div class="step">
           <button type="button" class="minus" :disabled="kids <= 0" aria-label="아이 한 명 빼기" @click="kids--">−</button>
           <b aria-live="polite">{{ kids }}</b>

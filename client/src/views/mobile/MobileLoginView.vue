@@ -23,7 +23,9 @@ async function submit() {
   error.value = ''
   try {
     await auth.login(loginId.value, password.value, keep.value)
-    router.push('/app/explore') // 로그인 후에는 메인으로
+    // next: 로그인이 필요해서 보낸 화면이 있으면 그리로 (예약하셨나요? → 예약 정보 확인). 우리 사이트 주소만 받는다
+    const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//') ? route.query.next : ''
+    router.push(next || '/app/explore') // 로그인 후에는 메인으로
   } catch (e) {
     error.value = e.message
   } finally {

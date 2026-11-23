@@ -6,7 +6,7 @@
 // 선택 파일: 파일이 없거나 내용이 잘못돼도 오류 없이 null을 돌려줘요
 export async function loadGeoOptional(name) {
   try {
-    const res = await fetch(`/data/${name}.geojson`)
+    const res = await fetch(`${import.meta.env.BASE_URL}metaverse/data/${name}.geojson`)
     if (!res.ok) return null
     const data = await res.json()
     return Array.isArray(data?.features) ? data : null
@@ -18,7 +18,7 @@ export async function loadGeoOptional(name) {
 // 필수 파일: 없으면 게임을 만들 수 없어서, 이유를 알 수 있게 오류를 내요
 export async function loadGeo(name) {
   const data = await loadGeoOptional(name)
-  if (!data) throw new Error(`필수 파일 public/data/${name}.geojson 을 읽지 못했어요`)
+  if (!data) throw new Error(`필수 파일 public/metaverse/data/${name}.geojson 을 읽지 못했어요`)
   return data
 }
 

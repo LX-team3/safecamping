@@ -1,5 +1,124 @@
 # 진행 상황
 
+## 2026-11-23 예약 정보 확인 = 저장한 일정 고치기 (브랜치 `hjs-metaverse-merge`)
+- 내 예약 카드의 "예약 정보 확인 ›"(웹 `WebMyBookingView`, 앱 `MobileMyCampingView`) → `booking-check?camp=&plan=일정id` 로 엶
+- 예약 확인 화면(웹·앱)이 `?plan=` 이면 저장해 둔 날짜 · 인원 · 동행 · 이동 수단을 채우고 제목은 "예약 정보 확인". 저장하면 새로 등록하지 않고 그 일정을 고침
+- 인원 · 동행 · 이동 수단은 지금처럼 memo 글자 (팀 결정: DB 칸은 이 값을 쓰는 기능이 생길 때). 글자 만들기·읽기는 `client/src/utils/bookingMemo.js` 한곳 (최대 48자, memo 100자 안)
+- 서버: `PUT /api/member/camp-plans/{id}` `{ checkIn, checkOut, memo }` 추가 (`CampPlanUpdateRequest`, `CampPlanService.update`, `CampPlanMapper.update`). 체크인을 바꿀 때만 지난 날짜·중복 검사. `server/CLAUDE.md` API 목록에 추가
+- 확인: 서버 `mvnw test` 181개 통과(고치기 테스트 3개 추가), client `vite build` 통과, memo 만들기→읽기 왕복 확인
+- 확인 못 함: 브라우저에서 실제로 고치기 (로그인 계정 없음 · 켜져 있는 서버가 고치기 전 코드라 재시작 필요). 직접 쓴 메모(예: "55")가 있던 일정은 저장하면 메모가 인원·동행·이동 수단 글자로 바뀜
+
+## 2026-11-23 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업 (브랜치 `hjs-metaverse-merge`)
+- "예약 사이트 ↗"를 누르면 캠핑장(내 예약 카드면 일정 id까지)과 시각을 기억 (`stores/reservationReturn.js`, localStorage). 누르는 곳: 웹 캠핑장 상세 패널 `WebCampDetailPanel`, 앱 캠핑장 상세 `MobileCampDetailView`, 웹 내 예약 카드 `WebMyBookingView`
+- 돌아오면(새 탭에서 돌아옴 = visibilitychange, 같은 탭 뒤로 = 화면 다시 열림) 팝업 `components/common/ReservationReturnPopup.vue` (App.vue 에 한 번). 웹은 `WebConfirmModal`, 앱은 tokens.css 색의 작은 팝업
+  - 10초 안에 돌아오면 묻지 않음, 하루 지난 기록은 버림, 예약 확인 · 로그인 화면에서는 안 띄움
+  - 예약했어요 → `booking-check?camp=(&plan=)`. 로그인 안 했으면 `login?next=그 주소` → 로그인 뒤 그 화면으로 (`WebLoginView`·`MobileLoginView` 에 next 추가, 우리 사이트 주소만 받음)
+  - 아직 안 했어요 · 바깥 누르기 → 기록 지움
+- 확인: client `vite build` 통과. 브라우저 웹(1400px)·앱(375px)에서 기록을 넣고 돌아온 것처럼 해 팝업이 뜸, 예약했어요 → 로그인 화면(next 에 `&plan=` 그대로), 3초 만에 돌아오면 안 뜸
+- 팝업 설명 줄("예약했다면 ~ 저장해 둘게요.") 삭제 → 제목과 버튼만
+- 예약 확인 화면(웹·앱) 인원 +/− 버튼이 안 눌리던 것 고침: 템플릿에서 `bump(adults, …)` 로 ref 를 넘기면 숫자로 풀려서 값이 안 바뀌었음 → `bump('adults', 1)` 처럼 칸 이름으로. 브라우저에서 웹·앱 둘 다 늘리기·줄이기·최소값(성인 1, 어린이 0) 확인
+- 어린이(아이) 기준 나이 "※13세 이하" 표시 (팀 결정): 예약 확인 웹·앱 "어린이 ※13세 이하", 웹 누구와·언제 팝업 `WebTripModal` "아이 ※13세 이하", 앱 `MobileTripSheet` "만 13세 미만" → "※13세 이하". 1분 진단의 "어린이 7~12세 · 영유아 0~6세"(`webSurvey.js`)는 다른 질문이라 그대로
+- `WebTripModal` 인원 +/− 도 같은 이유(ref 를 넘김)로 안 되던 것 고침 → `bump('adults', 1, 1)`. 브라우저에서 늘리기·줄이기 확인
+- 웹 캠핑장 상세 "예약 사이트 ↗" 버튼 테두리: 연한 회색(`--web-line-input`) → 메인 초록 1.5px(`--web-green`). 흰 패널 위 흰 버튼이라 안 보였음. "예약 사이트 없음"은 연한 테두리 그대로. 앱(`.reserve`)은 이미 진한 테두리라 그대로
+- DB 저장 확인 (사용자): 예약 확인 화면에서 저장 → `camp_plan` 에 들어감
+- 확인 못 함: 실제 외부 예약 사이트를 열었다 돌아오기, 로그인한 상태에서 저장까지 (테스트할 때 8080 서버가 꺼져 있었음)
+
+## 2026-11-23 재난지도 3D 로딩 빠르게 (브랜치 `hjs-metaverse-merge`)
+- `client/src/utils/disasterMap.js` (웹·모바일 재난지도 같이 씀)
+  - 로딩 화면: 최소 2.5초를 일부러 기다리던 것 없앰. 처음 보이는 타일이 들어오면 바로 걷고, 늦어도 3초 뒤에는 걷음 (예전엔 최대 8초)
+  - `maximumScreenSpaceError` 2(Cesium 기본값) → 3: 받는 타일이 줄어드는 대신 아주 약간 흐려짐
+  - `data.json`·`criteria.json` 을 차례로가 아니라 동시에 받음
+- 작은 물길(OSM 이름 없는 개천)을 인북천과 다르게: 폭 10m → 4m, 비가 와도 넓히지 않음, 물결 없이 옅은 색 띠 (`streamLook`). 폭 10m(비 올 때 최대 약 21m)로 그려서 대피소(서화중앙교회, 개천 가운데선에서 약 14m)가 물 위에 있는 것처럼 보였음. 대피소 좌표는 그대로 (처음부터 바뀐 적 없음)
+- 높낮이 그래프 설명을 짧은 문장으로 (`updateProfile`). 예: "큰 홍수가 나면 이 길 중 570m 정도가 물에 잠겨요. 가장 깊은 곳은 1.6m예요. 도착하는 곳은 물 높이와 거의 같아요."
+- 막대 114mm 눈금 "캠핑장 잠김" → "침수" (웹에서 "90 경보"와 글자가 겹쳤음): `criteria.json`, `disasterMap.js` DEFAULT_CRIT, 주석(`MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse`)
+- 웹(`/web/disaster`)과 앱(`/app/disaster`)은 같은 `disasterMap.js`·`criteria.json` 을 써서 위 수정이 둘 다에 들어감. 옛 단독 앱(`disaster-map/app/`)은 단계·화면이 달라 손대지 않음
+- 시험용 `DevTestNav`(보라색 '🧪 시험' 버튼) 삭제: `App.vue` 3줄, `components/DevTestNav.vue`
+- 확인: `vite build` 통과. 브라우저 모바일 재난지도에서 대피소 '위치 보기' → 기둥 옆 파란 띠 없어짐. 콘솔 오류는 `/api/auth/me` 401(로그인 안 한 상태) 하나뿐
+- 확인 못 함: 비 오는 단계(준비·대피)에서 작은 물길 모습, 브라우저에서 실제로 몇 초 빨라졌는지, 지도 화질 차이. 남은 일: `data.json`(5.5MB) 나눠 받기
+
+## 2026-11-22 메타버스를 client 안으로 합침 (브랜치 `hjs-metaverse-merge`)
+- 아래 "client 주소 아래로 연결"(서버 2개 + proxy, 브랜치 `hjs-metaverse-proxy`) 다음 단계. 개발 서버·빌드를 하나로 하려고 메타버스를 client의 화면 하나로 옮김. 느려지면 다시 생각하기로 함 (되돌릴 때는 `hjs-metaverse-proxy`)
+- 옮긴 곳: 3D 코드 `client/src/metaverse/`, 화면 `client/src/views/metaverse/MetaverseView.vue`, 데이터 `client/public/metaverse/data/`
+- 주소 `/metaverse` (`router/index.js`). 새 layout `full`(`App.vue`) = 웹·모바일 틀 없이 전체 화면. three.js는 이 화면에 들어올 때만 불러옴
+- client에 `three` 추가 (`package.json`). client `vite.config.js`의 `/metaverse` proxy 삭제 (원래대로)
+- 링크: `webLinks.js`의 `METAVERSE_URL` → `METAVERSE_PATH = '/metaverse'`. PC 3곳·모바일 내 정보 링크와 돌아가기 버튼을 RouterLink로 (새로고침 없이 이동)
+- `metaverse/` 폴더: 따로 앱이던 뼈대(Vue 기본 템플릿, index.html, package.json, vite.config.js 등)는 삭제. `gis/`(QGIS 원본), `docs/`, `CLAUDE.md`는 남김. `gis/export_geojson.py`는 `client/public/metaverse/data/`로 내보내게 고침
+- 비교(client `npm run build`): 첫 화면 JS 104.5KB → 104.8KB, 빌드 약 3.5초(같음), 메타버스 화면 덩어리 약 652KB(들어갈 때만 받음), 배포 폴더 26MB → 27MB
+- 확인: `npm run build` 통과. 브라우저 PC·모바일(375px)에서 링크 → `/metaverse` 3D 캠핑장·지형 나옴, 돌아가기로 PC `/web`·모바일 `/app/explore`, 나갔다 다시 들어와도 3D 화면이 하나만 남음(정리 잘 됨), 재난지도(`/web/disaster`) 열림
+- 확인 못 함: 실제 휴대폰·Capacitor 앱에서 열기, 퀴즈 DB(서버에 `/api/quizzes` 없음 → 예비 파일)
+- 참고: `MetaverseView.vue`는 원래 hex 색을 직접 써서 client CSS 규칙(`tokens.css` 변수만)과 다름. 옮기기만 하고 색은 안 바꿈
+
+## 2026-11-22 메타버스를 client 주소 아래로 연결 (브랜치 `hjs-metaverse-proxy`)
+- 목표: client 개발 서버(5173) 하나로 `/` client · `/api` Spring(8080) · `/metaverse/` 메타버스(5174)를 모두 열기. 주소가 하나라서 로그인 쿠키가 공유되고, 나중에 앱(Capacitor)으로 감쌀 때 메타버스가 앱 안에서 그대로 열림
+- 메타버스
+  - `metaverse/vite.config.js`: `base: '/metaverse/'`, 포트 5174 고정(`strictPort`). 메타버스만 따로 띄워도 퀴즈를 Spring에서 받도록 `/api` → 8080 proxy 추가
+  - `public/` 파일 경로 3곳을 `import.meta.env.BASE_URL` 기준으로 (`geo.js` geojson, `missions.js` 예비 파일, `scene.js` 지형). `/api/quizzes`는 그대로
+  - `MetaverseView.vue`: 왼쪽 위 "← 캠핑 앱으로" 링크(`href="/"` → client가 화면 폭을 보고 `/web` 또는 `/app/explore`로 보냄). 좁은 화면에서는 시간·점수 줄과 안 겹치게 정보줄을 한 칸 내림
+  - `metaverse/CLAUDE.md` 실행 주소, `metaverse/docs/작업기록.md` 결정 사항 갱신
+- client
+  - `client/vite.config.js`: proxy에 `/metaverse` → 5174 (`ws: true`, 코드 수정 자동 반영용)
+  - `utils/webLinks.js`: `METAVERSE_URL` 기본값을 `http://localhost:5174/metaverse` → `/metaverse/metaverse`
+  - PC 메타버스 링크 3곳(`WebMenuDrawer.vue`, `WebMyBookingView.vue`, `WebMyInfoView.vue`)에서 `target="_blank"` 삭제 (앱에서는 새 창이 안 열리거나 밖으로 나감). 내 정보 안내 문구 "새 창에서 열려요" → "3D 캠핑장에서 안전 퀴즈"
+  - 모바일 내 정보(`MobileMyInfoView.vue`) 메뉴에 "메타버스 안전 탐험" 추가 (로그인 전·후 모두)
+- 지킬 것: `http://localhost:5174` 같은 주소를 코드에 쓰지 않기 · 파일 경로는 `BASE_URL` 기준 · API는 `/api/...` · 새 창 쓰지 않기
+- 실행(창 3개): server `.\mvnw.cmd spring-boot:run`(8080) · client `npm run dev`(5173) · metaverse `npm run dev`(5174) → http://localhost:5173/metaverse/metaverse
+- 확인: client·metaverse `npm run build` 통과. 브라우저에서 PC·모바일(375px) 링크가 같은 탭에서 열리고 3D 캠핑장·지형이 나옴, 돌아가기 버튼으로 PC는 `/web`, 모바일은 `/app/explore`로 돌아옴
+- 확인 못 함 / 남은 것
+  - 퀴즈를 DB에서 가져오기: 요청은 client → Spring까지 가지만 Spring에 `/api/quizzes`가 없어 404 → 예비 파일 사용. 퀴즈는 Spring AI + RAG(안전 자료를 pgvector에 저장 → 퀴즈 후보 생성 → 사람이 검토·승인 → quiz 표)로 만들 예정이고, 게임은 승인된 문제만 `/api/quizzes`로 읽기로 함. 응답 모양은 `metaverse/public/data/missions.json`과 같게
+  - 배포: 지금은 개발 서버 proxy로만 묶임. 배포할 때는 메타버스 빌드(`dist`, 경로가 `/metaverse/...`)를 client 배포 결과의 `metaverse/` 폴더에 넣거나 같은 주소로 묶는 설정이 따로 필요
+  - Capacitor 앱 안에서 열기 (팀원 담당)
+
+## 2026-11-21 재난지도 3단계 · 산 대피 · 단계별 행동요령 · 119 전화 (브랜치 `hjs-disaster-live`)
+- 화면 단계는 **안전 · 준비 · 대피** 셋. 114mm(서화 50년 큰비)는 단계 이름을 따로 두지 않고 막대 눈금에 "캠핑장 잠김"으로만 표시 (`criteria.json`, `disasterMap.js` DEFAULT_CRIT). 내부 level 3 은 그대로 둬서 물은 캠핑장까지 차고, 할 일 문장만 더 급하게. 서버 `DisasterRules` 는 바꾸지 않음 (level 3 = 화면에선 "대피")
+- 높은 곳 안내를 "남서쪽 산으로 올라가세요"로 (방향은 코드가 계산한 `hDir`). 이유: 도로만 따라 다리 없이 물보다 높은 곳(311m, 100년 범위 밖)까지 가면 1,520m · 약 30분이고 캠핑장(290m)보다 낮은 285m 강가와 범람 범위 안을 약 460m 지나감 → 쓸 수 없음 (계산: 데이터 폴더 `road_route.py`, 그림 `도로경로_비교.png`). 산길은 지형 계산 방향이고 실제 길은 확인 못 함 → 이름표·길안내에 "길 확인 전"
+- 아래 시트 행동요령을 단계별 3줄로 (`LV[lv].todo`, 제목 "○○ 단계 행동요령"). 수치 없는 일반 행동만 씀
+- 긴급 신고 119 를 `tel:119` 링크로 (휴대폰에서 누르면 전화 걸기 화면)
+- 캠핑장 잠김(level 3, 114mm 이상)에서는 대피 경로·목적지 이름표·핀·대피소 칸·경로 고르기·길안내 버튼·높낮이 그래프를 숨김 (`noRoute`). 할 일 문장·행동요령·119 만 남김. 길안내 중에 이 단계가 되면 길안내를 끝냄
+- 화면 위 위치 줄을 "인북천 물빛테마공원 캠핑장"만 남김 (모바일). 웹 `WebDisasterPanel.vue` 는 팀원 파일이라 그대로
+- 안 쓰는 코드 정리: `state.hasBase`, `state.live.water`, 막대 눈금 `.ref`(기준표에 ref 단계 없음) 삭제. "시뮬레이션"·"즉시 대피"·"심각" 등 옛 이름 주석을 지금 이름(미리 보기 · 캠핑장 잠김)으로 (`disasterMap.js`, `MobileDisasterMapView.vue`, `MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse` 주석, `tokens.css` 주석). 동작은 그대로. `stage.ai` 는 팀원 웹 화면이 써서 남김
+- `osmBuildings`(OpenStreetMap 건물 157동) 삭제 (2026-11-22): 지도에서 한 번도 안 그리던 자료라 `client/public/disaster-map/data.json`·옛 단독 앱 `disaster-map/app/data.js` 에서 빼고(각 약 51KB 줄어듦), `disaster-map/qgis/export_data.py` 도 다시 내보낼 때 안 만들게 고침. 건물은 건물통합정보 803동만 (발표 11페이지도 803동). 확인: `npm run build` 통과, 화면 열림·콘솔 오류 없음
+- 막대 눈금 글자가 길면(캠핑장 잠김) 왼쪽 맞춤해 90 경보와 안 겹치게 (`MobileRainSlider.vue`)
+- 확인: `npm run build` 통과, 브라우저(375px)에서 120mm 때 문구 · 행동요령 · tel:119 · 눈금 확인. 팀원 웹 화면(`WebDisasterPanel.vue`)은 행동요령은 자동으로 따라오고 버튼 글자("높은 곳 (참고)")는 팀원 파일이라 그대로
+- 확인 못 함: 실제 휴대폰에서 전화 연결, 서버 켠 실시간 화면
+
+## 2026-11-21 재난지도 화면 단순하게 (브랜치 `hjs-disaster-live`)
+- 비 막대(`RainSlider.vue`)
+  - 글자를 "최근 3시간 비"에서 "3시간 강수량"으로 바꿈 (기상청 특보 기준과 같은 말이고, 실황이든 미리 보기든 맞는 표현)
+  - "실시간"·"실시간 보기"·"시뮬레이션" 표시와 상류 반월촌교 수위 줄(파란 글씨)을 화면에서 뺌
+  - PC 같은 넓은 화면에서도 막대 폭이 최대 440px를 넘지 않게 함
+- 화면에서만 뺀 것: 수위는 서버 단계 판단에 그대로 씀. "실시간 보기" 버튼이 없어서 막대를 만지면 새로고침 전까지 미리 보기 상태로 남음
+- 특보 칸(`DisasterMapView.vue`): 막대로 미리 보는 중이고 실제 특보가 없으면, 그 비에 맞는 특보를 "미리 보기 · 예시"로 보여 줌
+  - 안전: 특보 없음
+  - 준비(60mm~): 호우주의보
+  - 대피(90mm~)와 즉시 대피(114mm~): 호우경보. 특보는 경보가 가장 높음
+  - 큰비를 미리 보는데 초록 "특보 없음"이 함께 떠서 헷갈렸던 것을 고침. 실제 특보가 발효 중이면 미리 보기 중에도 그 특보를 보여 줌
+  - 이를 위해 `disasterMap.js`의 `state.stage`에 `level`을 더함
+- 안내 시트 제목(`disasterMap.js` `LV.head`)을 단계 이름 대신 할 일로 바꿈
+  - 안전: 대피소 가는 길만 알아 두세요
+  - 준비: 짐을 싸고 대피를 준비하세요
+  - 대피: 다리 말고 높은 곳으로 가세요
+  - 즉시 대피: 짐 두고 바로 높은 곳으로 가세요
+- 높은 곳 길 카메라: 남남서에서 보면 산등성이에 가려져서, 동북동에서 서남서를 내려다보게 바꿈 (heading 250°, pitch -45°). 대피소 길 카메라는 그대로
+- 확인: `npm run build` 통과. 휴대폰(390×844)과 PC(1600×900, 폭 제한을 푼 상태) 화면을 0·60·95·120mm에서 찍어 높은 곳 길이 보이는 것을 눈으로 확인함 (서버는 꺼진 상태라 실시간 값은 확인 못 함)
+
+## 2026-11-20 재난지도 실시간 비·기상특보 연결 (브랜치 `hjs-disaster-live`)
+- 서버 새 패키지 `disaster/`: `GET /api/disaster/now`
+  - 비: 기상청 초단기실황(getUltraSrtNcst) RN1 을 캠핑장 격자로 시간마다 받아 최근 3·12·24시간 합. 지난 시간 값은 저장해 두고 다시 안 부름(처음만 최대 24번, 그다음 한 시간에 1번). 정시 관측은 40분 뒤부터 받음
+  - 단계: `DisasterRules` — 준비 3h 60 또는 12h 110 · 대피 3h 90 또는 12h 180 · 즉시 대피 3h 114 또는 24h 310 (criteria.json·rag 문서와 같은 값)
+  - 특보: `alert` 의 `WarningSource`(기상청 특보현황, 10분 캐시)를 그대로 써서 강원 중 "인제"가 들어간 구역 또는 강원 전체 특보만. **alert 패키지 파일은 안 고침**
+  - 못 받으면 값을 비워 둠 (예시 값·더미 없음). 키: 기존 `KMA_SERVICE_KEY` 그대로
+- 화면(`/disaster`): 처음에 실황을 받아 그 단계로 시작, 10분마다 다시 받음. 슬라이더 옆 "실시간"(관측 시각·12/24시간 까닭) ↔ 슬라이더를 만지면 "시뮬레이션", "실시간 보기"로 복귀. 기상특보 칩은 예시 데이터 삭제 → 인제군 실제 특보 / "발효 중인 특보 없음" / "특보 정보 없음"
+- 확인: `mvnw test` 161개 통과(새 `DisasterServiceTest` 7개), `npm run build` 통과
+- 확인 못 함: 실제 키로 기상청 호출(`/api/disaster/now` 응답), 화면에서 실시간 ↔ 시뮬레이션 전환. 강 수위(원통 관측소)는 아직 (한강홍수통제소 키 따로 필요)
+- 높은 곳(2단계 이상) 경로 교체: 캠핑장에서 걸어서 가장 빨리 닿는 높은 곳으로 다시 계산 (10m DEM, 토블러 걷기 속도 최단 시간, 도착 = 지도 범람 범위의 가장 높은 물 높이 311.1m 보다 높고 100년 범람 범위 밖). 약 160m·캠핑장보다 약 20m 높음·계산상 걸어서 3~4분 (예전 188m·+40m 선 대체). 실제 길 아님, 현장 확인 필요. 화면 확인 못 함
+- 범람 물 표현: 3D 물 면이 가장자리 높이로 판판해서 둑·둔치·캠핑장이 안 잠긴 것처럼 보이던 문제 → 즉시 대피 단계에서 50년 범람 범위 전체를 땅에 강물로 덮는 층 추가. 넘친 물 색도 강물과 같은 변수(`--color-river`)로. 빌드 통과, 화면 확인 못 함
+- 강~캠핑장 사이가 안 잠기던 문제: 범람지도가 강 구역(강~둑 사이 낮은 땅, 284~290m)을 범위에서 빼서 생김 → `data.json` 에 `flood50fill` 추가 (강에서 시작해 가까운 범람 가장자리 물 높이보다 낮은 땅을 이어 채운 10m 칸, 가장자리 300m 안, 사각형 527개). 3D 물은 다 차오르면 강물과 같은 땅 덮개 층으로 바뀜(색 통일). 계산 스크립트는 아직 저장소 밖(임시 폴더)
+- 대피(경보, 90mm) 단계부터 강 구역(`flood50fill`)만 물로 덮음 → 즉시 대피(114mm)에서 캠핑장 쪽 범람 범위까지. 경보 때 실제 어디까지 차는지 계산 자료는 없어서 "그림 표현"으로 둠 (수위 자료 붙으면 교체)
+- 상류 수위 연결: 한강홍수통제소 Open API 반월촌교(1011620, 서화면 심적리, 캠핑장 약 4km 상류) — `HrfcoWaterClient`, 키 환경변수 `HRFCO_SERVICE_KEY`. 공식 기준수위 관심 6.7 · 경보 8.4 · 심각 9.4m(주의보 없음)를 관심→준비 · 경보→대피 · 심각→즉시 대피로 연결(팀 결정), 최종 단계 = 비·수위 중 높은 쪽. 1시간 넘게 새 자료 없으면 판단 제외. 화면 슬라이더 아래 "상류 반월촌교 수위 4.77m · 관심(6.7m)까지 1.93m" 줄. 로그에 키가 찍히지 않게 가림(기상청 비 클라이언트도). 테스트 165개 통과, 빌드 통과
+- 확인함(사용자 터미널): 반월촌교 info·10분 자료 응답 (2026-11-20 14:30 수위 4.77m). 확인 못 함: 서버를 통한 /api/disaster/now 의 water 칸, 화면 표시. 유량(fw) 값은 이상해 보여 안 씀
+- 서버에서 수위가 null 이던 원인: JDK 17 기본 신뢰 목록에 api.hrfco.go.kr 의 루트(OISTE WISeKey Global Root GB CA)가 없어 "PKIX path building failed". 공개 루트 인증서를 `server/src/main/resources/certs/` 에 두고 `HrfcoWaterClient` 에서만 추가로 믿게 함 (JDK 폴더·다른 호출은 그대로). Java 로 확인: 기본은 SSLHandshakeException, 루트 추가 시 HTTP 200
+- 대피 출발점 변경: 고캠핑 원본 좌표(128.2061766, 38.2258503) → QGIS 위성 사진에서 찍은 **캠핑장 안쪽**(128.2060817, 38.2252365, 땅 290.1m, 50·80·100년 범람 범위 안). 거기서 캠핑장 안 길 150m(QGIS 에서 그림)로 "세 갈래 길 끝"(128.206146, 38.2239962)까지 간 뒤 기존 경로. `data.json` campsite 점·두 경로(대피소 1,516→1,411m, 언덕 924→819m), `HILL_PTS` 다시 계산(108m·+21m·약 3분, 도착 311.2m), 서버 `CAMP_LAT/LNG`(서버 다시 켜야 반영). 계산 스크립트는 데이터 폴더 `hill_fastest.py`·`flood_fill_riverzone.py`, 정리 기록은 데이터 폴더 `레이어_정리_기록.md`. 포스터 이미지는 아직 예전 출발점 기준
+
 ## 2026-11-20 웹 내 예약 · 지난 캠핑 후기 (클라이언트 ↔ 서버, 브랜치 `lyh-record`)
 - DB: `db/schema_06.sql` — `camp_review`(일정 하나에 후기 하나, 별점 없음, 일정 · 회원 지우면 CASCADE) · `camp_review_photo`(파일 이름 · 순서) — **DB 에 직접 실행해야 함**
 - 서버 `mycamping/`: `CampReview*` · `ReviewPhotoStore`(인터페이스) · `LocalReviewPhotoStore`(서버 폴더 `{CAMPIN_UPLOAD_DIR 또는 uploads}/reviews`, `.gitignore` 에 `uploads/`). API 3개(목록 · 작성/수정 multipart POST · 사진 파일) — 표는 `server/CLAUDE.md`

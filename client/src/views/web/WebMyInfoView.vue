@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { useSurveyStore } from '@/stores/survey'
 import { loadSavedResult } from '@/utils/webSurvey'
-import { DISASTER_PATH, METAVERSE_URL } from '@/utils/webLinks'
+import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
@@ -32,7 +32,7 @@ const GROUPS = [
     title: '안전',
     rows: [
       { name: '알림', sub: '기상특보 · 재난문자', to: '/web/alerts' },
-      { name: '메타버스 안전 탐험', sub: '새 창에서 열려요', href: METAVERSE_URL },
+      { name: '메타버스 안전 탐험', sub: '3D 캠핑장에서 안전 퀴즈', to: METAVERSE_PATH },
       { name: '3D 재난 대피 지도', sub: '재난 위험 지역 보기', to: DISASTER_PATH },
     ],
   },
@@ -93,7 +93,7 @@ async function logout() {
       <ul>
         <li v-for="r in g.rows" :key="r.name">
           <RouterLink v-if="r.to" :to="r.to" class="row"><span class="n">{{ r.name }}<small>{{ r.sub }}</small></span><i class="arrow"></i></RouterLink>
-          <a v-else-if="r.href" :href="r.href" target="_blank" rel="noopener" class="row"><span class="n">{{ r.name }}<small>{{ r.sub }}</small></span><i class="arrow"></i></a>
+          <a v-else-if="r.href" :href="r.href" class="row"><span class="n">{{ r.name }}<small>{{ r.sub }}</small></span><i class="arrow"></i></a>
           <div v-else class="row off"><span class="n">{{ r.name }}<small>{{ r.sub }}</small></span></div>
         </li>
       </ul>

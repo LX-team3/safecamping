@@ -4,7 +4,7 @@
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { DISASTER_PATH, METAVERSE_URL } from '@/utils/webLinks'
+import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
 
 defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
@@ -48,7 +48,7 @@ async function logout() {
 
         <span class="badge">안전</span>
         <RouterLink to="/web/family" class="row" @click="emit('close')"><span>모임방</span><span class="sub">함께 가는 사람과 안전 공유 ›</span></RouterLink>
-        <a :href="METAVERSE_URL" target="_blank" rel="noopener" class="row" @click="emit('close')"><span>메타버스 안전 탐험</span><i class="arrow"></i></a>
+        <RouterLink :to="METAVERSE_PATH" class="row" @click="emit('close')"><span>메타버스 안전 탐험</span><i class="arrow"></i></RouterLink>
         <RouterLink :to="DISASTER_PATH" class="row" @click="emit('close')"><span>3D 재난 대피 지도</span><i class="arrow"></i></RouterLink>
         <RouterLink to="/web/my-booking" class="row" @click="emit('close')"><span>안전 점검 체크리스트</span><span class="sub">내 예약에서 열려요 ›</span></RouterLink>
       </div>

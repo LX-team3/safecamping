@@ -79,6 +79,37 @@ public class CampPlanService {
         return CampPlanResponse.from(plan);
     }
 
+    // 날짜 · 메모만 고친다. 캠핑장(자리)은 그대로
+    public CampPlanResponse update(String loginId, Long planId, CampPlanUpdateRequest req) {
+        Long memberId = findMember(loginId).getId();
+        CampPlan plan = campPlanMapper.findById(memberId, planId);
+        if (plan == null) {
+            throw new NotFoundException("등록한 캠핑을 찾을 수 없습니다.");
+        }
+        // 체크인을 바꿀 때만 지난 날짜를 막는다 (이미 시작한 캠핑의 인원만 고치는 경우는 허용)
+        if (!req.checkIn().equals(plan.getCheckIn()) && req.checkIn().isBefore(LocalDate.now(KST))) {
+            throw new InvalidRequestException("지난 날짜는 고를 수 없습니다.");
+        }
+        if (ChronoUnit.DAYS.between(req.checkIn(), req.checkOut()) < 1) {
+            throw new InvalidRequestException("체크아웃은 체크인 다음 날부터 고를 수 있습니다.");
+        }
+        // 체크인을 바꾸면 같은 캠핑장 · 같은 체크인의 다른 일정과 겹치는지 본다 (DB 의 UNIQUE 와 같은 조건)
+        if (!req.checkIn().equals(plan.getCheckIn())) {
+            boolean dup = plan.getCampId() != null
+                    ? campPlanMapper.exists(memberId, plan.getCampId(), req.checkIn())
+                    : campPlanMapper.existsSpot(memberId, plan.getLat(), plan.getLng(), req.checkIn());
+            if (dup) {
+                throw new InvalidRequestException("이미 같은 날짜로 등록한 캠핑입니다.");
+            }
+        }
+
+        plan.setCheckIn(req.checkIn());
+        plan.setCheckOut(req.checkOut());
+        plan.setMemo(blankToNull(req.memo()));
+        campPlanMapper.update(plan);
+        return CampPlanResponse.from(plan);
+    }
+
     public void delete(String loginId, Long planId) {
         Long memberId = findMember(loginId).getId();
         // 후기 · 사진 줄은 DB 가 같이 지우지만(CASCADE) 사진 파일은 서버 폴더에 남으므로, 지우기 전에 이름을 받아 둔다

@@ -55,6 +55,7 @@ class ChecklistServiceTest {
             @Override public boolean exists(Long memberId, Long campId, LocalDate checkIn) { return false; }
             @Override public boolean existsSpot(Long memberId, double lat, double lng, LocalDate checkIn) { return false; }
             @Override public int insert(CampPlan plan) { return 1; }
+            @Override public int update(CampPlan plan) { return 1; }
             @Override public int delete(Long memberId, Long planId) { return 0; }
         };
         ChecklistSource source = new ChecklistSource() {

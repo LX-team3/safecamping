@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -38,6 +39,14 @@ public class CampPlanController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CampPlanResponse> add(Authentication authentication, @Valid @RequestBody CampPlanRequest body) {
         return ApiResponse.ok(service.add(authentication.getName(), body));
+    }
+
+    // 고치기: PUT /api/member/camp-plans/3  {"checkIn":"2026-11-24","checkOut":"2026-11-27","memo":"성인 2명 · 어린이 0명 · 친구·연인 · 자동차"}
+    // 예약 정보 확인 화면이 이미 등록한 일정을 고칠 때 쓴다 (같은 일정을 두 번 등록하지 않게)
+    @PutMapping("/{planId}")
+    public ApiResponse<CampPlanResponse> update(Authentication authentication, @PathVariable Long planId,
+                                                @Valid @RequestBody CampPlanUpdateRequest body) {
+        return ApiResponse.ok(service.update(authentication.getName(), planId, body));
     }
 
     // 삭제: DELETE /api/member/camp-plans/3

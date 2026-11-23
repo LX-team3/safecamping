@@ -6,7 +6,8 @@
 #   3. 이 파일(gis/export_geojson.py)을 열고 ▶ 실행
 #   4. 브라우저에서 게임을 새로고침
 #
-# camp.gpkg는 읽기만 해요. 바뀌는 것은 public/data/ 안의 .geojson 파일뿐이에요.
+# camp.gpkg는 읽기만 해요. 바뀌는 것은 client/public/metaverse/data/ 안의 .geojson 파일뿐이에요.
+# (메타버스가 client 안의 화면으로 합쳐져서 데이터도 그쪽으로 옮김. 2026-11-22)
 import os
 
 from osgeo import ogr
@@ -100,7 +101,8 @@ def run():
         print('먼저 QGIS에서 camp.qgz 프로젝트를 열어 주세요.')
         return
     gpkg = os.path.join(gis_dir, 'camp.gpkg')
-    out_dir = os.path.normpath(os.path.join(gis_dir, '..', 'public', 'data'))
+    # gis 폴더(metaverse/gis) 기준으로 두 칸 위가 프로젝트 맨 위 → client/public/metaverse/data
+    out_dir = os.path.normpath(os.path.join(gis_dir, '..', '..', 'client', 'public', 'metaverse', 'data'))
 
     unsaved = unsaved_layers()
     if unsaved:

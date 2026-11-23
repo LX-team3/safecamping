@@ -4,6 +4,10 @@
 거북이 캐릭터로 캠핑장을 돌아다니며 위험 지점을 찾고, 5분 안에 퀴즈 4개를 풀어요.
 팀 프로젝트 "캠핀(CAMPIN)"의 메타버스 파트예요.
 
+> **2026-11-22부터 게임 코드는 client 안에 있어요.** 이 `metaverse/` 폴더에는 QGIS 원본(`gis/`)과 문서(`docs/`, 이 파일)만 남았어요.
+> - 3D 코드: `client/src/metaverse/` · 화면: `client/src/views/metaverse/MetaverseView.vue` · 데이터: `client/public/metaverse/data/`
+> - 주소: client의 `/metaverse` (라우트는 `client/src/router/index.js`)
+
 ## 먼저 읽을 것
 
 - **docs/작업기록.md**: Claude 채팅에서 지금까지 진행한 내용, 결정 사항, 해결한 문제, 남은 할 일이 정리돼 있어요. 새 작업 전에 꼭 읽어 주세요.
@@ -17,18 +21,22 @@
 - 파일을 고칠 때는 필요한 부분만 고치고, 관계없는 코드는 건드리지 마세요.
 - 새 기능은 가능하면 **QGIS 데이터(type 값)로 조절**할 수 있게 만들어 주세요. 코드에 좌표를 직접 적지 않아요.
 - `gis/camp.gpkg`, `gis/camp.qgz`는 원본 데이터예요. **절대 지우거나 덮어쓰지 마세요.**
-- 바꾼 뒤에는 `npm run dev`로 확인할 수 있게 해 주세요.
+- 바꾼 뒤에는 client에서 `npm run dev`로 확인할 수 있게 해 주세요.
 
 ## 실행 방법
 
 ```bash
-npm install        # 처음 한 번
+cd client
+npm install        # 처음 한 번 (three.js도 client에 들어 있어요)
 npm run dev        # http://localhost:5173/metaverse
 ```
 
+- 퀴즈를 DB에서 가져오려면 Spring(8080)도 켜 둬요. 꺼져 있으면 예비 파일(`missions.json`)로 게임이 돼요.
+- 데이터 파일은 `` `${import.meta.env.BASE_URL}metaverse/data/...` ``로 불러요. `http://localhost:...` 같은 주소나 새 창(`target="_blank"`)은 쓰지 않아요 (나중에 앱 안에서 안 열려요).
+
 ## 기술 구성
 
-- **Vue 3 + Vite** (`src/`), 3D는 **three.js** (`src/metaverse/`)
+- **Vue 3 + Vite** (client와 같은 프로젝트), 3D는 **three.js** (`client/src/metaverse/`)
 - 팀 아키텍처: Vue(Firebase Hosting) → Spring Boot(Cloud Run) → PostgreSQL(Cloud SQL, PostGIS)
 - 좌표계: 모든 공간 데이터는 **EPSG:5179** (KGD2002 / Unified CS)
 - 3D 좌표 변환: `x = X - 중심X`, `z = -(Y - 중심Y)` (중심은 terrain.asc 범위의 가운데, 북쪽 = -z)
@@ -36,8 +44,8 @@ npm run dev        # http://localhost:5173/metaverse
 ## 폴더 구조
 
 ```
-src/
-  views/MetaverseView.vue   화면(UI): 시작 화면, 점수·타이머, 퀴즈 창, 결과 화면
+client/src/
+  views/metaverse/MetaverseView.vue   화면(UI): 시작 화면, 점수·타이머, 퀴즈 창, 결과 화면
   metaverse/
     scene.js                총감독: 순서대로 불러오고 매 프레임 업데이트, 다시 하기(restart)
     terrain.js              DEM 지형, 캠핑장 평평하게 깎기, 강바닥 파기, heightAt(x, z)
@@ -54,12 +62,12 @@ src/
     player.js               거북이 캐릭터 이동, 카메라, 충돌, 시작 위치
     daynight.js             낮·밤 바꾸기: 하늘색, 빛, 별과 달, 캐릭터 손전등 (MODES 설정값)
     missions.js             퀴즈 불러오기(DB → 예비 JSON), 위치(anchor) 찾기, 고리·화살표
-public/data/                QGIS에서 내보낸 GeoJSON, terrain.asc, missions.json(예비 문제)
-gis/                        QGIS 원본 (camp.gpkg, camp.qgz) — 수정은 QGIS에서만
+client/public/metaverse/data/  QGIS에서 내보낸 GeoJSON, terrain.asc, missions.json(예비 문제)
+metaverse/gis/                        QGIS 원본 (camp.gpkg, camp.qgz) — 수정은 QGIS에서만
 sql/                        quiz, quiz_choice 테이블 SQL
 ```
 
-## QGIS 레이어 (camp.gpkg → public/data/*.geojson)
+## QGIS 레이어 (camp.gpkg → client/public/metaverse/data/*.geojson)
 
 | 레이어 | 도형 | 주요 필드 / type 값 |
 |---|---|---|
@@ -76,7 +84,7 @@ sql/                        quiz, quiz_choice 테이블 SQL
 
 GeoJSON 내보내기 설정: EPSG:5179, COORDINATE_PRECISION 1, RFC7946 NO, 같은 이름이면 **파일 덮어쓰기**.
 
-**한 번에 내보내기**: QGIS 파이썬 콘솔(Ctrl+Alt+P) 편집기에서 `gis/export_geojson.py`를 열고 ▶ 실행하면 camp.gpkg의 모든 레이어가 위 설정으로 `public/data/`에 내보내져요. (gpkg는 읽기만 해요. 레이어를 먼저 저장해야 해요)
+**한 번에 내보내기**: QGIS 파이썬 콘솔(Ctrl+Alt+P) 편집기에서 `gis/export_geojson.py`를 열고 ▶ 실행하면 camp.gpkg의 모든 레이어가 위 설정으로 `client/public/metaverse/data/`에 내보내져요. (gpkg는 읽기만 해요. 레이어를 먼저 저장해야 해요)
 
 ## 퀴즈
 

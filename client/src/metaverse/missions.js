@@ -17,9 +17,9 @@ export async function loadMissions() {
     if (!Array.isArray(list) || list.length === 0) throw new Error('문제가 0개예요')
     return list
   } catch (err) {
-    // 서버가 꺼져 있을 때도 게임은 되도록, 예비 파일(public/data/missions.json)을 써요
+    // 서버가 꺼져 있을 때도 게임은 되도록, 예비 파일(public/metaverse/data/missions.json)을 써요
     console.warn('DB에서 문제를 못 가져와서 예비 파일을 써요:', err.message)
-    return (await fetch('/data/missions.json')).json()
+    return (await fetch(`${import.meta.env.BASE_URL}metaverse/data/missions.json`)).json()
   }
 }
 

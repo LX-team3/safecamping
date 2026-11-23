@@ -3,6 +3,9 @@
     <!-- 3D 화면 -->
     <div ref="container" class="metaverse"></div>
 
+    <!-- 캠핑 앱 화면으로 돌아가기. '/' 로 가면 화면 폭을 보고 PC(/web) · 모바일(/app/explore) 으로 보내 준다 -->
+    <RouterLink to="/" class="back">← 캠핑 앱으로</RouterLink>
+
     <!-- 위쪽 정보줄: 시간, 점수, 찾은 개수 -->
     <div v-if="phase === 'play'" class="hud">
       <span :class="{ hurry: timeLeft <= 30 }">⏱ {{ timeText }}</span>
@@ -90,7 +93,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { createScene } from '../metaverse/scene.js'
+import { createScene } from '@/metaverse/scene.js'
 
 const TIME_LIMIT = 300 // 제한 시간(초)
 
@@ -223,6 +226,15 @@ const resultTitle = computed(() => {
   font-size: 18px; font-weight: 700;
 }
 .hud .hurry { color: #ff8a65; }
+.back {
+  position: absolute; top: 14px; left: 14px; z-index: 10;
+  padding: 8px 14px; background: rgba(20, 40, 30, 0.8); color: #fff;
+  border-radius: 999px; font-size: 14px; font-weight: 700; text-decoration: none;
+}
+/* 휴대폰처럼 좁은 화면에서는 돌아가기 버튼과 겹치지 않게 정보줄을 한 줄 아래로 */
+@media (max-width: 560px) {
+  .hud { top: 58px; }
+}
 .help {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
   padding: 8px 16px; background: rgba(255, 255, 255, 0.85); border-radius: 10px; font-size: 14px;
