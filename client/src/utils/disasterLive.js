@@ -6,6 +6,7 @@
 //   지도를 만들기 전에 live.start(), 지도를 만든 뒤 live.mapReady(), 화면을 떠날 때 live.stop()
 //   특보 칸에는 live.alert 를 쓴다 (미리 보기 중에는 그 비에 맞는 예시 특보)
 //   막대로 미리 보다가 "현상황 보기"를 누르면 live.backToLive() — 마지막으로 받은 실황으로 돌아간다
+//   시연용 호우특보 예시 알림을 누르고 들어오면 live.showDemo(예시) — 특보 칸에 그 예시를 "예시"로 표시 (미리 보기 중에만)
 import { computed, shallowRef } from 'vue'
 import { api } from '@/utils/api'
 
@@ -33,6 +34,7 @@ export function useDisasterLive(state, map) {
   let alive = true
   let timer = null
   let first = null
+  const demo = shallowRef(null) // 알림 예시(data/rainWarningDemo.js) 특보 칸. 실황으로 돌아가면 보이지 않는다
 
   // 기상특보 칸
   function showWarnings(res) {
@@ -58,6 +60,7 @@ export function useDisasterLive(state, map) {
 
   const alert = computed(() => {
     const preview = !state.live.on && state.live.status !== 'loading'
+    if (preview && demo.value) return demo.value // 예시 알림으로 들어온 경우: 실제 특보보다 예시를 먼저 (제목에 "예시" 표시)
     if (!preview || !state.alert.calm) return state.alert
     return PREVIEW_ALERT[state.stage.level ?? 0] || PREVIEW_ALERT[0]
   })
@@ -98,6 +101,14 @@ export function useDisasterLive(state, map) {
       if (alive && !timer) timer = setInterval(loadNow, REFRESH_MS)
     },
     stop() { alive = false; clearInterval(timer) },
-    backToLive() { if (now.value?.level != null) showRain(now.value) },
+    backToLive() { demo.value = null; if (now.value?.level != null) showRain(now.value) },
+    // d: RAIN_DEMOS 의 한 항목. 비 양은 화면이 map.setRain 으로 따로 넣는다 (미리 보기 상태가 됨)
+    showDemo(d) {
+      demo.value = {
+        title: d.category + ' 발효 (예시)', time: '시연용 예시 · ' + d.area, area: '대상: ' + d.area,
+        body: d.lines.slice(0, 2).join(' ') + ' 실제 특보가 아니에요. 실제 특보는 기상청 날씨누리나 재난문자로 확인하세요.',
+        src: '', warn: d.category.includes('경보'), calm: false,
+      }
+    },
   }
 }

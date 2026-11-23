@@ -5,14 +5,20 @@
 // 예보(기온·강수) 값은 아직 없다 — 수치를 지어내지 않기 위해 비워 둔다
 // 지난 캠핑 카드: 후기 쓰기·수정 (GET /api/member/camp-plans/reviews · POST /api/member/camp-plans/{id}/review, 웹 내 예약과 같은 서버)
 // 예약 전·중 카드: "예약 정보 확인" 으로 예약 확인 화면(MobileBookingCheckView)
-import { computed, nextTick, onMounted, ref } from 'vue'
+// 캠핑 전날(D-1) 카드 · 브리핑 알림으로 들어온 카드: 삭제 옆 초인종 버튼 → 카드 안에 브리핑 3줄이 스르륵 열리고 닫힘 (utils/campBrief.js)
+//   앱 브리핑 알림을 누르고 들어오면(?brief=일정id) 그 카드의 브리핑을 바로 펼친다 (utils/localNotify.js)
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { api } from '@/utils/api'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
+import { buildBriefLines, readCheckedIds } from '@/utils/campBrief'
+import { loadSavedResult } from '@/utils/webSurvey'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import MobileReviewSheet from '@/components/mobile/MobileReviewSheet.vue'
 
+const route = useRoute()
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
 
@@ -30,8 +36,38 @@ async function load() {
   // 끝나지 않은 일정마다 출발 준비 요약(특보·안전점수)을 받는다. 못 받아도 카드는 그대로 (줄에 글자만 빠짐)
   myCamping.plans.filter((p) => p.checkOut >= todayIso()).forEach((p) => myCamping.loadChecklist(p.id).catch(() => {}))
   loadReviews()
+  openBriefFromQuery()
 }
 onMounted(load)
+
+// ---- 캠핑 전날 브리핑 (초인종) ----
+const briefOpen = ref({}) // 일정 id → 펼쳤는지
+const briefFailed = ref({}) // 일정 id → 출발 준비 응답을 못 받았는지
+async function toggleBrief(p) {
+  const opening = !briefOpen.value[p.id]
+  briefOpen.value = { ...briefOpen.value, [p.id]: opening }
+  // 처음 화면을 열 때 받은 출발 준비가 없으면(실패) 펼칠 때 한 번 더 받아 본다
+  if (opening && !myCamping.checklists[p.id]) {
+    briefFailed.value = { ...briefFailed.value, [p.id]: false }
+    try {
+      await myCamping.loadChecklist(p.id)
+    } catch {
+      briefFailed.value = { ...briefFailed.value, [p.id]: true }
+    }
+  }
+}
+// 알림을 눌러 들어온 경우: 그 일정 카드가 전날 카드면 브리핑을 펼치고 카드가 보이게 내린다
+async function openBriefFromQuery() {
+  const id = Number(route.query.brief)
+  const card = cards.value.find((c) => c.id === id)
+  if (!card?.briefable) return
+  if (!briefOpen.value[id]) await toggleBrief(card)
+  await nextTick()
+  document.getElementById(`plan-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+// 이미 내 캠핑 화면에 있을 때 알림을 누르면 화면을 새로 만들지 않고 주소만 바뀐다
+// (같은 알림을 또 눌러도 반응하도록 알림 쪽에서 누른 시각 t 를 함께 붙인다)
+watch(() => [route.query.brief, route.query.t], ([v]) => v && openBriefFromQuery())
 
 // ---- 지난 캠핑 후기 ----
 // 일정 id → 서버 후기 { planId, content, photos: [{ id, url }], createdAt, updatedAt }
@@ -126,12 +162,23 @@ const cards = computed(() => {
     else if (p.checkIn <= today) badge = '캠핑 중'
     else badge = `D-${nightsBetween(today, p.checkIn)}`
     const nights = nightsBetween(p.checkIn, p.checkOut)
+    const eve = p.checkIn > today && nightsBetween(today, p.checkIn) === 1 // 내일 출발 = 오늘이 캠핑 전날
+    // 브리핑 알림을 눌러 들어온 일정은 전날이 아니어도 브리핑을 보여 준다 (시연용 5초 알림이 아무 날짜에나 오므로)
+    const fromNotice = !p.past && String(p.id) === route.query.brief
+    const briefable = eve || fromNotice
+    const checklist = myCamping.checklists[p.id]
     return {
       ...p,
       badge,
       past: p.checkOut < today,
       prep: p.checkOut < today ? null : prepLine(myCamping.checklists[p.id]), // 지난 캠핑은 줄 없음
       range: `${labelWithDay(p.checkIn)} – ${labelWithDay(p.checkOut)} · ${nights}박`,
+      briefable,
+      briefTitle: eve ? '내일 캠핑 브리핑' : `캠핑 브리핑 (${badge})`,
+      // 브리핑 3줄 (출발 준비 응답이 와야 만들 수 있다). 진단 · 체크 상태는 이 브라우저에 저장된 값
+      brief: briefable && checklist
+        ? buildBriefLines(p, checklist, loadSavedResult(auth.member?.id), readCheckedIds(auth.member?.id, p.id))
+        : null,
     }
   })
 })
@@ -162,13 +209,25 @@ async function remove(p) {
           {{ error }} <button type="button" class="retry" @click="load">다시 시도</button>
         </p>
         <ul v-else-if="cards.length" class="plans">
-          <li v-for="p in cards" :key="p.id" class="plan" :class="{ past: p.past }">
+          <li v-for="p in cards" :id="`plan-${p.id}`" :key="p.id" class="plan" :class="{ past: p.past }">
             <div class="plan-head">
               <span class="tags">
                 <span class="badge">{{ p.badge }}</span>
                 <span v-if="p.campId == null" class="kind">차박지</span>
               </span>
-              <button type="button" class="del" :aria-label="`${p.campName} 일정 지우기`" @click="remove(p)">삭제</button>
+              <span class="actions">
+                <!-- 캠핑 전날에만: 브리핑 열기·닫기 -->
+                <button v-if="p.briefable" type="button" class="bell" :class="{ on: briefOpen[p.id] }"
+                  :aria-expanded="!!briefOpen[p.id]" :aria-controls="`brief-${p.id}`"
+                  :aria-label="`${p.campName} 캠핑 브리핑 ${briefOpen[p.id] ? '닫기' : '열기'}`" @click="toggleBrief(p)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                  </svg>
+                </button>
+                <button type="button" class="del" :aria-label="`${p.campName} 일정 지우기`" @click="remove(p)">삭제</button>
+              </span>
             </div>
             <!-- 등록 캠핑장은 캠핑장 상세로, 차박 자리(campId 없음)는 차박 지도에서 그 자리로 -->
             <RouterLink v-if="p.campId != null" :to="`/app/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
@@ -178,6 +237,22 @@ async function remove(p) {
             <p class="plan-place">{{ p.place }}</p>
             <p class="plan-range">{{ p.range }}</p>
             <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
+            <!-- 캠핑 전날 브리핑: 닫혀 있을 때는 높이 0 (grid 행 0fr → 1fr 로 바뀌며 스르륵 열림) -->
+            <div v-if="p.briefable" :id="`brief-${p.id}`" class="brief" :class="{ open: briefOpen[p.id] }" :inert="!briefOpen[p.id]">
+              <div class="brief-inner">
+                <div class="brief-box">
+                  <p class="brief-title">{{ p.briefTitle }}</p>
+                  <ul v-if="p.brief" class="brief-lines">
+                    <li v-for="l in p.brief" :key="l.key">
+                      <b :class="{ warn: l.warn }">{{ l.label }}</b>
+                      <span>{{ l.text }}</span>
+                    </li>
+                  </ul>
+                  <p v-else-if="briefFailed[p.id]" class="brief-msg">브리핑을 불러오지 못했어요. 출발 준비에서 확인해 주세요.</p>
+                  <p v-else class="brief-msg">브리핑을 불러오는 중이에요…</p>
+                </div>
+              </div>
+            </div>
             <RouterLink v-if="p.prep" :to="`/app/my-camping/${p.id}/checklist`" class="prep">
               <span v-if="p.prep.warn" class="warn-dot" aria-label="특보 발효 중" />
               <span class="prep-text">
@@ -471,6 +546,85 @@ h1 {
   color: var(--color-card);
   font-size: 12px;
   font-weight: 700;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* 초인종: 검정 원 안에 흰 종. 펼쳐져 있으면 살짝 흔들린 모양으로 기울인다 */
+.bell {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-text);
+  color: var(--color-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.bell svg {
+  transition: transform 0.25s ease;
+}
+.bell.on svg {
+  transform: rotate(-15deg);
+}
+/* 브리핑 접기·펼치기: 높이를 모르는 내용도 부드럽게 열리도록 grid 행 높이(0fr ↔ 1fr)를 바꾼다 */
+.brief {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.35s ease, opacity 0.35s ease;
+}
+.brief.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.brief-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.brief-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+}
+.brief-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.brief-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.brief-lines li {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.brief-lines b {
+  flex: none;
+  width: 58px;
+  color: var(--color-text-sub);
+}
+.brief-lines b.warn {
+  color: var(--color-danger);
+}
+.brief-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-sub);
 }
 .del {
   padding: 4px 0 4px 12px;

@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/utils/api'
+import { scheduleBriefNotice } from '@/utils/localNotify'
 
 // 내 캠핑: 캠핑장 상세에서 "일정 등록"한 캠핑 목록 (내 캠핑 탭에 카드로 보인다)
 // 서버(camp_plan 테이블, /api/member/camp-plans)가 정본이라 다른 기기에서 로그인해도 보인다. 회원 전용
@@ -16,6 +17,12 @@ export const useMyCampingStore = defineStore('myCamping', () => {
   async function add(plan) {
     await api('/api/member/camp-plans', { method: 'post', body: plan })
     await load() // 서버 순서(체크인 순)를 그대로 쓰려고 다시 불러온다
+    // 방금 저장한 일정을 다시 찾아 (서버가 정한 id 가 필요해서) 앱이면 5초 뒤 브리핑 알림을 예약한다
+    const saved = plans.value.find((p) =>
+      p.checkIn === plan.checkIn && (plan.campId != null ? p.campId === plan.campId : p.lat === plan.lat && p.lng === plan.lng),
+    )
+    scheduleBriefNotice(saved) // 기다리지 않는다 — 알림이 실패해도 저장은 끝난 것
+    return saved
   }
 
   // 고치기: 날짜 · 메모만 (예약 정보 확인 화면). 캠핑장은 그대로

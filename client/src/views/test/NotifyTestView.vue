@@ -3,6 +3,8 @@
 import { ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
+import { RAIN_DEMOS } from '@/data/rainWarningDemo'
+import { scheduleRainDemoNotice } from '@/utils/localNotify'
 
 const status = ref('버튼을 눌러 테스트하세요.')
 
@@ -48,6 +50,17 @@ async function sendTest(delaySec) {
     ? `${delaySec}초 뒤에 알림이 와요. 지금 바로 화면을 꺼서 잠가 보세요.`
     : '알림을 보냈어요. 위쪽 알림창을 확인해 보세요.'
 }
+
+// 인제군 호우특보 예시 알림 (시연용 더미). 5초 뒤 잠금화면 알림 → 누르면 재난지도가 그 비 양으로 열린다
+const RAIN_MSG = {
+  ok: '5초 뒤에 호우특보 예시 알림이 와요. 화면을 잠그고 기다린 뒤 알림을 눌러 보세요.',
+  denied: '알림 권한이 거부됐어요. 폰 설정 › 애플리케이션 › 앱 › 알림을 켜 주세요.',
+  web: '앱에서만 동작해요. PC 브라우저에서는 알림이 뜨지 않아요.',
+  error: '알림을 예약하지 못했어요.',
+}
+async function sendRain(key) {
+  status.value = RAIN_MSG[await scheduleRainDemoNotice(key, RAIN_DEMOS[key])]
+}
 </script>
 
 <template>
@@ -59,6 +72,15 @@ async function sendTest(delaySec) {
     </button>
     <button type="button" style="display:block; width:100%; padding:16px; margin-top:12px" @click="sendTest(10)">
       10초 뒤 알림 (잠금화면 테스트)
+    </button>
+
+    <h2 style="margin-top: 32px; font-size: 18px">인제군 호우특보 예시 (5초 뒤)</h2>
+    <p style="font-size: 13px">실제 특보가 아닌 시연용 더미예요. 알림을 누르면 재난지도로 가요.</p>
+    <button type="button" style="display:block; width:100%; padding:16px; margin-top:12px" @click="sendRain('advisory')">
+      호우주의보 예시 (3시간 65mm · 준비)
+    </button>
+    <button type="button" style="display:block; width:100%; padding:16px; margin-top:12px" @click="sendRain('warning')">
+      호우경보 예시 (3시간 95mm · 대피)
     </button>
   </main>
 </template>

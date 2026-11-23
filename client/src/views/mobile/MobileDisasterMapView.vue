@@ -3,7 +3,10 @@
 // 지도 자체는 utils/disasterMap.js (CesiumJS) 가 그리고, 이 화면은 위·아래 안내 부품을 배치한다
 // 화면을 떠나면 지도를 정리한다 (Cesium 은 그래픽 메모리를 많이 써서 꼭 destroy 해야 함)
 // 실시간(/api/disaster/now, 10분마다)·기상특보는 utils/disasterLive.js — 웹(WebDisasterMapView)과 같이 쓴다
-import { onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
+// ?demo=advisory·warning: 호우특보 예시 알림(utils/localNotify.js)을 누르고 들어옴 → 예시 비 양 · 예시 특보로 보여 준다 ("현상황 보기"로 실황 복귀)
+import { onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { RAIN_DEMOS } from '@/data/rainWarningDemo'
 import { createDisasterMap, initialState } from '@/utils/disasterMap'
 import { useDisasterLive } from '@/utils/disasterLive'
 import MobileAlertPill from '@/components/mobile/MobileAlertPill.vue'
@@ -17,7 +20,18 @@ const state = reactive(initialState())
 const map = shallowRef(null)
 const live = useDisasterLive(state, map)
 const pillAlert = live.alert
+const route = useRoute()
 let alive = true
+
+// 예시 알림으로 들어왔으면 그 비 양으로 미리 보기 + 특보 칸에 예시 (지도가 준비된 뒤에만 가능)
+function applyDemo() {
+  const d = RAIN_DEMOS[route.query.demo]
+  if (!d || !map.value) return
+  map.value.setRain(d.rain3h)
+  live.showDemo(d)
+}
+// 이미 이 화면에 있을 때 알림을 또 누르면 화면은 그대로이고 주소(t)만 바뀐다
+watch(() => [route.query.demo, route.query.t], applyDemo)
 
 onMounted(async () => {
   live.start()
@@ -29,6 +43,7 @@ onMounted(async () => {
     if (!alive) { m.destroy(); return }   // 불러오는 사이에 화면을 떠났으면 바로 정리
     map.value = m
     await live.mapReady()
+    if (alive) applyDemo() // 실황을 먼저 반영한 뒤 덮어써야 예시 단계가 남는다
   } catch (e) {
     state.error = '3D 지도를 불러오지 못했어요: ' + e.message
     console.error(e)

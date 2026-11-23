@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { fromIso, labelWithDay } from '@/utils/date'
 import { weatherKind } from '@/utils/weather'
+import { checklistStoreKey } from '@/utils/campBrief'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -39,7 +40,7 @@ onMounted(load)
 
 // ---- 체크 상태: 브라우저에만 (사용자·일정마다 따로 — 다른 사람이 같은 브라우저를 써도 안 섞이게) ----
 const checked = ref({}) // { 항목id: true }
-const storeKey = () => `campin.checklist.${auth.member?.id ?? 0}.${planId.value}`
+const storeKey = () => checklistStoreKey(auth.member?.id, planId.value) // 내 캠핑 브리핑도 같은 값을 읽는다
 
 function readChecked() {
   try {
