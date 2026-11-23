@@ -115,6 +115,42 @@ class DisasterServiceTest {
         assertEquals(List.of("호우주의보", "한파주의보"), res.warnings().stream().map(DisasterNowResponse.Warning::category).toList());
     }
 
+    // 2026-11-23: 호우특보는 예보 기반이라 비가 오기 전에 단계를 올린다
+    @Test
+    void 호우특보만으로_단계를_올린다() {
+        WarningSource watch = () -> Optional.of(List.of(warning("호우주의보", "강원 인제평지에 호우주의보가 발효 중입니다.")));
+        WarningSource alarm = () -> Optional.of(List.of(warning("호우경보", "강원 인제평지에 호우경보가 발효 중입니다.")));
+        DisasterNowResponse r1 = new DisasterService(every(0), watch, NO_WATER).now();
+        assertEquals(1, r1.level());
+        assertEquals(List.of("기상청 호우주의보 발효"), r1.reasons());
+        DisasterNowResponse r2 = new DisasterService(every(0), alarm, NO_WATER).now();
+        assertEquals(2, r2.level());
+        assertEquals(List.of("기상청 호우경보 발효"), r2.reasons());
+    }
+
+    @Test
+    void 비가_특보보다_크면_비를_따른다() {
+        WarningSource alarm = () -> Optional.of(List.of(warning("호우경보", "강원 인제평지에 호우경보가 발효 중입니다.")));
+        assertEquals(3, new DisasterService(rain(38.0, 38.0, 38.0), alarm, NO_WATER).now().level());
+        DisasterNowResponse same = new DisasterService(rain(30.0, 30.0, 30.0), alarm, NO_WATER).now();  // 둘 다 대피면 까닭도 둘 다
+        assertEquals(2, same.level());
+        assertEquals(2, same.reasons().size());
+    }
+
+    @Test
+    void 호우가_아닌_특보는_단계와_상관없다() {
+        WarningSource cold = () -> Optional.of(List.of(warning("한파주의보", "강원에 한파주의보가 발효 중입니다.")));
+        assertEquals(0, new DisasterService(every(0), cold, NO_WATER).now().level());
+    }
+
+    @Test
+    void 특보가_없다고_안전이라_하지_않는다() {
+        // 비·수위를 모르면 특보가 없어도 단계를 정하지 않는다 (null = 미리 보기)
+        assertNull(new DisasterService((lat, lng, h) -> Optional.empty(), NO_WARNING, NO_WATER).now().level());
+        // 특보를 못 받아도 비로는 판단한다
+        assertEquals(0, new DisasterService(every(0), Optional::empty, NO_WATER).now().level());
+    }
+
     @Test
     void 기상청_값_읽기() {
         assertEquals(0.0, KmaRainClient.parseMm("0"));

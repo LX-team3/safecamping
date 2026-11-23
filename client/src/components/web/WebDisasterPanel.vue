@@ -4,14 +4,13 @@
 // 값은 전부 state(utils/disasterMap.js 가 채움)에서 오고, 버튼은 map 의 동작을 부른다
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-// 높낮이 그래프는 화면 배치가 없는 순수 그림이라 앱 것을 그대로 쓴다
-import MobileRouteProfile from '@/components/mobile/MobileRouteProfile.vue'
 
 const props = defineProps({
   state: { type: Object, required: true },
   map: { type: Object, default: null }, // createDisasterMap 이 돌려준 동작들
+  alert: { type: Object, required: true }, // 특보 칸 (utils/disasterLive.js, 미리 보기 중에는 예시 특보)
 })
-const emit = defineEmits(['rain'])
+const emit = defineEmits(['rain', 'live'])
 
 // ---- 비 슬라이더: 단계 구간별 색으로 칠한 막대 (앱 MobileRainSlider 와 같은 계산)
 const pct = (v) => (v / props.state.maxRain) * 100
@@ -28,29 +27,34 @@ const ticks = computed(() => props.state.stages.slice(1))
     <header class="head">
       <RouterLink to="/web" class="back">‹ CAMPIN 홈</RouterLink>
       <h1>호우 및 침수 시 대피경로</h1>
-      <span class="loc">인북천 물빛테마공원 캠핑장 · 인제군 서화면</span>
+      <span class="loc">인북천 물빛테마공원 캠핑장</span>
     </header>
 
     <!-- 기상특보 -->
-    <section class="alert" :class="{ warn: state.alert.warn }" aria-label="기상특보">
-      <b>{{ state.alert.title }}</b><small>{{ state.alert.time }}</small>
-      <p>{{ state.alert.area }}</p>
-      <p>{{ state.alert.body }}</p>
-      <p class="src">{{ state.alert.src }}</p>
+    <section class="alert" :class="{ warn: alert.warn, calm: alert.calm && !alert.off, off: alert.off }" aria-label="기상특보">
+      <b>{{ alert.title }}</b><small>{{ alert.time }}</small>
+      <p v-if="alert.area">{{ alert.area }}</p>
+      <p>{{ alert.body }}</p>
+      <p v-if="alert.src" class="src">{{ alert.src }}</p>
     </section>
 
-    <!-- 길안내 중에는 비 슬라이더를 숨긴다 (앱도 둘러보기 중에만 보임) -->
-    <section v-show="!state.tourOn" class="box flood" aria-label="강수량에 따라 잠기는 범위">
+    <section class="box flood" aria-label="강수량에 따라 잠기는 범위">
       <div class="top">
-        <span class="k">최근 3시간 비</span>
+        <span class="k">3시간 강수량</span>
         <span class="v"><b>{{ state.rain }}</b>mm</span>
         <span class="stage"><i :style="{ background: state.stage.color }"></i>{{ state.stage.label }}</span>
-        <span class="srcbadge" :class="{ ai: state.stage.ai }">{{ state.stage.ai ? 'AI 판단' : '기준표' }}</span>
       </div>
-      <input type="range" min="0" :max="state.maxRain" step="5" :value="state.rain" aria-label="최근 3시간 동안 내린 비"
+      <p v-if="state.live.on" class="note">
+        {{ state.live.time }} · 기상청<template v-if="state.live.reasons.length"> · {{ state.live.reasons.join(', ') }}</template>
+      </p>
+      <!-- 막대로 미리 보는 중이고 받아 둔 실황이 있으면, 실제 상황으로 돌아가는 버튼 (앱과 같음) -->
+      <p v-else-if="state.live.status === 'ok'" class="note preview">
+        미리 보기 중 <button type="button" class="golive" @click="emit('live')">↺ 현상황 보기</button>
+      </p>
+      <input type="range" min="0" :max="state.maxRain" step="5" :value="state.rain" aria-label="3시간 강수량"
         :style="{ '--track': track }" @input="emit('rain', +$event.target.value)">
       <div class="ticks" aria-hidden="true">
-        <span v-for="s in ticks" :key="s.from" :class="{ ref: s.ref }" :style="{ left: pct(s.from) + '%' }">
+        <span v-for="s in ticks" :key="s.from" :class="{ wide: (s.alert || '').length > 3 }" :style="{ left: pct(s.from) + '%' }">
           {{ s.from }}<b v-if="s.alert">{{ s.alert }}</b>
         </span>
         <span style="left: 100%">mm</span>
@@ -62,16 +66,17 @@ const ticks = computed(() => props.state.stages.slice(1))
       <section class="box">
         <div class="state-row">
           <span class="badge">{{ state.lv.badge }}</span>
-          <div>
-            <h2>{{ state.lv.head }}</h2>
-            <p>{{ state.dest.sum }}</p>
-          </div>
+          <h2>{{ state.lv.head }}</h2>
         </div>
 
+        <!-- 침수(114mm 이상)에는 경로·목적지·길안내를 빼고 할 일만 (앱 MobileEvacSheet 와 같음) -->
+        <template v-if="!state.noRoute">
         <div class="shelter">
           <span class="name">{{ state.dest.name }}</span>
           <span class="meta">{{ state.dest.meta }}</span>
+          <div class="links">
           <button type="button" class="where" @click="map?.where()">위치 보기</button>
+        </div>
           <div class="dist">
             <b>{{ state.dest.distNum }}<span class="unit">{{ state.dest.distUnit }}</span></b>
             <small>{{ state.dest.min }}</small>
@@ -81,25 +86,26 @@ const ticks = computed(() => props.state.stages.slice(1))
         <div class="seg" role="group" aria-label="경로 선택">
           <button type="button" :aria-pressed="state.routeKey === 'base'" :disabled="state.baseDisabled"
             @click="map?.selectRoute('base')">{{ state.baseLabel }}</button>
-          <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">높은 곳 (참고)</button>
+          <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">산 위 높은 곳</button>
         </div>
 
         <div class="actions">
           <button type="button" class="btn primary" @click="map?.startNav()">{{ state.lv.cta }}</button>
-          <button type="button" class="btn ghost" @click="map?.toggleTour()">{{ state.tourOn ? '■ 미리 보기 멈추기' : '▶ 대피 경로 따라가기' }}</button>
+          <!-- 카카오맵 걷기 길찾기 (대피소 경로일 때만, 새 창) -->
+          <a v-if="state.dest.navUrl" class="btn ghost link" :href="state.dest.navUrl" target="_blank" rel="noopener">카카오맵 길찾기</a>
         </div>
+        </template>
       </section>
 
-      <MobileRouteProfile :state="state" />
-
       <section class="todo-box">
-        <h3>침수 시 행동요령</h3>
+        <h3>{{ state.lv.badge }} 단계 행동요령</h3>
         <ul class="todo">
           <li v-for="(t, i) in state.todo" :key="i"><span>{{ i + 1 }}</span><span>{{ t }}</span></li>
         </ul>
       </section>
 
-      <div class="emergency"><span>긴급 신고</span><b>119</b></div>
+      <!-- 휴대폰·전화 앱이 있는 PC 에서 누르면 바로 119 전화 걸기 (tel: 링크, 앱과 같음) -->
+      <a class="emergency" href="tel:119" aria-label="119에 전화 걸기"><span>긴급 신고 · 눌러서 전화</span><b>119</b></a>
     </template>
 
     <!-- 길안내 화면 -->
@@ -117,7 +123,7 @@ const ticks = computed(() => props.state.stages.slice(1))
         <button type="button" class="btn primary" @click="map?.next()">{{ state.nav.nextLabel }}</button>
       </div>
       <button v-if="state.detourBtn" type="button" class="btn ghost detour" @click="map?.detour()">
-        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 높은 곳으로
+        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 산으로
       </button>
       <button type="button" class="btn ghost" @click="map?.endNav()">길안내 종료</button>
     </section>
@@ -142,6 +148,9 @@ const ticks = computed(() => props.state.stages.slice(1))
   font-size: 13px; line-height: 1.6;
 }
 .alert.warn { background: var(--dm-severe); }
+/* 앱 특보 알림(MobileAlertPill)과 같은 색: 특보 없음 = 안전 색, 못 받음 = 회색 */
+.alert.calm { background: var(--dm-safe); }
+.alert.off { background: var(--dm-card); color: var(--dm-text); }
 .alert b { font-size: 14px; margin-right: 8px; }
 .alert small { font-size: 11px; opacity: 0.85; }
 .alert p { margin: 4px 0 0; }
@@ -156,8 +165,10 @@ const ticks = computed(() => props.state.stages.slice(1))
 .v b { font-family: var(--dm-font-num); font-size: 18px; color: var(--dm-text); margin-right: 1px; }
 .stage { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--dm-sheet); }
 .stage i { width: 8px; height: 8px; border-radius: 50%; }
-.srcbadge { font-size: 10px; font-weight: 700; color: var(--dm-muted); border: 1px solid var(--dm-line); border-radius: 5px; padding: 1px 4px; }
-.srcbadge.ai { color: var(--dm-water); border-color: var(--dm-water); }
+.note { margin: 2px 0 0; font-size: 11px; color: var(--dm-muted); }
+.note.preview { display: flex; align-items: center; gap: 8px; }
+.golive { font: inherit; font-size: 11px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 2px 9px; cursor: pointer; }
+.golive:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
 input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; background: transparent; margin: 0; cursor: pointer; }
 input[type='range']::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--track); }
 input[type='range']::-moz-range-track { height: 6px; border-radius: 3px; background: var(--track); }
@@ -167,12 +178,12 @@ input[type='range']:focus-visible { outline: 2px solid var(--dm-water); outline-
 .ticks { position: relative; height: 14px; margin: -5px 10px 0; font-family: var(--dm-font-num); font-size: 10px; color: var(--dm-muted); }
 .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .ticks span b { font-weight: 700; color: var(--dm-text); margin-left: 2px; }
-.ticks span.ref { opacity: 0.6; }
+/* 글자가 긴 눈금(4글자 이상)은 왼쪽 끝을 눈금에 맞춰 옆 눈금과 겹치지 않게 (앱과 같음) */
+.ticks span.wide { transform: translateX(-6px); }
 
 .state-row { display: flex; gap: 12px; align-items: center; }
 .badge { flex: none; font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 8px; background: var(--lv); color: var(--color-dm-on-light); }
 .state-row h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 700; text-wrap: balance; }
-.state-row p { margin: 4px 0 0; font-size: 13px; color: var(--dm-muted); line-height: 1.5; }
 
 .shelter { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; background: var(--dm-sheet); border-radius: 12px; padding: 12px; }
 .shelter .name { font-size: 16px; font-weight: 700; }
@@ -181,12 +192,14 @@ input[type='range']:focus-visible { outline: 2px solid var(--dm-water); outline-
 .shelter .dist b { font-family: var(--dm-font-num); font-size: 22px; display: block; }
 .shelter .dist .unit { font-size: 13px; }
 .shelter .dist small { font-size: 11px; color: var(--dm-muted); }
-.shelter .where { font: inherit; justify-self: start; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.shelter .links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.shelter .where { font: inherit; text-decoration: none; font-size: 12px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 
 .btn { font: inherit; font-weight: 700; border: 0; border-radius: 12px; cursor: pointer; min-height: 48px; font-size: 15px; }
 .btn.primary { background: var(--lv); color: var(--color-dm-on-light); }
 .btn.ghost { background: transparent; color: var(--dm-text); border: 1px solid var(--dm-line); min-height: 44px; font-size: 14px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.link { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .btn.detour { border-color: var(--dm-caution); color: var(--dm-caution); }
 .btn:focus-visible, .seg button:focus-visible, .where:focus-visible, .back:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
 .actions { display: grid; gap: 8px; }
@@ -200,8 +213,9 @@ input[type='range']:focus-visible { outline: 2px solid var(--dm-water); outline-
 .todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .todo li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 14px; line-height: 1.5; background: var(--dm-card); border-radius: 12px; padding: 10px 12px; }
 .todo li span:first-child { font-family: var(--dm-font-num); color: var(--lv); font-weight: 700; }
-.emergency { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dm-muted); border-top: 1px solid var(--dm-line); padding-top: 12px; }
-.emergency b { font-family: var(--dm-font-num); font-size: 20px; color: var(--dm-text); user-select: all; }
+.emergency { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dm-muted); border-top: 1px solid var(--dm-line); padding-top: 12px; text-decoration: none; min-height: 44px; }
+.emergency b { font-family: var(--dm-font-num); font-size: 20px; color: var(--dm-text); }
+.emergency:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; border-radius: 6px; }
 
 .nav-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--dm-muted); }
 .progress { height: 6px; background: var(--dm-sheet); border-radius: 3px; overflow: hidden; }

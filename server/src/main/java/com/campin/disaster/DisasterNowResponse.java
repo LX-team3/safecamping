@@ -10,7 +10,7 @@ import java.util.List;
 // level: 0 안전 · 1 준비 · 2 대피 · 3 침수, 화면 이름은 '대피' (DisasterRules). reasons: 그 단계가 된 까닭
 // warningAvailable: 기상특보를 실제로 받았으면 true. false 면 warnings 는 빈 목록 (예시 특보를 넣지 않는다)
 // warnings: 인제군에 지금 발효 중인 기상특보
-// water: 상류 반월촌교 수위(한강홍수통제소). 못 받았으면 null. level 은 비 단계와 수위 단계 중 높은 쪽
+// water: 상류 반월촌교 수위(한강홍수통제소). 못 받았으면 null. level 은 비 · 수위 · 호우특보(주의보 1, 경보 2) 단계 중 높은 쪽
 public record DisasterNowResponse(String place, boolean rainAvailable, LocalDateTime observedAt,
                                   Double rain3h, Double rain12h, Double rain24h,
                                   Integer level, List<String> reasons,

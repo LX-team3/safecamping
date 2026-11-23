@@ -1,8 +1,6 @@
 <script setup>
 // 아래 대피 안내 시트: 기본(대피 장소·경로 고르기·행동요령) / 길안내(단계별) 두 모양
 // 지도를 만지면 접히고(지도가 가려지지 않게), 손잡이를 누르면 펼쳐진다
-import MobileRouteProfile from '@/components/mobile/MobileRouteProfile.vue'
-
 defineProps({
   state: { type: Object, required: true },
   map: { type: Object, default: null },   // utils/disasterMap.js 가 돌려준 동작들
@@ -18,17 +16,16 @@ defineProps({
     <div v-if="state.mode === 'overview'" class="sec">
       <div class="state-row">
         <span class="badge">{{ state.lv.badge }}</span>
-        <div>
-          <h2>{{ state.lv.head }}</h2>
-          <p v-if="!state.noRoute">{{ state.dest.sum }}</p>
-        </div>
+        <h2>{{ state.lv.head }}</h2>
       </div>
 
       <template v-if="!state.noRoute">
       <div class="shelter">
         <span class="name">{{ state.dest.name }}</span>
         <span class="meta">{{ state.dest.meta }}</span>
+        <div class="links">
         <button type="button" class="where" @click="map?.where()">위치 보기</button>
+      </div>
         <div class="dist">
           <b>{{ state.dest.distNum }}<span class="unit">{{ state.dest.distUnit }}</span></b>
           <small>{{ state.dest.min }}</small>
@@ -43,10 +40,9 @@ defineProps({
 
       <div class="actions">
         <button type="button" class="btn primary" @click="map?.startNav()">{{ state.lv.cta }}</button>
-        <button type="button" class="btn ghost" @click="map?.toggleTour()">{{ state.tourOn ? '■ 미리 보기 멈추기' : '▶ 대피 경로 따라가기' }}</button>
+        <!-- 카카오맵 걷기 길찾기 (대피소 경로일 때만, 새 창) -->
+        <a v-if="state.dest.navUrl" class="btn ghost link" :href="state.dest.navUrl" target="_blank" rel="noopener">카카오맵 길찾기</a>
       </div>
-
-      <MobileRouteProfile :state="state" />
       </template>
 
       <div class="sec small">
@@ -101,7 +97,6 @@ defineProps({
 .state-row { display: flex; gap: 12px; align-items: center; }
 .badge { flex: none; font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 8px; background: var(--lv); color: var(--color-dm-on-light); }
 .state-row h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 700; text-wrap: balance; }
-.state-row p { margin: 4px 0 0; font-size: 13px; color: var(--dm-muted); line-height: 1.5; }
 
 .shelter { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; background: var(--dm-card); border-radius: 14px; padding: 14px; }
 .shelter .name { font-size: 17px; font-weight: 700; }
@@ -110,13 +105,15 @@ defineProps({
 .shelter .dist b { font-family: var(--dm-font-num); font-size: 22px; display: block; }
 .shelter .dist .unit { font-size: 13px; }
 .shelter .dist small { font-size: 11px; color: var(--dm-muted); }
-.shelter .where { font: inherit; justify-self: start; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.shelter .links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.shelter .where { font: inherit; text-decoration: none; font-size: 12px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 
 .btn { font: inherit; font-weight: 700; border: 0; border-radius: 14px; cursor: pointer; min-height: 52px; font-size: 16px; }
 .btn.primary { background: var(--lv); color: var(--color-dm-on-light); }
 .btn.ghost { background: transparent; color: var(--dm-text); border: 1px solid var(--dm-line); min-height: 46px; font-size: 14px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn:focus-visible, .seg button:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
+.btn.link { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .btn.detour { border-color: var(--dm-caution); color: var(--dm-caution); }
 .actions { display: grid; gap: 8px; }
 
