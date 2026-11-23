@@ -3,8 +3,8 @@
 // 탐색 화면(캠핑장 지도)과 위쪽 "캠핑장 | 차박" 토글로 오간다. 아래 탭은 탐색으로 표시
 // 판정은 서버 GET /api/chabak/verdict (DB 의 판정 함수가 계산). 지금은 인제군만 판정한다
 // 아래 시트는 두 가지 (탐색 화면과 같은 틀):
-//  - 둘러보기(아직 안 누름): 검색 · 칩(필터 · 차박 후보지 · 등록 야영장 · 주변 안전) · 차박지 목록
-//  - 판정 카드(지도나 목록에서 고름): 차박 규제 · 주변 안전 · 자세히 보기 · (등록 야영장이면) 내 캠핑에 등록
+//  - 둘러보기(아직 안 누름): 검색 · 칩(필터 · 차박 후보지 · 등록 야영장 · 안전점수) · 차박지 목록
+//  - 판정 카드(지도나 목록에서 고름): 판정 · 안전점수 · 자세히 보기 · (등록 야영장이면) 내 캠핑에 등록
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import MobileChabakMap from '@/components/mobile/MobileChabakMap.vue'
@@ -62,18 +62,18 @@ const layerOn = ref({}) // { no: true, open: true, ... } 켜짐 여부
 const layerData = ref({}) // type → { items, loading, error }
 // 켜 둔 것만, 칩 순서대로 (아래 시트 제목 줄)
 const activeLayers = computed(() => verdictLayers.filter((c) => layerOn.value[c.type]))
-// "주변 안전" 필터: 안전점수가 기준 이상인 곳만 (기준은 캠핑장 등급과 같음)
+// "안전점수" 필터: 안전점수가 기준 이상인 곳만 (기준은 캠핑장 등급과 같음)
 const safetyFilter = ref('all') // SAFETY_FILTERS 의 key
 const safetyMin = computed(() => SAFETY_FILTERS.find((f) => f.key === safetyFilter.value)?.min ?? null)
 // 필터를 거친 목록 (받기 전이면 null)
 function shownItems(type) {
   const items = layerData.value[type]?.items
   if (!items) return null
-  // 구역(불가·주의)은 안전점수가 없어서 거르지 않는다 — "주변 안전" 필터는 점(후보지·야영장)에만
+  // 구역(불가·주의)은 안전점수가 없어서 거르지 않는다 — "안전점수" 필터는 점(후보지·야영장)에만
   if (LAYER_CHIPS.find((c) => c.type === type)?.zone) return items
   return safetyMin.value == null ? items : items.filter((it) => it.score != null && it.score >= safetyMin.value)
 }
-// ---- 차박지 필터 시트 (칩 줄: 맨 왼쪽 필터 아이콘 = 구역 표시, "주변 안전 ▾" = 안전점수 거르기) ----
+// ---- 차박지 필터 시트 (칩 줄: 맨 왼쪽 필터 아이콘 = 구역 표시, "안전점수 ▾" = 안전점수 거르기) ----
 const filterOpen = ref(null) // null · 'avoid' · 'safety'
 const safetyLabel = computed(() => SAFETY_FILTERS.find((f) => f.key === safetyFilter.value)?.label ?? '전체')
 // 필터 시트에 보여 줄 개수 (필터를 거친 것, 받기 전·구역이면 null — 구역은 한 덩어리라 개수가 의미 없음)
@@ -265,7 +265,7 @@ function goInje() {
   backToBrowse()
 }
 
-// 판정 카드 닫기 → 처음 화면(갈 수 있는 곳 · 주변 안전 필터)으로
+// 판정 카드 닫기 → 처음 화면(갈 수 있는 곳 · 안전점수 필터)으로
 // 지도의 핀·칠한 필지·근처 시설도 같이 지운다. 아직 오는 중인 응답은 버린다 (요청 번호를 올림)
 function closeVerdict() {
   requestNo++
@@ -279,9 +279,8 @@ function closeVerdict() {
 }
 
 // ---- 둘러보기 목록: 켜 둔 차박 후보지 · 등록 야영장을 한 목록으로 (탐색 목록과 같은 모양, MobileSpotRow) ----
-// 주변 안전 필터 · 검색어를 거쳐 정렬. 누르면 지도를 그 자리로 옮기고 판정 카드
+// 안전점수 필터 · 검색어를 거쳐 안전점수 높은 순으로 정렬 (응급실 거리는 점수에 이미 들어 있어 정렬 선택은 두지 않음). 누르면 지도를 그 자리로 옮기고 판정 카드
 const query = ref('')
-const sort = ref('score') // score 안전점수순 · er 응급실 가까운순
 const listLoading = computed(() => spotChips.some((c) => layerOn.value[c.type] && layerData.value[c.type]?.loading))
 const listItems = computed(() => {
   const q = query.value.trim()
@@ -291,9 +290,7 @@ const listItems = computed(() => {
     .filter((it) => !q || [it.name, it.area].some((t) => t?.includes(q)))
   const er = (it) => it.erDriveMin ?? Infinity // 모르는 곳은 뒤로
   const sc = (it) => it.score ?? -1
-  return all.sort((a, b) =>
-    sort.value === 'er' ? er(a) - er(b) || sc(b) - sc(a) : sc(b) - sc(a) || er(a) - er(b),
-  )
+  return all.sort((a, b) => sc(b) - sc(a) || er(a) - er(b)) // 점수 같으면 응급실 가까운 곳 먼저
 })
 
 const fromList = ref(false) // 지금 판정이 목록에서 고른 것인지 (판정 카드에 "‹ 목록으로")
@@ -435,7 +432,7 @@ const parcelLine = computed(() =>
             </button>
             <button type="button" class="chip" :class="{ on: safetyFilter !== 'all' }" aria-haspopup="dialog"
               @click="filterOpen = 'safety'">
-              주변 안전{{ safetyFilter !== 'all' ? ` · ${safetyLabel}` : '' }} ▾
+              안전점수{{ safetyFilter !== 'all' ? ` · ${safetyLabel}` : '' }} ▾
             </button>
           </div>
         </template>
@@ -445,22 +442,13 @@ const parcelLine = computed(() =>
           <!-- 1. 둘러보기 목록: 켜 둔 차박 후보지 · 등록 야영장 (탐색 목록과 같은 모양). 누르면 지도에서 그 자리 판정 -->
           <template v-if="browsing">
             <div class="list-head">
-              <div>
-                <h1>차박지 {{ listItems.length }}곳</h1>
-                <p class="sub">지도를 누르면 그 자리를 판정해요</p>
-              </div>
-              <label class="sort">
-                <select v-model="sort" aria-label="정렬">
-                  <option value="score">안전점수순</option>
-                  <option value="er">응급실 가까운순</option>
-                </select>
-              </label>
+              <h1>차박지 {{ listItems.length }}곳</h1>
             </div>
             <p v-if="listLoading && !listItems.length" class="state">불러오는 중...</p>
             <p v-else-if="!spotChips.some((c) => layerOn[c.type])" class="state">
-              차박 후보지 · 등록 야영장 칩을 켜면 목록이 보여요
+              차박 후보지 · 등록 야영장을 눌러 목록 확인
             </p>
-            <p v-else-if="!listItems.length" class="state">조건에 맞는 곳이 없어요. 주변 안전을 넓혀 보세요</p>
+            <p v-else-if="!listItems.length" class="state">조건에 맞는 곳이 없어요. 안전점수 기준을 넓혀 보세요</p>
             <ol v-else class="spot-list">
               <MobileSpotRow v-for="(it, i) in listItems" :key="`${it.kind}-${it.id ?? it.name}-${it.lat}`" :item="it"
                 :rank="i + 1" @open="pickFromList" />
@@ -491,18 +479,11 @@ const parcelLine = computed(() =>
             </div>
             <p class="sub">{{ parcelLine }}</p>
 
-            <!-- 판정(여기서 자도 되나)과 안전점수(도움받기 쉬운가)는 다른 질문 → 이름표를 붙인 두 줄로 나눈다
-                 큰 제목은 위의 판정 하나만. 안전점수는 캠핑장과 같은 기준·등급 (안전 70↑ · 주의 40↑ · 위험) -->
+            <!-- 판정(여기서 자도 되나)은 위의 딱지와 큰 제목이 이미 말하므로 따로 한 줄을 더 두지 않는다
+                 안전점수(도움받기 쉬운가)는 캠핑장과 같은 기준·등급 (안전 70↑ · 주의 40↑ · 위험) -->
             <dl class="facts">
-              <div class="fact">
-                <dt>차박 규제</dt>
-                <dd>
-                  <i :style="{ background: `var(${verdict?.colorVar ?? '--color-text-sub'})` }" />
-                  {{ result.verdict }}
-                </dd>
-              </div>
               <div v-if="scoreData?.score != null" class="fact">
-                <dt>주변 안전</dt>
+                <dt>안전점수</dt>
                 <dd>
                   <!-- 누르면 시트를 올려 "가까운 시설" 목록 -->
                   <button type="button" class="fact-link" :disabled="!nearestByType.length" @click="snap = 'full'">
@@ -524,7 +505,6 @@ const parcelLine = computed(() =>
               <!-- 가까운 시설: 캠핑장 상세의 목록과 같은 모양 (번호 · 이름 · 거리 · 차로 몇 분). 누르면 시설 상세 -->
               <template v-if="nearestByType.length">
                 <h2>가까운 시설</h2>
-                <p class="note">가까운 순 · 누르면 시설 상세를 보여줘요 · 시간은 직선거리로 어림한 값</p>
                 <ol class="rows facility-rows">
                   <li v-for="(f, i) in nearestByType" :key="f.id">
                     <RouterLink :to="`/app/facilities/${f.id}`" class="row">
@@ -547,7 +527,7 @@ const parcelLine = computed(() =>
 
               <template v-if="result.alternatives?.length">
                 <h2>근처 차박 후보</h2>
-                <p class="note">공공데이터상 제한이 없는 국공유지예요</p>
+                <p class="note">공공데이터상 제한 없는 국공유지</p>
                 <ul class="rows">
                   <li v-for="a in result.alternatives" :key="a.jibun">
                     <button type="button" class="row" @click="openAlternative(a)">
@@ -589,7 +569,7 @@ const parcelLine = computed(() =>
           </template>
 
           <p v-if="!browsing" class="disclaimer">
-            공공데이터 기준 참고용 판정이며 법적 경계는 지적측량으로 확정돼요 · 지금은 인제군만 판정해요
+            공공데이터 기준 참고용 판정이며 법적 경계는 지적측량으로 확정
           </p>
           </div>
         </div>
@@ -611,7 +591,7 @@ const parcelLine = computed(() =>
     <!-- 지도 설정: 지도 종류 · 안전 시설 (탐색·내 주변과 같은 시트) -->
     <MobileLayerSheet v-if="layerSheetOpen" :layers="layers" :on="facilityOn" @close="layerSheetOpen = false"
       @toggle="toggleFacility" />
-    <!-- 차박지 필터: 구역 표시(필터 아이콘) · 주변 안전(칩) -->
+    <!-- 차박지 필터: 구역 표시(필터 아이콘) · 안전점수(칩) -->
     <MobileFilterSheet v-if="filterOpen" :only="filterOpen" :spots="verdictLayers" :on="layerOn" :counts="filterCounts"
       :safety="safetyFilter" @close="filterOpen = null" @toggle="toggleLayer" @safety="safetyFilter = $event" />
     <!-- 내 캠핑에 일정 등록 (등록 야영장) -->
@@ -729,26 +709,6 @@ const parcelLine = computed(() =>
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
-}
-.list-head .sub {
-  margin-top: 4px;
-}
-.sort {
-  flex: none;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 17px;
-  background: var(--color-bg-soft);
-  display: flex;
-  align-items: center;
-  font-size: 13px;
-}
-.sort select {
-  border: none;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-  outline: none;
 }
 .spot-list {
   margin: 0;
@@ -973,7 +933,7 @@ h2 {
   font-weight: 700;
   color: var(--color-caution);
 }
-/* 이름표 붙은 두 줄: 차박 규제 / 주변 안전 (서로 다른 질문이라 나눠 보여 줌) */
+/* 이름표 붙은 줄: 안전점수 (판정은 위의 딱지·제목이 말함) */
 .facts {
   margin: 0;
   padding: 4px 14px;

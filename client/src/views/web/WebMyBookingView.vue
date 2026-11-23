@@ -12,10 +12,12 @@ import WebConfirmModal from '@/components/web/WebConfirmModal.vue'
 import WebReviewModal from '@/components/web/WebReviewModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
-import { DISASTER_PATH, METAVERSE_URL } from '@/utils/webLinks'
+import { useReservationReturnStore } from '@/stores/reservationReturn'
+import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
 
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
+const visit = useReservationReturnStore() // 예약 사이트에서 돌아오면 "예약하셨나요?" → 이 일정 고치기
 
 const tab = ref('up')
 const error = ref('')
@@ -235,7 +237,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
                 <span class="dtext"><b>{{ b.left }}</b><span>내 캠핑 일정</span></span>
               </span>
               <span class="acts">
-                <RouterLink v-if="b.campId" :to="`/web/booking-check?camp=${b.campId}`" class="edit">예약 정보 확인 ›</RouterLink>
+                <RouterLink v-if="b.campId" :to="`/web/booking-check?camp=${b.campId}&plan=${b.id}`" class="edit">예약 정보 확인 ›</RouterLink>
                 <button type="button" class="del" :aria-label="`${b.campName} 일정 지우기`" @click="remove(b)">삭제</button>
               </span>
             </div>
@@ -260,7 +262,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
               <RouterLink v-if="b.campId" :to="`/web/camps/${b.campId}`">캠핑장 상세</RouterLink>
               <span v-else class="off">캠핑장 상세</span>
               <RouterLink to="/web/family">모임방 초대</RouterLink>
-              <a v-if="b.resv" :href="b.resv" target="_blank" rel="noopener">예약 사이트 ↗</a>
+              <a v-if="b.resv" :href="b.resv" target="_blank" rel="noopener" @click="visit.mark({ campId: b.campId, campName: b.campName, planId: b.id })">예약 사이트 ↗</a>
               <span v-else class="off">예약 사이트 없음</span>
             </div>
             <div class="check">
@@ -282,7 +284,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
                 </RouterLink>
                 <div class="tools">
                   <RouterLink :to="b.campId ? `/web/nearby?camp=${b.campId}` : '/web/nearby'" class="main-tool"><span aria-hidden="true">📍</span>주변 안전시설 · 길찾기</RouterLink>
-                  <a :href="METAVERSE_URL" target="_blank" rel="noopener" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</a>
+                  <RouterLink :to="METAVERSE_PATH" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</RouterLink>
                   <RouterLink :to="DISASTER_PATH" class="sub-tool"><span aria-hidden="true">🌊</span>3D 재난 대피 지도</RouterLink>
                 </div>
               </div>

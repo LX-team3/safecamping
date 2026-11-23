@@ -1,11 +1,13 @@
 <script setup>
-// 1분 진단 (설계: Survey.dc.html). 3단계 5문항. 질문·선택지·규칙은 서버(/api/survey/questions)에서 받는다
-// 여기에는 화면 묶음(단계별 제목·안내 문구)만 둔다. 지역·날짜·동행은 탐색 화면, 관광지·체험은 여행 취향에서 고른다
-// 끝나면 내 정보로 간다 (설계는 탐색 화면인데 아직 없음). 다시 진단할 때는 이전 답을 채워서 연다
-import { ref, reactive, computed, onMounted } from 'vue'
+// 1분 진단 (웹과 같은 질문 8개). 질문·선택지·결과 계산은 utils/webSurvey.js 를 웹과 같이 쓴다 (앱·웹이 항상 같은 질문)
+// 단계는 웹의 묶음과 같다: ① 어떤 캠핑을 가나요? (5문항) ② 이럴 땐 어떻게 할까요? (3문항, 안전 상식 퀴즈)
+// 답은 이 브라우저에 저장한다 (stores/survey.js). 끝나면 내 정보(또는 탐색)로 간다 — 앱에는 결과 화면 없이 내 정보 카드에 요약만 보인다
+// 다시 진단할 때는 이전 답을 채워서 연다
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
+import { ALLQ, KID_OPTS, PARTS, emptyAnswers, isReady, pickAnswer } from '@/utils/webSurvey'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
@@ -14,79 +16,36 @@ const route = useRoute()
 // 탐색 화면 팝업에서 왔으면(?from=explore) 끝난 뒤·나갈 때 탐색으로, 아니면 내 정보로 돌아간다
 const backTo = computed(() => (route.query.from === 'explore' ? '/app/explore' : '/app/my-info'))
 
-// 단계 묶음과 문구는 설계 그대로. card: 세로 카드 모양(체크 원 있음), 아니면 알약 모양
-const STEPS = [
-  { title: '어떻게 캠핑하세요?', sub: '지역 · 날짜 · 동행은 여행마다 바뀌니까 나중에 지도에서 골라요', keys: ['campType', 'transport'] },
-  { title: '밤에 어떻게 지내세요?', sub: '사고가 가장 많이 나는 시간이라 꼭 물어봐요', keys: ['heating', 'safetyItems'] },
-  { title: '가까이 있으면 안심되는 곳은요?', sub: '이 답이 캠핑장 추천 순서에 가장 크게 반영돼요', keys: ['facilities'] },
-]
-const CARD = ['campType', 'heating']
-
+const STEPS = PARTS // [{ title, desc, qs }]
 const step = ref(0)
 const error = ref('')
 const loading = ref(false)
-// 질문 key → 고른 code 목록 (1개만 고르는 질문도 목록으로 다룬다)
-const picked = reactive({ campType: [], transport: [], heating: [], safetyItems: [], facilities: [] })
+const A = ref(emptyAnswers())
 
 onMounted(async () => {
   try {
-    await survey.fetchQuestions()
     await survey.load(auth.isLoggedIn)
   } catch (e) {
     error.value = e.message
   }
-  const a = survey.answers
-  if (a) {
-    picked.campType = [a.campType]
-    picked.transport = [a.transport]
-    picked.heating = [...a.heating]
-    picked.safetyItems = [...a.safetyItems]
-    picked.facilities = [...a.facilities]
-  }
+  if (survey.answers) A.value = { ...emptyAnswers(), ...survey.answers, who: [...survey.answers.who] }
 })
 
 const current = computed(() => STEPS[step.value])
-const questionsOfStep = computed(() =>
-  current.value.keys.map((k) => survey.questions.find((q) => q.key === k)).filter(Boolean),
-)
-const number = (key) => survey.questions.findIndex((q) => q.key === key) + 1
-
-function ruleText(q) {
-  if (q.type === 'single') return '1개 선택'
-  if (q.type === 'rank') return `최대 ${q.max}개 · 중요한 순서대로`
-  return '복수 선택'
-}
-
-// 설계와 같은 고르기 규칙: 다시 누르면 빠짐 / 혼자만 고르는 값(아직 없어요 등)은 다른 것을 지움 / 최대 개수까지만
-function toggle(q, code) {
+const number = (q) => ALLQ.indexOf(q) + 1
+const isOn = (q, code) => (q.multi ? A.value[q.k].includes(code) : A.value[q.k] === code)
+const showKid = (q) => q.k === 'who' && A.value.who.includes('child')
+const pick = (k, v) => {
   error.value = ''
-  let arr = picked[q.key]
-  if (arr.includes(code)) arr = arr.filter((c) => c !== code)
-  else if (code === q.exclusive) arr = [code]
-  else {
-    arr = arr.filter((c) => c !== q.exclusive)
-    if (q.max === 1) arr = [code]
-    else if (arr.length < q.max) arr = [...arr, code]
-    else error.value = `${q.max}개까지 고를 수 있습니다.`
-  }
-  picked[q.key] = arr
+  A.value = pickAnswer(A.value, k, v)
 }
 
-// 질문 아래 안내 문구 (설계 그대로). 연료를 태우는 난방을 고르면 빨간 상자로 바뀐다
-function note(q) {
-  if (q.key === 'heating') {
-    const fuel = picked.heating.includes('fuel') || picked.heating.includes('wood')
-    return fuel
-      ? { text: '연료를 태우는 난방은 텐트 안에서 일산화탄소 위험이 있어요. 결과에서 가장 먼저 알려드려요.', danger: true }
-      : { text: '연료를 태우는 난방을 고르면 일산화탄소 안내를 먼저 보여드려요.' }
-  }
-  if (q.key === 'safetyItems') return { text: '고르지 않은 용품은 출발 전 체크리스트에 담아드려요.' }
-  if (q.key === 'facilities') return { text: '1순위와 가까운 캠핑장일수록 지도에서 더 안심으로 보여요.' }
-  return null
-}
+const ruleText = (q) => (q.multi ? '복수 선택' : '1개 선택')
 
+// 이 단계의 질문에 다 답했는지 (아이를 골랐다면 나이대까지)
 function stepAnswered() {
-  return current.value.keys.every((k) => picked[k].length > 0)
+  const ok = current.value.qs.every((q) => (q.multi ? A.value[q.k].length > 0 : !!A.value[q.k]))
+  return ok && (!current.value.qs.some(showKid) || !!A.value.kid)
 }
 
 async function next() {
@@ -99,15 +58,10 @@ async function next() {
     step.value++
     return
   }
+  if (!isReady(A.value)) return
   loading.value = true
   try {
-    await survey.save({
-      campType: picked.campType[0],
-      transport: picked.transport[0],
-      heating: picked.heating,
-      safetyItems: picked.safetyItems,
-      facilities: picked.facilities,
-    }, auth.isLoggedIn)
+    await survey.save(A.value, auth.isLoggedIn)
     router.push(backTo.value)
   } catch (e) {
     error.value = e.message
@@ -130,7 +84,7 @@ function prev() {
         <span class="step-text">1분 진단 · {{ step + 1 }} / {{ STEPS.length }}</span>
         <RouterLink :to="backTo" class="later">나중에 할게요</RouterLink>
       </div>
-      <div class="bars">
+      <div class="bars" :style="{ gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))` }">
         <span v-for="(s, i) in STEPS" :key="i" :class="{ on: i <= step }" />
       </div>
     </div>
@@ -138,29 +92,35 @@ function prev() {
     <div class="body">
       <div class="title">
         <h1>{{ current.title }}</h1>
-        <span>{{ current.sub }}</span>
+        <span>{{ current.desc }}</span>
       </div>
 
-      <div v-for="q in questionsOfStep" :key="q.key" class="question">
+      <div v-for="q in current.qs" :key="q.k" class="question">
         <div class="q-head">
-          <span class="n">{{ number(q.key) }}</span>
-          <b>{{ q.title }}</b>
-          <span class="rule">{{ ruleText(q) }}</span>
+          <span class="n">{{ number(q) }}</span>
+          <b>{{ q.t }}</b>
+          <span class="rule">{{ q.h || ruleText(q) }}</span>
         </div>
 
-        <div :class="CARD.includes(q.key) ? 'cards' : 'pills'">
-          <button v-for="o in q.options" :key="o.code" type="button"
-            :class="[CARD.includes(q.key) ? 'card' : 'pill', { on: picked[q.key].includes(o.code) }]"
-            :aria-pressed="picked[q.key].includes(o.code)" @click="toggle(q, o.code)">
-            <span class="label"><span>{{ o.label }}</span><small v-if="o.sub">{{ o.sub }}</small></span>
-            <!-- 카드는 체크, 순서 있는 질문은 몇 순위인지 숫자 -->
-            <span v-if="CARD.includes(q.key) || q.type === 'rank'" class="mark" aria-hidden="true">
-              {{ picked[q.key].includes(o.code) ? (q.type === 'rank' ? picked[q.key].indexOf(o.code) + 1 : '✓') : '' }}
-            </span>
+        <!-- 퀴즈 보기는 문장이라 세로 카드, 나머지는 알약 -->
+        <div :class="q.quiz ? 'cards' : 'pills'">
+          <button v-for="o in q.o" :key="o[0]" type="button" :class="[q.quiz ? 'card' : 'pill', { on: isOn(q, o[0]) }]"
+            :aria-pressed="isOn(q, o[0])" @click="pick(q.k, o[0])">
+            <span class="label"><span>{{ o[1] }}</span><small v-if="!q.quiz && o[2]">{{ o[2] }}</small></span>
+            <span v-if="q.quiz" class="mark" aria-hidden="true">{{ isOn(q, o[0]) ? '✓' : '' }}</span>
           </button>
         </div>
 
-        <div v-if="note(q)" :class="['note', { danger: note(q).danger }]">{{ note(q).text }}</div>
+        <!-- 아이를 골랐으면 나이대 -->
+        <div v-if="showKid(q)" class="kid">
+          <b>가장 어린 아이는 몇 살이에요?</b>
+          <div class="pills">
+            <button v-for="o in KID_OPTS" :key="o[0]" type="button" :class="['pill', { on: A.kid === o[0] }]"
+              :aria-pressed="A.kid === o[0]" @click="pick('kid', o[0])">
+              <span class="label"><span>{{ o[1] }}</span></span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -168,7 +128,6 @@ function prev() {
       <p v-if="error" class="warn" role="alert">{{ error }}</p>
       <div class="buttons">
         <button type="button" class="prev" @click="prev">이전</button>
-        <!-- 설계 문구는 "내 유형으로 캠핑장 보기"(탐색 화면). 탐색 화면이 생기면 되돌린다 -->
         <button type="button" :class="['next', { last: step === STEPS.length - 1 }]" :disabled="loading" @click="next">
           {{ step === STEPS.length - 1 ? '진단 마치기' : '다음으로' }}
         </button>
@@ -340,17 +299,17 @@ h1 {
   background: var(--color-text);
   color: var(--color-card);
 }
-.note {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--color-text-sub);
-}
-.note.danger {
+/* 아이를 골랐을 때 나오는 "가장 어린 아이는 몇 살이에요?" */
+.kid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-  font-weight: 700;
+  background: var(--color-bg-soft);
+}
+.kid b {
+  font-size: 14px;
 }
 .foot {
   display: flex;

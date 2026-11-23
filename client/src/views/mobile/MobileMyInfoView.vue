@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
 import { useMyCampingStore } from '@/stores/myCamping'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
+import { METAVERSE_PATH } from '@/utils/webLinks'
 
 const auth = useAuthStore()
 const survey = useSurveyStore()
@@ -16,24 +17,25 @@ const router = useRouter()
 
 onMounted(async () => {
   try {
-    await survey.fetchQuestions() // 요약에 선택지 이름이 필요하다
-    await survey.load(auth.isLoggedIn)
+    await survey.load(auth.isLoggedIn) // 이 브라우저에 저장된 내 진단 답 (요약 카드)
   } catch {
     // 진단 카드를 못 불러와도 나머지 메뉴는 쓸 수 있게 둔다 (진단 전 모양으로 보임)
   }
 })
 
-// 아직 화면이 없는 메뉴는 누를 수 없게 두고 "준비 중"으로 안내한다 (href 가 있으면 이동)
+// 아직 화면이 없는 메뉴는 누를 수 없게 두고 "준비 중"으로 안내한다 (to 가 있으면 이동)
 // 로그인하면 Me.dc.html 의 메뉴 5개, 안 했으면 ForYouNew.dc.html 의 메뉴 (로그인·알림·공지)
 const menu = computed(() =>
   auth.isLoggedIn
     ? [
         { name: '여행 취향', to: '/app/tour-preference' },
         { name: '알림', to: '/app/my-info/alerts' },
+        { name: '메타버스 안전 탐험', to: METAVERSE_PATH },
       ]
     : [
         { name: '로그인 · 회원가입', to: '/app/login' },
         { name: '알림', to: '/app/my-info/alerts' },
+        { name: '메타버스 안전 탐험', to: METAVERSE_PATH },
       ],
 )
 
@@ -65,7 +67,7 @@ async function logout() {
       <!-- 진단 전 (ForYouNew.dc.html) -->
       <div v-else class="diagnosis">
         <div class="head">
-          <span class="step">3단계 · 5문항 · 약 1분</span>
+          <span class="step">2단계 · 8문항 · 약 1분</span>
           <span class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</span>
         </div>
         <ol class="points">

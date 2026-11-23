@@ -16,6 +16,7 @@ import { vHscroll } from '@/utils/hscroll'
 import { FACILITY_LABEL, shortSido } from '@/utils/place'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
+import { useReservationReturnStore } from '@/stores/reservationReturn'
 
 const props = defineProps({ id: { type: Number, required: true } })
 
@@ -33,6 +34,7 @@ const favorite = useFavoriteStore()
 const preference = useTourPreferenceStore()
 
 const camp = ref(null)
+const visit = useReservationReturnStore() // 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업
 const tours = ref([])
 const error = ref('')
 const sheetOpen = ref(true)
@@ -276,7 +278,7 @@ function openPlan() {
         <footer class="foot">
           <p>어디서 예약했든 날짜만 등록하면 캠핑 중 안전 알림을 보내드려요</p>
           <div class="buttons">
-            <a v-if="camp.reservationUrl" class="reserve" :href="camp.reservationUrl" target="_blank"
+            <a v-if="camp.reservationUrl" class="reserve" :href="camp.reservationUrl" target="_blank" @click="visit.mark({ campId: props.id, campName: camp.name })"
               rel="noopener noreferrer">예약 사이트 ↗</a>
             <button v-else type="button" class="reserve" disabled title="예약 사이트 정보가 없어요">예약 사이트 ↗</button>
             <button type="button" class="plan" aria-haspopup="dialog" @click="openPlan">내 캠핑에 일정 등록</button>

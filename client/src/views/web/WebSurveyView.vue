@@ -1,5 +1,5 @@
 <script setup>
-// 웹 1분 진단 (설계 2-1 설문 · 2-2 결과표): 헤더·하단이 없는 한 화면. 질문 10개에 답하면 결과표가 같은 주소에서 바뀐다
+// 웹 1분 진단 (설계 2-1 설문 · 2-2 결과표): 헤더·하단이 없는 한 화면. 질문 8개에 답하면 결과표가 같은 주소에서 바뀐다
 // 질문·유형·점수 계산은 utils/webSurvey.js (설계서 그대로). 추천 캠핑장은 실제 캠핑장 안전점수 순
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -97,7 +97,7 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
         <div class="head">
           <span class="pill">1분 안전 진단</span>
           <h1>나의 캠핑 안전 유형 알아보기</h1>
-          <p>10문항 · 약 1분이면 내가 놓치기 쉬운 안전과 맞는 캠핑장을 알려 드려요</p>
+          <p>{{ ALLQ.length }}문항 · 약 1분이면 내가 놓치기 쉬운 안전과 맞는 캠핑장을 알려 드려요</p>
           <p v-if="hadSaved" class="again">저장한 결과가 있어요 · 다시 진단하면 새 결과로 바뀌어요</p>
         </div>
         <WebIllust />

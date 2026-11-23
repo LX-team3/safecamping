@@ -12,6 +12,9 @@ import { useFavoriteStore } from '@/stores/favorite'
 import { useMyCampingStore } from '@/stores/myCamping'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
 import { useTripStore } from '@/stores/trip'
+import { useReservationReturnStore } from '@/stores/reservationReturn'
+
+const visit = useReservationReturnStore() // 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업
 
 const props = defineProps({
   campId: { type: Number, required: true },
@@ -298,7 +301,7 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
 
       <!-- 아래 고정 -->
       <div class="foot">
-        <a v-if="camp.reservationUrl" :href="camp.reservationUrl" target="_blank" rel="noopener" class="resv">예약 사이트 ↗</a>
+        <a v-if="camp.reservationUrl" :href="camp.reservationUrl" target="_blank" rel="noopener" class="resv" @click="visit.mark({ campId: props.campId, campName: camp.name })">예약 사이트 ↗</a>
         <span v-else class="resv off" aria-disabled="true">예약 사이트 없음</span>
         <button type="button" class="plan" @click="openPlan">내 캠핑에 일정 등록</button>
       </div>
@@ -835,12 +838,14 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
   justify-content: center;
   cursor: pointer;
 }
+/* 흰 패널 위 흰 버튼이라 테두리가 연하면 버튼으로 안 보임 → 메인 초록 테두리 (앱 .reserve 도 진한 테두리) */
 .resv {
-  border: 1px solid var(--web-line-input);
+  border: 1.5px solid var(--web-green);
   background: var(--web-bg);
   color: var(--web-text);
 }
 .resv.off {
+  border-color: var(--web-line-input); /* 예약 사이트 없음: 누를 수 없으니 연한 테두리 그대로 */
   color: var(--web-text-mute);
   cursor: default;
 }

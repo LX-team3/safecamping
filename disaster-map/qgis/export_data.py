@@ -75,8 +75,7 @@ def bld_extra(f, g, t):
     return {"base": base_z(g, t), "hgt": round(h, 2)}
 
 D['buildings'] = fc(L('buildings.kangwon — buildings'), ['A9', 'A11', 'A16', 'A24', 'A25', 'A26', 'A4'], bld_extra)
-D['osmBuildings'] = fc(L('building'), ['name', 'amenity', 'building'],
-                       lambda f, g, t: {"base": base_z(g, t), "hgt": 6})
+# OpenStreetMap 건물(157동)은 지도에서 쓰지 않아 내보내지 않음 (2026-11-22). 건물은 건물통합정보 803동만
 for k, n in [('flood50', '범람 50년 빈도'), ('flood80', '범람 80년 빈도'), ('flood100', '범람 100년 빈도')]:
     D[k] = fc(L(n), ['SEG_CODE', 'FLDLV_FREQ'])
 D['evac'] = fc(L('evac_route (대피 경로)'), ['camp_name', 'disaster', 'length_m', 'alert', 'dest', 'bridge'])

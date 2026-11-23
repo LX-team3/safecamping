@@ -34,8 +34,8 @@ const emit = defineEmits(['start', 'hideToday', 'close'])
         </div>
 
         <div class="cta">
-          <!-- 앱 진단은 5문항이다 (웹은 10문항) -->
-          <span class="bubble">5문항 · 약 1분 · 로그인 없이<i aria-hidden="true"></i></span>
+          <!-- 앱·웹 진단은 같은 8문항이다 (utils/webSurvey.js) -->
+          <span class="bubble">8문항 · 약 1분 · 로그인 없이<i aria-hidden="true"></i></span>
           <button type="button" class="start" @click="emit('start')">진단 시작하기</button>
         </div>
       </div>

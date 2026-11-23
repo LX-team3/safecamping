@@ -16,6 +16,15 @@ const router = createRouter({
     { path: '/', redirect: () => (isWideScreen() ? '/web' : `${APP_PREFIX}/explore`) },
     { path: APP_PREFIX, redirect: `${APP_PREFIX}/explore` },
 
+    // 메타버스 안전 탐험 (웹·모바일 같이 씀). 3D(three.js)는 이 화면에 들어올 때만 불러온다
+    // layout 'full' = 웹·모바일 틀 없이 화면 전체에 그린다 (App.vue)
+    {
+      path: '/metaverse',
+      name: 'metaverse',
+      component: () => import('../views/metaverse/MetaverseView.vue'),
+      meta: { layout: 'full' },
+    },
+
     ...mobileRoutes, // 모바일(앱) 주소 (/app/...)
     ...webRoutes, // 웹(PC) 주소 (/web/...)
     ...legacyRedirects, // 옛 모바일 주소(/explore …) → /app/... (이전 링크·북마크 보호)

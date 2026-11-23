@@ -18,6 +18,12 @@ export const useMyCampingStore = defineStore('myCamping', () => {
     await load() // 서버 순서(체크인 순)를 그대로 쓰려고 다시 불러온다
   }
 
+  // 고치기: 날짜 · 메모만 (예약 정보 확인 화면). 캠핑장은 그대로
+  async function update(id, { checkIn, checkOut, memo }) {
+    await api(`/api/member/camp-plans/${id}`, { method: 'put', body: { checkIn, checkOut, memo } })
+    await load()
+  }
+
   async function remove(id) {
     await api(`/api/member/camp-plans/${id}`, { method: 'delete' })
     plans.value = plans.value.filter((p) => p.id !== id)
@@ -36,5 +42,5 @@ export const useMyCampingStore = defineStore('myCamping', () => {
     checklists.value = {}
   }
 
-  return { plans, checklists, load, add, remove, loadChecklist, reset }
+  return { plans, checklists, load, add, update, remove, loadChecklist, reset }
 })

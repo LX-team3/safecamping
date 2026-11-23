@@ -65,6 +65,10 @@ class CampPlanServiceTest {
                 table.add(plan);
                 return 1;
             }
+            @Override public int update(CampPlan plan) {
+                // 서비스가 표에 있는 같은 객체를 고쳐서 넘기므로 따로 바꿀 것이 없다 (남의 일정이면 0줄)
+                return table.stream().anyMatch(p -> p.getId().equals(plan.getId()) && p.getMemberId().equals(plan.getMemberId())) ? 1 : 0;
+            }
             @Override public int delete(Long memberId, Long planId) {
                 boolean removed = table.removeIf(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId));
                 if (removed) reviews.cascadeDeletePlan(planId);  // DB 의 ON DELETE CASCADE 흉내
@@ -177,5 +181,37 @@ class CampPlanServiceTest {
         service.delete("camper01", id);
         assertTrue(photoStore.files.isEmpty());
         assertTrue(reviews.reviews.isEmpty());
+    }
+
+    // 예약 정보 확인 화면에서 고치기: 날짜 · 메모(인원 · 동행 · 이동 수단)만 바뀐다
+    @Test
+    void 고치면_날짜와_메모가_바뀐다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        LocalDate in = TODAY.plusDays(6);
+        CampPlanResponse r = service.update("camper01", id, new CampPlanUpdateRequest(in, in.plusDays(3), " 성인 2명 · 어린이 0명 · 친구·연인 · 자동차 "));
+
+        assertEquals(in, r.checkIn());
+        assertEquals("성인 2명 · 어린이 0명 · 친구·연인 · 자동차", r.memo());
+        assertEquals(1L, r.campId());   // 캠핑장은 그대로
+        assertEquals(1, service.findAll("camper01").size());   // 새로 생기지 않는다
+    }
+
+    @Test
+    void 고칠_때도_날짜_규칙과_중복을_본다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        service.add("camper01", plan(1L, 10, 1));
+        LocalDate d5 = TODAY.plusDays(5), d10 = TODAY.plusDays(10), past = TODAY.minusDays(1);
+
+        assertThrows(InvalidRequestException.class, () -> service.update("camper01", id, new CampPlanUpdateRequest(d5, d5, null)));         // 체크아웃 = 체크인
+        assertThrows(InvalidRequestException.class, () -> service.update("camper01", id, new CampPlanUpdateRequest(past, d5, null)));       // 지난 날짜로 옮기기
+        assertThrows(InvalidRequestException.class, () -> service.update("camper01", id, new CampPlanUpdateRequest(d10, d10.plusDays(1), null)));  // 같은 캠핑장 · 같은 체크인
+        service.update("camper01", id, new CampPlanUpdateRequest(d5, d5.plusDays(2), "메모만"));   // 체크인 그대로면 중복 검사 안 함
+    }
+
+    @Test
+    void 남의_일정은_고칠_수_없다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        LocalDate in = TODAY.plusDays(5);
+        assertThrows(NotFoundException.class, () -> service.update("camper02", id, new CampPlanUpdateRequest(in, in.plusDays(1), null)));
     }
 }
