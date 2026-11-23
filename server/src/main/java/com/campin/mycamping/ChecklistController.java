@@ -19,7 +19,7 @@ public class ChecklistController {
     private final ChecklistService service;
 
     // 내가 등록한 캠핑 하나의 출발 준비: GET /api/member/camp-plans/3/checklist
-    // 응답 필드는 ChecklistResponse 참고. 남의 일정 id 는 404
+    // 응답 필드는 ChecklistResponse 참고. 같은 가족방 사람의 일정도 볼 수 있다. 그 밖의 남의 일정 id 는 404
     @GetMapping("/{planId}/checklist")
     public ApiResponse<ChecklistResponse> checklist(Authentication authentication, @PathVariable Long planId) {
         return ApiResponse.ok(service.find(authentication.getName(), planId));

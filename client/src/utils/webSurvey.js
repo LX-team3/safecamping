@@ -19,7 +19,7 @@ const EXP = { first: '첫 캠핑', few: '몇 번 해봄', often: '캠핑 자주'
 
 // 질문 (o: [코드, 글씨, (퀴즈면 점수 | 보조글씨)])
 export const PARTS = [
-  { chip: 'map', title: '어떤 캠핑을 가나요?', feature: '안전지도', desc: '내 유형에서 안전점수가 높은 캠핑장을 골라 드려요', qs: [
+  { chip: 'map', title: '어떤 캠핑을 가나요?', feature: '안전지도', desc: '주무시는 방식에 맞는 캠핑장을 골라 드려요', qs: [
     { k: 'who', t: '누구와 가세요?', h: '여러 개 골라도 돼요', multi: true, solo: 'solo', o: [['solo', '혼자'], ['group', '성인 일행'], ['child', '아이'], ['senior', '어르신', '65세 이상']] },
     { k: 'site', t: '어디서 주무세요?', o: [['glamping', '글램핑·카라반'], ['auto', '오토캠핑 텐트'], ['carcamp', '차박']] },
     { k: 'season', t: '언제 가세요?', o: [['spring', '봄'], ['summer', '여름'], ['fall', '가을'], ['winter', '겨울']] },
@@ -27,7 +27,7 @@ export const PARTS = [
     // 이동수단: 예전 "위급할 때는요?"(침수 예측지도) 묶음의 마지막 문항. 그 묶음을 없애면서 이 문항만 여기로 옮겼다
     { k: 'car', t: '위급할 때 차로 이동할 수 있나요?', o: [['yes', '네, 차로'], ['no', '아니요, 걸어서']] },
   ] },
-  { chip: 'meta', title: '이럴 땐 어떻게 할까요?', feature: '메타버스', desc: '틀린 것부터 메타버스에서 먼저 배우게 해 드려요', qs: [
+  { chip: 'meta', title: '이럴 땐 어떻게 할까요?', feature: '', desc: '선택에 따라 조심해야 할 것이 달라집니다', qs: [
     { k: 'q5', quiz: true, ax: '일산화탄소', t: '텐트 안에서 난로를 켜고 잔다면?', o: [['a', '문을 조금 열면 괜찮다', 30], ['b', '끄고 잔다 · 켜면 경보기와 환기', 100], ['c', '약하게 틀면 괜찮다', 0]],
       why: '일산화탄소는 냄새도 색도 없어 잠든 사이 중독돼요. 잠들기 전 끄는 게 가장 안전하고, 켠다면 경보기와 환기가 꼭 함께여야 해요.', v: '일산화탄소 중독 예방' },
     { k: 'q6', quiz: true, ax: '화재', t: '화로에 불씨가 남았다면?', o: [['a', '재만 있으면 그냥 둔다', 0], ['b', '물을 붓고 꺼진 걸 확인한다', 100], ['c', '흙이나 뚜껑으로 덮는다', 40]],
@@ -114,6 +114,22 @@ export function answerTags(A) {
 // 진단의 "어디서 주무세요?" 답을 옮긴다: 글램핑·카라반 → glamping, 오토캠핑 텐트·차박 → auto (앱 예전 선택지도 "오토캠핑장 · 차박 포함"이었다)
 // 진단에 노지·백패킹이 없어서 backpacking 은 진단으로 정해지지 않는다. 답이 없으면 '' (유형으로 거르지 않음)
 export const campTypeOf = (A) => ({ glamping: 'glamping', auto: 'auto', carcamp: 'auto' })[A?.site] || ''
+
+// ---- 진단 유형 가산점 (지도의 "내 유형 점수") ----
+// 아이·어르신·차박·겨울·걸어서 중 하나라도 고르면, 응급실이 가까운 캠핑장일수록 점수를 최대 +5 더해 보여 준다
+// 가산점 크기는 서버가 캠핑장마다 계산해 준다 (GET /api/camps 의 erBonus, 기준은 server score/ScoreRules.erBonus)
+// 여기서는 "이 사람에게 가산점을 쓸지"만 정한다. 저장된 안전점수 · 등급은 그대로 (화면이 "79 +5" 로 따로 보여 줌)
+// 이동 답(걸어서)은 가산점에만 쓰고 조심할 것 · 대비할 것에는 쓰지 않는다 (팀 결정 2026-11-23)
+const BONUS_REASONS = [
+  [(A) => A.who?.includes('child'), '아이 동반'],
+  [(A) => A.who?.includes('senior'), '어르신 동반'],
+  [(A) => A.site === 'carcamp', '차박'],
+  [(A) => A.season === 'winter', '겨울'],
+  [(A) => A.car === 'no', '걸어서 대피'],
+]
+// 가산점에 해당하는 내 답 이름들 (없으면 빈 목록 → 가산점 안 씀)
+export const erBonusReasons = (A) => (A ? BONUS_REASONS.filter(([f]) => f(A)).map(([, label]) => label) : [])
+export const needsErBonus = (A) => erBonusReasons(A).length > 0
 
 // 답 → 결과 (설계서와 같은 계산)
 export function computeResult(A) {

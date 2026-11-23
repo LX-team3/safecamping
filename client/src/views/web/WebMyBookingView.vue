@@ -2,6 +2,7 @@
 // 웹 내 예약 (설계 1-7): 제목 띠 + 탭(다가오는 캠핑 · 지난 캠핑) + 캠핑 한 건마다 카드
 // 데이터: 내 캠핑 일정 GET /api/member/camp-plans (캠핑장 상세의 "내 캠핑에 일정 등록"으로 저장),
 //         출발 준비 GET /api/member/camp-plans/{id}/checklist (특보 · 예보 · 안전), 캠핑장 GET /api/camps/{id} (사진 · 예약 사이트 · 시설)
+//         가족 캠핑 GET /api/family/camp-plans (같은 가족방 사람 일정, 보기만)
 //         지난 캠핑 후기 GET /api/member/camp-plans/reviews · 쓰기·수정 POST /api/member/camp-plans/{id}/review (사진은 서버 폴더)
 // 설계와 다른 점: 인원 · 동행 · 이동 수단 · 체크인 시각은 일정에 저장되는 칸이 없어서 메모로만 보인다. 후기에 별점은 없다 (팀 결정)
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -37,6 +38,7 @@ async function load() {
   }
   loading.value = false
   loadReviews()
+  loadFamilyPlans()
   // 끝나지 않은 일정마다 출발 준비를 받는다. 캠핑장이 있으면 상세(사진 · 시설)도. 못 받아도 카드는 그대로 보인다
   myCamping.plans.forEach((p) => {
     if (p.checkOut >= todayIso()) myCamping.loadChecklist(p.id).catch(() => {})
@@ -89,6 +91,48 @@ const cards = computed(() =>
   }),
 )
 const upcoming = computed(() => cards.value.filter((c) => !c.past))
+
+// ---- 가족 캠핑: 같은 가족방 사람이 등록한 캠핑 (GET /api/family/camp-plans, 보기만) ----
+// 가족방이 없으면 서버가 빈 목록을 준다 → 묶음이 안 보인다. 못 받아도 내 예약은 그대로
+// 출발 준비 체크리스트는 같은 가족방이면 서버가 보여 준다 (체크 표시는 보는 사람 브라우저에 따로)
+const familyPlans = ref([])
+const familyError = ref('')
+async function loadFamilyPlans() {
+  familyError.value = ''
+  try {
+    familyPlans.value = await api('/api/family/camp-plans')
+  } catch (e) {
+    familyError.value = `모임방 캠핑을 불러오지 못했어요. ${e.message}`
+    return
+  }
+  // 사진을 보여 주려고 캠핑장 상세를 받는다 (내 일정과 같은 details 를 같이 쓴다)
+  familyPlans.value.forEach(async (p) => {
+    if (p.campId == null || details.value[p.campId]) return
+    try {
+      details.value = { ...details.value, [p.campId]: await api(`/api/camps/${p.campId}`) }
+    } catch {
+      // 사진이 없을 뿐이다
+    }
+  })
+}
+// 지난 캠핑은 빼고 다가오는·진행 중인 것만
+const familyCards = computed(() =>
+  familyPlans.value
+    .filter((p) => p.checkOut >= today())
+    .map((p) => {
+      const d = details.value[p.campId]
+      return {
+        ...p,
+        dday: p.checkIn <= today() ? '캠핑 중' : `D-${nightsBetween(today(), p.checkIn)}`,
+        nights: nightsBetween(p.checkIn, p.checkOut),
+        inDate: labelWithDay(p.checkIn),
+        outDate: labelWithDay(p.checkOut),
+        image: d?.imageUrl,
+        score: d?.safetyScore ?? null,
+        grade: d?.grade ?? null,
+      }
+    }),
+)
 const past = computed(() => cards.value.filter((c) => c.past).reverse())
 // 일정 삭제 (캠핑장 등록 일정만 지우는 것이고 캠핑장 정보는 그대로다). 서버가 정본이라 지운 뒤 목록에서 바로 빠진다
 const target = ref(null) // 삭제할지 묻는 중인 일정
@@ -203,7 +247,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
       <img src="/web/banner-night.png" alt="" aria-hidden="true" />
       <span class="shade" aria-hidden="true"></span>
       <div class="inner">
-        <h1>내 예약</h1>
+        <h1>내 캠핑</h1>
         <div class="tabs" role="tablist" aria-label="예약 구분">
           <button type="button" role="tab" :aria-selected="tab === 'up'" :class="{ on: tab === 'up' }" @click="tab = 'up'">다가오는 캠핑 <span>{{ upcoming.length }}</span></button>
           <button type="button" role="tab" :aria-selected="tab === 'past'" :class="{ on: tab === 'past' }" @click="showPastTab">지난 캠핑 <span>{{ past.length }}</span></button>
@@ -215,7 +259,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
       <div class="col">
         <!-- 로그인 전 -->
         <div v-if="!auth.isLoggedIn" class="empty">
-          <p>내 예약은 로그인하면 확인할 수 있어요.</p>
+          <p>내 캠핑은 로그인하면 확인할 수 있어요.</p>
           <RouterLink to="/web/login" class="btn">로그인</RouterLink>
         </div>
         <p v-else-if="error" class="state">{{ error }} <button type="button" class="link" @click="load">다시 시도</button></p>
@@ -290,6 +334,64 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
               </div>
             </div>
           </article>
+
+          <!-- 가족 캠핑: 가족방 사람이 등록한 캠핑 (보기만 — 삭제·예약 정보 확인 없음) -->
+          <template v-if="familyCards.length || familyError">
+            <div class="sec"><h2>모임방 캠핑</h2></div>
+            <p v-if="familyError" class="state">{{ familyError }} <button type="button" class="link" @click="loadFamilyPlans">다시 시도</button></p>
+            <article v-for="b in familyCards" :key="`f${b.id}`" class="card">
+              <div class="status">
+                <span class="dwrap">
+                  <span class="dday">{{ b.dday }}</span>
+                  <span class="dtext"><b>{{ b.ownerName }}님의 캠핑</b><span>모임방에서 공유</span></span>
+                </span>
+              </div>
+              <div class="camp">
+                <span class="photo" role="img" :aria-label="`${b.campName} 사진`">
+                  <img v-if="b.image" :src="b.image" :alt="b.campName" />
+                  <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8.5" cy="10" r="1.5" /><path d="m21 16-5-5-8 8" /></svg>
+                </span>
+                <span class="cinfo">
+                  <RouterLink v-if="b.campId" :to="`/web/camps/${b.campId}`" class="cname">{{ b.campName }}</RouterLink>
+                  <span v-else class="cname">{{ b.campName }}</span>
+                  <span class="sub">{{ b.place }}</span>
+                  <span v-if="b.memo" class="sub">{{ b.memo }}</span>
+                </span>
+                <span v-if="b.score != null" class="badge" :class="GRADE_CLASS[b.grade] || 'safe'"><span>{{ GRADE_LABEL[b.grade] || '점수' }}</span><b>{{ b.score }}<small>점</small></b></span>
+              </div>
+              <div class="dates">
+                <span><span class="k">체크인</span><b>{{ b.inDate }}</b></span>
+                <span class="out"><span class="k">체크아웃 · {{ b.nights }}박</span><b>{{ b.outDate }}</b></span>
+              </div>
+              <!-- 내 카드의 "캠핑 전 안전 체크" 상자와 같은 모양 (펼치기 없이 바로 보임) -->
+              <div class="check">
+                <div class="cbody fam">
+                  <RouterLink :to="`/web/checklist/${b.id}`" class="listlink">
+                    <span class="lt">안전 점검 체크리스트</span><span class="ls">특보 · 날씨 · 준비물 같이 보기 ›</span>
+                  </RouterLink>
+                  <div class="tools">
+                    <RouterLink :to="b.campId ? `/web/nearby?camp=${b.campId}` : '/web/nearby'" class="main-tool"><span aria-hidden="true">📍</span>주변 안전시설 · 길찾기</RouterLink>
+                    <RouterLink :to="METAVERSE_PATH" class="sub-tool"><span aria-hidden="true">🐢</span>메타버스 안전 탐험</RouterLink>
+                    <RouterLink :to="DISASTER_PATH" class="sub-tool"><span aria-hidden="true">🌊</span>3D 재난 대피 지도</RouterLink>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </template>
+
+          <!-- 가족 모임방 (앱 내 캠핑 맨 아래와 같은 버튼). 내 일정이 없어도 늘 보인다 → 초대받은 사람도 여기서 들어간다 -->
+          <RouterLink to="/web/family" class="family-btn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="9" cy="8" r="3" />
+              <circle cx="17" cy="9" r="2.5" />
+              <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c.6-.3 1.3-.5 2-.5 2.8 0 4.5 2.2 4.5 5" />
+            </svg>
+            <span class="ftext">
+              <b>모임방</b>
+              <small>함께 가는 사람을 초대하면 서로의 캠핑 일정과 안전 점검을 함께 볼 수 있어요</small>
+            </span>
+            <span class="farrow" aria-hidden="true">›</span>
+          </RouterLink>
         </template>
 
         <!-- 지난 캠핑 -->
@@ -331,7 +433,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
         </template>
       </div>
     </main>
-    <WebConfirmModal :open="!!target" title="이 일정을 지울까요?" :text="target ? `'${target.campName}' 일정이 내 예약에서 사라져요.
+    <WebConfirmModal :open="!!target" title="이 일정을 지울까요?" :text="target ? `'${target.campName}' 일정이 내 캠핑에서 사라져요.
 실제 예약 사이트의 예약은 취소되지 않아요.` : ''"
       confirm-label="삭제" :busy="removing" @confirm="confirmRemove" @cancel="target = null" />
     <WebReviewModal :open="!!reviewTarget" :camp-name="reviewTarget?.campName || ''"
@@ -459,6 +561,35 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
+}
+.family-btn {
+  margin-top: 8px;
+  padding: 18px 22px;
+  border: 1px solid var(--web-border-card);
+  border-radius: 18px;
+  background: var(--web-bg);
+  color: var(--web-text);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.family-btn .ftext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.family-btn b {
+  font-size: 17px;
+}
+.family-btn small {
+  font-size: 14px;
+  color: var(--web-text-sub);
+}
+.family-btn .farrow {
+  font-size: 22px;
+  color: var(--web-arrow);
 }
 .sec {
   display: flex;
@@ -706,6 +837,9 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.cbody.fam {
+  padding-top: 18px; /* 가족 카드는 위 머리 줄(펼치기 버튼)이 없어서 위 여백을 준다 */
 }
 .cells {
   display: grid;

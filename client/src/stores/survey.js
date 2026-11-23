@@ -35,6 +35,9 @@ export const useSurveyStore = defineStore('survey', () => {
 
   const done = computed(() => answers.value !== null)
 
+  // 지도 "내 유형 점수"(응급실 가산점) 켜짐. 진단을 마치면 켜진다 (팀 결정). 화면 사이에서만 기억하고 새로 열면 다시 켜짐
+  const bonusOn = ref(true)
+
   // 로그인했으면 이 브라우저에 저장된 내 답을 읽는다. 없는데 로그인 전에 한 답이 있으면 그 답을 내 것으로 저장해 준다
   async function load(isLoggedIn) {
     if (!isLoggedIn || !auth.member) return
@@ -49,6 +52,7 @@ export const useSurveyStore = defineStore('survey', () => {
 
   async function save(value, isLoggedIn) {
     answers.value = value
+    bonusOn.value = true // 진단을 마치면 지도 "내 유형 점수"를 켠다
     if (isLoggedIn && auth.member) {
       saveResult(auth.member.id, value, computeResult(value))
     } else {
@@ -65,5 +69,5 @@ export const useSurveyStore = defineStore('survey', () => {
   // 내 정보 카드에 쓸 요약 (예: 아이 동반 · 어린이 · 오토캠핑 텐트 · 여름 · 첫 캠핑 · 차량 대피)
   const summary = computed(() => (answers.value ? answerTags(answers.value).join(' · ') : ''))
 
-  return { answers, done, summary, load, save, reset }
+  return { answers, done, summary, bonusOn, load, save, reset }
 })

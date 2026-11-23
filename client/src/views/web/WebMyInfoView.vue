@@ -22,7 +22,7 @@ const GROUPS = [
   {
     title: '내 활동',
     rows: [
-      { name: '내 예약', sub: '저장한 캠핑 일정 · 출발 준비', to: '/web/my-booking' },
+      { name: '내 캠핑', sub: '저장한 캠핑 일정 · 출발 준비', to: '/web/my-booking' },
       { name: '찜한 캠핑장', sub: '비교하고 한눈에 보기', to: '/web/saved' },
       { name: '내 캠핑 유형', sub: '1분 진단 · 다시 하기', to: '/web/survey' },
       { name: '모임방', sub: '함께 가는 사람과 안전 공유', to: '/web/family' },

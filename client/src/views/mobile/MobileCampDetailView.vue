@@ -16,6 +16,8 @@ import { vHscroll } from '@/utils/hscroll'
 import { FACILITY_LABEL, shortSido } from '@/utils/place'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
+import { useSurveyStore } from '@/stores/survey'
+import { erBonusReasons } from '@/utils/webSurvey'
 import { useReservationReturnStore } from '@/stores/reservationReturn'
 
 const props = defineProps({ id: { type: Number, required: true } })
@@ -34,6 +36,12 @@ const favorite = useFavoriteStore()
 const preference = useTourPreferenceStore()
 
 const camp = ref(null)
+// 내 유형 점수 (응급실 가산점): 탐색과 같은 켜짐 상태 · 같은 규칙. 켜져 있고 해당 답이 있으면 점수 옆에 "+5" 를 따로
+const survey = useSurveyStore()
+const bonusReasons = computed(() => erBonusReasons(survey.answers))
+const bonusApplies = computed(() => bonusReasons.value.length > 0 && !!camp.value?.erBonus)
+const bonus = computed(() => (survey.bonusOn && bonusApplies.value ? camp.value.erBonus : 0))
+const shownScore = computed(() => (camp.value?.safetyScore == null ? '-' : Math.min(100, camp.value.safetyScore + bonus.value)))
 const visit = useReservationReturnStore() // 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업
 const tours = ref([])
 const error = ref('')
@@ -183,12 +191,26 @@ function openPlan() {
           <p class="sub">{{ subLine }}</p>
 
           <div class="score">
-            <span class="circle" :class="camp.grade">
+            <!-- 내 유형 점수가 붙는 사람 · 캠핑장이면 원이 켜고 끄는 버튼 (켜면 76, 끄면 71 — 숫자 자체가 바뀜). 색(등급)은 저장된 점수 그대로 -->
+            <span v-if="bonusApplies" class="circle-wrap">
+              <button type="button" class="circle tap" :class="camp.grade" :aria-pressed="survey.bonusOn"
+                :aria-label="survey.bonusOn ? `내 유형 점수 ${shownScore}점 (안전점수 ${camp.safetyScore} + 응급실 ${bonus}). 누르면 끄기` : `안전점수 ${camp.safetyScore}점. 누르면 내 유형 점수 켜기`"
+                @click="survey.bonusOn = !survey.bonusOn">
+                <b>{{ shownScore }}</b>{{ GRADE_LABEL[camp.grade] }}
+              </button>
+              <span class="tap-tag" aria-hidden="true">내 유형 {{ survey.bonusOn ? 'ON' : 'OFF' }}</span>
+            </span>
+            <span v-else class="circle" :class="camp.grade">
               <b>{{ camp.safetyScore ?? '-' }}</b>{{ GRADE_LABEL[camp.grade] }}
             </span>
             <div class="score-text">
               <b>{{ camp.headline }}</b>
               <span v-if="summary">{{ summary }}</span>
+              <!-- 켜고 끄기는 왼쪽 원을 누른다 -->
+              <span v-if="bonusApplies" class="bonus-line">
+                <template v-if="bonus">내 유형 점수예요 · {{ bonusReasons.join(' · ') }} (안전점수 {{ camp.safetyScore }})</template>
+                <template v-else>내 유형 점수 꺼짐 · 원을 누르면 켜져요</template>
+              </span>
               <span v-if="camp.dummy" class="dummy">점수·시간은 더미 데이터</span>
             </div>
             <button type="button" class="to-route" :disabled="!facilities.length" @click="sheetOpen = false">
@@ -668,5 +690,30 @@ h1 {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+.bonus-line {
+  font-size: 13px;
+  color: var(--color-primary);
+}
+.bonus-line b {
+  font-weight: 800;
+}
+.circle-wrap {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.circle.tap {
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  box-shadow: 0 0 0 3px var(--color-bg-soft), 0 0 0 4px var(--color-primary); /* 누를 수 있는 원이라는 표시 (바깥 테두리) */
+}
+.tap-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-primary);
 }
 </style>

@@ -44,7 +44,7 @@ onMounted(async () => {
 
 async function create() {
   if (!roomName.value) {
-    startError.value = '가족방 이름을 입력해 주세요.'
+    startError.value = '모임방 이름을 입력해 주세요.'
     return
   }
   await run(() => family.createRoom(roomName.value), startError)
@@ -62,8 +62,8 @@ async function leave() {
   // 마지막 사람이 나가면 방과 그 안의 정보가 모두 지워지므로 한 번 더 묻는다
   const last = family.room.members.length === 1
   const msg = last
-    ? '마지막 구성원이라 나가면 가족방과 모일 곳·일정이 모두 지워집니다. 나갈까요?'
-    : '가족방에서 나갈까요?'
+    ? '마지막 구성원이라 나가면 모임방과 모일 곳·일정이 모두 지워집니다. 나갈까요?'
+    : '모임방에서 나갈까요?'
   if (!window.confirm(msg)) return
   if (await run(() => family.leave(), error)) tab.value = 0
 }
@@ -95,11 +95,11 @@ async function run(fn, errorRef) {
   <div class="family-room">
     <div class="head">
       <RouterLink to="/app/my-camping" class="back" aria-label="내 캠핑으로">‹</RouterLink>
-      <h1>가족 모임방</h1>
+      <h1>모임방</h1>
     </div>
 
     <div v-if="!auth.isLoggedIn" class="empty">
-      <p>가족 모임방은 로그인하면 쓸 수 있어요.</p>
+      <p>모임방은 로그인하면 쓸 수 있어요.</p>
       <RouterLink to="/app/login" class="primary">로그인</RouterLink>
     </div>
 
@@ -109,10 +109,10 @@ async function run(fn, errorRef) {
 
     <!-- 가족방이 없을 때 -->
     <section v-else-if="!family.room" class="start">
-      <p class="sub">가족이 한 방에서 모일 곳, 아이 정보, 일정, 위치를 함께 봐요.</p>
+      <p class="sub">함께 가는 사람이 한 방에서 위치, 모일 곳, 일정을 함께 봐요.</p>
 
       <form class="row" @submit.prevent="create">
-        <input v-model.trim="roomName" maxlength="20" placeholder="가족방 이름 (예: 우리 가족)" />
+        <input v-model.trim="roomName" maxlength="20" placeholder="모임방 이름 (예: 우리 가족)" />
         <button type="submit" class="primary">만들기</button>
       </form>
 

@@ -63,14 +63,14 @@ onMounted(async () => {
   }
 })
 
-const create = () => (roomName.value ? run(() => family.createRoom(roomName.value), startError) : (startError.value = '가족방 이름을 입력해 주세요.'))
+const create = () => (roomName.value ? run(() => family.createRoom(roomName.value), startError) : (startError.value = '모임방 이름을 입력해 주세요.'))
 const join = () => (inviteCode.value ? run(() => family.join(inviteCode.value), startError) : (startError.value = '초대코드를 입력해 주세요.'))
 
 function leave() {
   const last = family.room.members.length === 1
   ask(
-    '가족방에서 나갈까요?',
-    last ? '마지막 구성원이라 나가면 가족방과 모일 곳·일정이 모두 지워집니다.' : '나가도 다른 가족은 그대로 방을 쓸 수 있어요.',
+    '모임방에서 나갈까요?',
+    last ? '마지막 구성원이라 나가면 모임방과 모일 곳·일정이 모두 지워집니다.' : '나가도 다른 사람은 그대로 방을 쓸 수 있어요.',
     '나가기',
     async () => {
       await family.leave()
@@ -162,7 +162,7 @@ const schGroups = computed(() => {
 </script>
 
 <template>
-  <WebSubPage eyebrow="함께 가는 사람" title="모임방" desc="가족이 한 방에서 모일 곳과 일정을 함께 봐요" narrow>
+  <WebSubPage eyebrow="함께 가는 사람" title="모임방" desc="함께 가는 사람이 한 방에서 모일 곳과 일정을 함께 봐요" narrow>
     <div v-if="!auth.isLoggedIn" class="card center">
       <p>모임방은 로그인하면 쓸 수 있어요.</p>
       <RouterLink to="/web/login" class="primary">로그인</RouterLink>
@@ -172,9 +172,9 @@ const schGroups = computed(() => {
 
     <!-- 방이 없을 때 -->
     <section v-else-if="!family.room" class="card start">
-      <h2>새 가족방 만들기</h2>
+      <h2>새 모임방 만들기</h2>
       <form class="row" @submit.prevent="create">
-        <input v-model.trim="roomName" maxlength="20" placeholder="가족방 이름 (예: 우리 가족)" />
+        <input v-model.trim="roomName" maxlength="20" placeholder="모임방 이름 (예: 우리 가족)" />
         <button type="submit" class="primary">만들기</button>
       </form>
       <div class="or">또는</div>
@@ -234,7 +234,7 @@ const schGroups = computed(() => {
 
       <!-- 일정 -->
       <section v-if="tab === 1" class="card">
-        <div class="shead"><h2>가족 일정</h2><button type="button" class="add" @click="addingSch = !addingSch">{{ addingSch ? '닫기' : '+ 추가' }}</button></div>
+        <div class="shead"><h2>모임방 일정</h2><button type="button" class="add" @click="addingSch = !addingSch">{{ addingSch ? '닫기' : '+ 추가' }}</button></div>
         <form v-if="addingSch" class="form" @submit.prevent="addSchedule">
           <input v-model.trim="sch.title" maxlength="50" placeholder="일정 내용 (예: 장보기)" />
           <input v-model="sch.startAt" type="datetime-local" aria-label="날짜와 시간" />

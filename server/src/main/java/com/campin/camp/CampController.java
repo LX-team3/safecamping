@@ -20,7 +20,7 @@ public class CampController {
 
     private final CampService campService;
 
-    // 목록: GET /api/camps?sido=강원특별자치도&sigungu=인제군&campType=auto&sort=score
+    // 목록: GET /api/camps?sido=강원특별자치도&sigungu=인제군&campType=auto&sort=score  (sort: score · er · bonus=안전점수+진단 유형 가산점)
     // (시·군·구 이름은 전국에서 겹칠 수 있어 시·도도 함께 받는다. 예: 고성군은 강원·경남에 둘 다 있음)
     // @RequestParam(required = false): 값이 없어도 되는 주소 뒤 ?조건 — 없으면 null
     @GetMapping
