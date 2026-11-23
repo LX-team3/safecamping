@@ -41,7 +41,6 @@ public class DisasterService {
         DisasterNowResponse.Water water = waterSource.current().map(DisasterService::toWater).orElse(null);
         DisasterRules.Judgement waterJ = water == null || water.stale() ? new DisasterRules.Judgement(null, List.of())
                 : DisasterRules.judgeWater(water.station(), water.wl(), water.attention(), water.alarm(), water.serious());
-        DisasterRules.Judgement j = DisasterRules.higher(rainJ, waterJ);
 
         Optional<List<Alert>> warnings = warningSource.activeWarnings();
         List<DisasterNowResponse.Warning> mine = warnings.orElse(List.of()).stream()
@@ -49,6 +48,10 @@ public class DisasterService {
                 .map(a -> new DisasterNowResponse.Warning(a.category(), a.area(), a.message(),
                         a.issuedAt() == null ? null : a.issuedAt().toString()))
                 .toList();
+        // 호우특보는 비가 오기 전에 내리는 예보 기반 경고 → 비·수위보다 먼저 단계를 올릴 수 있다 (2026-11-23)
+        DisasterRules.Judgement warnJ = DisasterRules.judgeWarnings(
+                warnings.isPresent() ? mine.stream().map(DisasterNowResponse.Warning::category).toList() : null);
+        DisasterRules.Judgement j = DisasterRules.higher(DisasterRules.higher(rainJ, waterJ), warnJ);
 
         return new DisasterNowResponse(PLACE, rainOk && r3 != null, rainOk ? hours.get().get(0).at() : null,
                 r3, r12, r24, j.level(), j.reasons(), warnings.isPresent(), mine, water);

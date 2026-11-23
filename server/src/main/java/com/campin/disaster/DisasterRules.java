@@ -9,6 +9,8 @@ import java.util.List;
 //  - 대피 2단계: 3시간 90mm 또는 12시간 180mm  = 기상청 호우경보 기준
 //  - 3단계(화면 이름은 '대피', 막대 표시 '침수'): 3시간 114mm 또는 24시간 310mm = 서화 관측소 50년에 한 번 올 큰비 (WAMIS 설계강수량)
 // 숫자를 바꾸려면 criteria.json · rag 문서도 같이 바꾼다 (안전 기준이라 임의로 바꾸지 않는다)
+// 2026-11-23: 기상청 호우특보도 단계에 넣는다 (judgeWarnings). 특보는 "3시간 60·90mm 이상 예상" 때 내리는 예보 기반 경고라,
+//   이미 내린 비(실황)가 기준에 닿기 전에 단계를 올릴 수 있다. 최종 단계 = 비 · 수위 · 특보 중 가장 높은 쪽
 public final class DisasterRules {
 
     public static final double READY_3H = 60;
@@ -67,7 +69,23 @@ public final class DisasterRules {
         return new Judgement(0, List.of());
     }
 
-    // 비 단계와 수위 단계 중 높은 쪽. 까닭은 그 단계를 만든 쪽 것만 (둘 다 같으면 둘 다). 둘 다 모르면 null
+    // 기상청 호우특보로 본 단계: 호우주의보 → 1 준비 · 호우경보 → 2 대피 (특보 이름이 곧 기준이라 새 숫자는 없다)
+    // categories: 캠핑장(인제)에 걸린 특보 이름들. 못 받았으면 null
+    // 호우특보가 없으면 level null = 판단 재료로 쓰지 않음 (특보가 없다는 이유만으로 '안전'이라 하지 않는다 — 비·수위로 판단)
+    public static Judgement judgeWarnings(List<String> categories) {
+        if (categories == null) {
+            return new Judgement(null, List.of());
+        }
+        if (categories.stream().anyMatch(c -> c != null && c.contains("호우경보"))) {
+            return new Judgement(2, List.of("기상청 호우경보 발효"));
+        }
+        if (categories.stream().anyMatch(c -> c != null && c.contains("호우주의보"))) {
+            return new Judgement(1, List.of("기상청 호우주의보 발효"));
+        }
+        return new Judgement(null, List.of());
+    }
+
+    // 두 판단 중 높은 쪽. 까닭은 그 단계를 만든 쪽 것만 (둘 다 같으면 둘 다). 둘 다 모르면 null
     public static Judgement higher(Judgement a, Judgement b) {
         if (a.level() == null) {
             return b;
