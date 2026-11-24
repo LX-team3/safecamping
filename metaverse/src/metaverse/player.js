@@ -222,7 +222,23 @@ export function createPlayer({ scene, camera, controls, terrain, camp }) {
     controls.target.add(delta)
   }
 
-  const api = { object: turtle, update, reset, moveTo, dispose, enabled: true }
+  // ----- 터치(휴대폰) 입력: 화면의 조이스틱·버튼이 불러요 -----
+  const touch = { x: 0, y: 0, run: false } // x: 오른쪽이 +, y: 위(앞으로)가 +. 각각 -1~1
+  // 조이스틱을 민 방향과 세기. 손을 떼면 (0, 0)을 보내요
+  function setMove(x, y) {
+    touch.x = x
+    touch.y = y
+  }
+  // 달리기 버튼을 켜고 끄기
+  function setRun(on) {
+    touch.run = !!on
+  }
+  // 점프 버튼: 스페이스바와 똑같이, 땅에 서 있을 때만 뛰어요
+  function jump() {
+    if (api.enabled && jumpY === 0) jumpV = JUMP_SPEED
+  }
+
+  const api = { object: turtle, update, reset, moveTo, setMove, setRun, jump, dispose, enabled: true }
 
   function update(dt) {
     dt = Math.min(dt, 0.05) // 탭을 다녀오면 dt가 커지는 것 방지
@@ -250,11 +266,16 @@ export function createPlayer({ scene, camera, controls, terrain, camp }) {
     if (keys.KeyS || keys.ArrowDown) move.sub(forward)
     if (keys.KeyD || keys.ArrowRight) move.add(right)
     if (keys.KeyA || keys.ArrowLeft) move.sub(right)
+    // 터치 조이스틱: 민 방향을 더해요. 살짝 건드린 정도(0.15 아래)는 무시해요
+    const push = Math.min(1, Math.hypot(touch.x, touch.y))
+    const byTouch = move.lengthSq() === 0 && push > 0.15
+    if (byTouch) move.addScaledVector(forward, touch.y).addScaledVector(right, touch.x)
 
     const moving = move.lengthSq() > 0
     if (moving) {
       move.normalize()
-      const speed = keys.ShiftLeft || keys.ShiftRight ? RUN_SPEED : WALK_SPEED
+      let speed = keys.ShiftLeft || keys.ShiftRight || touch.run ? RUN_SPEED : WALK_SPEED
+      if (byTouch) speed *= Math.max(0.4, push) // 조이스틱을 조금만 밀면 천천히 걸어요
       const old = turtle.position.clone()
       old.y -= jumpY // 점프 높이는 빼고 계산해요 (카메라가 점프를 따라 위아래로 흔들리지 않게)
       let nx = old.x + move.x * speed * dt

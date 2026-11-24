@@ -247,7 +247,8 @@ export function createMissions({ scene, camp, terrain, missions, positions = [],
 
     // follow: 따라다닐 물체(달리는 차). 없으면 한자리에 가만히 있어요
     // backUp: 뒤로 움직일 주차된 차 (없으면 null)
-    return { mission, pos: new THREE.Vector3(x, y, z), ring, icon, done: false, follow, backUp: actor ? makeBackUp(actor) : null }
+    // prop: 소품 물체 (없으면 null). 미니게임이 그릴 자리를 찾을 때 써요
+    return { mission, pos: new THREE.Vector3(x, y, z), ring, icon, done: false, follow, backUp: actor ? makeBackUp(actor) : null, prop: prop?.object ?? null }
   })
 
   // 주차된 차를 뒤로 움직일 준비. 차의 원래 자리와 길이 방향을 적어 둬요

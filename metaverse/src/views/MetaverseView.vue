@@ -5,17 +5,60 @@
 
     <!-- 위쪽 정보줄: 지금 낮·밤, 푼 문제 수, 나가기 (점수는 없앴어요) -->
     <div v-if="phase === 'play'" class="hud">
-      <span>{{ timeOfDay === 'night' ? '🌙 밤' : '☀️ 낮' }}</span>
+      <!-- 누르면 낮↔밤이 바로 바뀌어요. 퀴즈를 푸는 중이나 침수 대피 중에는 못 눌러요 -->
+      <button
+        class="time"
+        :disabled="!!quiz || !!flood || !!mini"
+        :title="timeOfDay === 'night' ? '눌러서 낮으로 바꾸기' : '눌러서 밤으로 바꾸기'"
+        @click="toggleTime"
+      >
+        {{ timeOfDay === 'night' ? '🌙 밤' : '☀️ 낮' }}
+      </button>
       <span>✅ {{ doneCount }}문제</span>
       <button class="exit" @click="finish">나가기</button>
     </div>
-    <div v-if="phase === 'play' && !quiz && !flood" class="help">
-      WASD·방향키 이동 · Shift 달리기 · Space 점프 · 머리 위 <b>빨간 화살표</b>를 따라가요
+    <!-- 미니게임: 마시멜로 굽기. 굽는 동안은 안내와 남은 시간 막대, 끝나면 결과 글자가 보여요 -->
+    <div v-if="phase === 'play' && mini" class="mini">
+      <template v-if="mini === 'play'">
+        <b>🍡 마시멜로를 구워요!</b>
+        <span v-if="isTouch"><b>화면을 터치</b>해서 뒤집어요. 한쪽만 오래 구우면 타요</span>
+        <span v-else><b>Space</b> 또는 <b>마우스 클릭</b>으로 뒤집어요. 한쪽만 오래 구우면 타요</span>
+        <div class="mini-bar"><i></i></div>
+      </template>
+      <template v-else>
+        <b>{{ miniText }}</b>
+        <span class="ouch">앗, 뜨거워! 뜨거운 꼬치에 손이 닿았어요</span>
+      </template>
     </div>
+
+    <!-- 조작 안내: 터치 화면이면 아래쪽에 조이스틱이 있어서 안내를 위쪽에 보여요 -->
+    <div v-if="phase === 'play' && !quiz && !flood && !mini" class="help" :class="{ top: isTouch }">
+      <template v-if="isTouch">조이스틱으로 이동 · 화면을 끌어 둘러보기 · 머리 위 <b>빨간 화살표</b>를 따라가요</template>
+      <template v-else>WASD·방향키 이동 · Shift 달리기 · Space 점프 · 머리 위 <b>빨간 화살표</b>를 따라가요</template>
+    </div>
+
+    <!-- 터치 조작(휴대폰): 왼쪽 아래 조이스틱, 오른쪽 아래 달리기·점프 버튼. 퀴즈·미니게임·결과 창이 떠 있으면 숨겨요 -->
+    <template v-if="showPad">
+      <div
+        ref="stick"
+        class="stick"
+        @pointerdown.prevent="stickDown"
+        @pointermove.prevent="stickMove"
+        @pointerup="stickUp"
+        @pointercancel="stickUp"
+      >
+        <i :style="{ transform: `translate(${knob.x}px, ${knob.y}px)` }"></i>
+      </div>
+      <div class="pad-btns">
+        <!-- 달리기는 누르고 있지 않아도 되게 켜고 끄는 방식이에요 (한 손으로 점프도 눌러야 해서) -->
+        <button class="pad-btn" :class="{ on: running }" @pointerdown.prevent="toggleRun">🏃<small>달리기</small></button>
+        <button class="pad-btn" @pointerdown.prevent="game.jump()">⬆️<small>점프</small></button>
+      </div>
+    </template>
 
     <!-- 돌발 미션: 비가 와서 물이 차오르는 동안 보이는 알림 -->
     <div v-if="phase === 'play' && flood === 'run'" class="alert">
-      🌧️ 비가 많이 와요! 물이 차오르기 전에 <b>초록 화살표</b>를 따라 <b>출구</b>로 대피해요 (Shift 달리기)
+      🌧️ 비가 많이 와요! 물이 차오르기 전에 <b>초록 화살표</b>를 따라 <b>출구</b>로 대피해요 ({{ isTouch ? '🏃 달리기 버튼' : 'Shift 달리기' }})
     </div>
 
     <!-- 시작 화면 -->
@@ -26,7 +69,7 @@
         <ul>
           <li>머리 위 <b>빨간 화살표</b>가 위험 지점을 가리켜요.</li>
           <li>노란 고리 안으로 들어가면 퀴즈가 열려요. 풀면 다음 문제가 다른 곳에 나타나요.</li>
-          <li>낮과 밤이 <b>2분마다</b> 바뀌어요. 낮에는 낮 문제, 밤에는 밤 문제가 나와요.</li>
+          <li>화면 위쪽 <b>☀️ 낮 / 🌙 밤</b> 버튼을 누르면 낮과 밤이 바뀌어요. 낮에는 낮 문제, 밤에는 밤 문제가 나와요.</li>
           <li>갑자기 <b>비</b>가 오면 물이 차오르기 전에 <b>출구</b>로 대피해요.</li>
           <li>제한 시간은 없어요. 그만하고 싶을 때 <b>나가기</b>를 눌러요.</li>
         </ul>
@@ -115,16 +158,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { createScene } from '../metaverse/scene.js'
 
 const container = ref(null)
 const phase = ref('loading') // loading → ready → play → end (불러오기 실패는 error)
 const doneCount = ref(0)     // 푼 문제 수
-const timeOfDay = ref('day') // 'day' 낮, 'night' 밤. 게임이 2분마다 바꿔서 알려줘요
+const timeOfDay = ref('day') // 'day' 낮, 'night' 밤. 위쪽 버튼을 누르면 게임이 바꿔서 알려줘요
 const audience = ref('child') // 'child' 아이, 'adult' 어른
 // 돌발 미션 상태: '' 없음 / 'run' 대피 중 / 'safe' 대피 성공 / 'drowned' 물에 잠김
 const flood = ref('')
+// 미니게임(마시멜로 굽기) 상태: '' 없음 / 'play' 굽는 중 / 'ouch' 굽기 끝
+const mini = ref('')
+const miniText = ref('') // 굽기 결과 글자 (잘 구웠어요 / 탔어요 / 덜 익었어요)
 
 // 아이·어른 고르기 ("처음으로"를 해도 고른 것이 그대로 남아요)
 function pickAudience(who) {
@@ -132,8 +178,59 @@ function pickAudience(who) {
   game?.setAudience(who)
 }
 
+// ---------- 터치 조작 (휴대폰·태블릿) ----------
+// 터치 화면인지: 터치가 되는 기기면 처음부터 켜고, 아니어도 화면을 한 번 터치하면 켜요
+const isTouch = ref(navigator.maxTouchPoints > 0)
+const onFirstTouch = () => { isTouch.value = true }
+// 조이스틱·버튼을 보여 줄 때: 탐험 중이고, 퀴즈·미니게임·대피 결과 창이 없을 때 (대피 중에는 보여요)
+const showPad = computed(() =>
+  isTouch.value && phase.value === 'play' && !quiz.value && !mini.value && flood.value !== 'safe' && flood.value !== 'drowned')
+
+const STICK_R = 45                    // 조이스틱 손잡이가 움직일 수 있는 거리(px)
+const stick = ref(null)               // 조이스틱 바탕 원
+const knob = reactive({ x: 0, y: 0 }) // 손잡이가 가운데에서 움직인 거리(px)
+const running = ref(false)            // 달리기 버튼이 켜져 있는지
+let stickId = null                    // 조이스틱을 잡고 있는 손가락 번호
+
+function stickDown(e) {
+  stickId = e.pointerId
+  // 손가락이 원 밖으로 나가도 계속 따라오게 붙잡아요. 붙잡기를 못 해도 조이스틱은 움직이게 오류는 넘어가요
+  try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* 붙잡기 실패는 무시 */ }
+  stickMove(e)
+}
+function stickMove(e) {
+  if (e.pointerId !== stickId) return
+  const box = stick.value.getBoundingClientRect()
+  let dx = e.clientX - (box.left + box.width / 2)
+  let dy = e.clientY - (box.top + box.height / 2)
+  const len = Math.hypot(dx, dy)
+  if (len > STICK_R) { dx *= STICK_R / len; dy *= STICK_R / len } // 원 밖으로는 못 나가요
+  knob.x = dx
+  knob.y = dy
+  game?.setMove(dx / STICK_R, -dy / STICK_R) // 화면은 아래쪽이 +라서 위(앞으로)가 +가 되게 뒤집어요
+}
+function stickUp(e) {
+  if (e && e.pointerId !== stickId) return
+  stickId = null
+  knob.x = 0
+  knob.y = 0
+  game?.setMove(0, 0)
+}
+function toggleRun() {
+  running.value = !running.value
+  game?.setRun(running.value)
+}
+// 조이스틱이 사라질 때(퀴즈가 열릴 때 등) 손잡이를 가운데로 돌려놔요. 안 그러면 다시 나왔을 때 혼자 걸어가요
+watch(showPad, (on) => { if (!on) stickUp() })
+
+// 위쪽 낮·밤 버튼: 바로 낮↔밤을 바꿔요 (글자는 게임이 onTime으로 알려 주면 바뀌어요)
+function toggleTime(e) {
+  game?.toggleTime()
+  e.currentTarget.blur() // 버튼에 초점이 남으면 Space(점프)를 누를 때 버튼이 또 눌려서 초점을 빼요
+}
+
 // 퀴즈 상태
-const quiz = ref(null)      // 지금 풀고 있는 문제
+const quiz = ref(null)     // 지금 풀고 있는 문제
 const answered = ref(false) // 답을 골랐는지
 const correct = ref(false)  // 맞혔는지
 const picked = ref(-1)      // 고른 번호
@@ -156,6 +253,12 @@ function mountGame() {
       else if (state === 'end') flood.value = ''
       else flood.value = state
     },
+    // 미니게임: 'start' 시작 / 'ouch' 굽기 끝(text: 결과 글자) / 'end' 끝
+    onMini: (state, text) => {
+      if (state === 'start') mini.value = 'play'
+      else if (state === 'ouch') { mini.value = 'ouch'; miniText.value = text }
+      else mini.value = ''
+    },
     onMission: (m) => {
       quiz.value = m
       answered.value = false
@@ -168,8 +271,12 @@ function mountGame() {
   })
 }
 
-onMounted(mountGame)
+onMounted(() => {
+  mountGame()
+  window.addEventListener('touchstart', onFirstTouch, { passive: true })
+})
 onUnmounted(() => {
+  window.removeEventListener('touchstart', onFirstTouch)
   if (game) game.dispose()
 })
 
@@ -229,7 +336,11 @@ function choiceClass(i) {
 </script>
 
 <style scoped>
-.wrap { position: relative; width: 100vw; height: 100vh; overflow: hidden; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
+/* touch-action: none → 손가락으로 끌 때 브라우저가 화면을 밀거나 확대하지 않게 해요
+   100dvh → 휴대폰에서 주소창을 뺀 실제 화면 높이 (모르는 브라우저는 윗줄 100vh를 써요) */
+.wrap { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.wrap { height: 100vh; height: 100dvh; }
+.wrap { position: relative; width: 100vw; overflow: hidden; font-family: 'Pretendard', 'Noto Sans KR', sans-serif; }
 .metaverse { width: 100%; height: 100%; background: #183c36; }
 
 .hud {
@@ -239,6 +350,13 @@ function choiceClass(i) {
   font-size: 18px; font-weight: 700;
 }
 .hud { align-items: center; }
+/* 낮·밤 버튼: 누를 수 있다는 것이 보이게 테두리를 둘러요 */
+.hud .time {
+  padding: 4px 14px; border: 2px solid rgba(255, 255, 255, 0.6); border-radius: 999px;
+  background: transparent; color: #fff; font: inherit; cursor: pointer;
+}
+.hud .time:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+.hud .time:disabled { border-color: transparent; cursor: default; }
 .hud .exit {
   padding: 4px 14px; border: 0; border-radius: 999px;
   background: #fff; color: #1f4d2b; font-size: 15px; font-weight: 700; cursor: pointer;
@@ -247,6 +365,41 @@ function choiceClass(i) {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
   padding: 8px 16px; background: rgba(255, 255, 255, 0.85); border-radius: 10px; font-size: 14px;
 }
+
+.help.top { top: 66px; bottom: auto; width: max-content; max-width: 92vw; text-align: center; font-size: 13px; }
+
+/* 터치 조작: 왼쪽 아래 조이스틱 */
+.stick {
+  position: absolute; left: 28px; bottom: 32px; width: 130px; height: 130px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28); border: 2px solid rgba(255, 255, 255, 0.7);
+  display: flex; align-items: center; justify-content: center;
+}
+.stick i { width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+/* 터치 조작: 오른쪽 아래 달리기·점프 버튼 */
+.pad-btns { position: absolute; right: 24px; bottom: 32px; display: flex; gap: 14px; align-items: flex-end; }
+.pad-btn {
+  width: 76px; height: 76px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.7);
+  background: rgba(20, 40, 30, 0.6); color: #fff; font-size: 26px; line-height: 1.1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pad-btn small { font-size: 12px; font-weight: 700; }
+.pad-btn.on { background: #e8862e; border-color: #fff; }
+.pad-btn:active { transform: scale(0.94); }
+
+/* 미니게임 안내: 3D 화면 클릭(뒤집기)을 막지 않게 pointer-events를 꺼요 */
+.mini {
+  position: absolute; top: 66px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: max-content; max-width: 92vw; padding: 12px 20px;
+  background: rgba(255, 253, 247, 0.92); border-radius: 14px;
+  font-size: 15px; text-align: center; pointer-events: none;
+}
+.mini > b { font-size: 19px; }
+.mini .ouch { color: #c0392b; font-weight: 700; }
+/* 남은 시간 막대: 10초 동안 줄어들어요 (minigame.js의 PLAY_SECONDS와 같은 시간) */
+.mini-bar { width: 260px; max-width: 80vw; height: 8px; background: #e2e6dc; border-radius: 999px; overflow: hidden; }
+.mini-bar i { display: block; height: 100%; background: #e8862e; transform-origin: left; animation: mini-shrink 10s linear forwards; }
+@keyframes mini-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 .alert {
   position: absolute; top: 66px; left: 50%; transform: translateX(-50%);
