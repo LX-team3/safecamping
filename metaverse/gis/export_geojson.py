@@ -27,7 +27,9 @@ LAYER_OPTIONS = [
     'COORDINATE_PRECISION=1',  # 소수점 1자리 (10cm 단위)
     'RFC7946=NO',              # NO여야 EPSG:5179 좌표 그대로 나와요 (YES면 위경도로 바뀌어요)
 ]
-SKIP = []  # 내보내지 않을 레이어 이름. 예: ['test']
+# 내보내지 않을 레이어 이름. 예: ['test']
+# flood_zones: 홍수위험지도 구역. 게임이 쓰지 않기로 해서(2026-11-20) 내보내지 않아요. 레이어는 gpkg에 그대로 있어요
+SKIP = ['flood_zones']
 
 
 def layer_names(gpkg):

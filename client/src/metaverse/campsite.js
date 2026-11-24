@@ -27,10 +27,29 @@ export async function buildCampsite(terrain) {
 
   // boundary(캠핑장 테두리)만 꼭 있어야 해요.
   // 나머지는 파일이 없어도 그 부분만 빼고 만들어요 (게임이 멈추지 않게)
-  const [boundary, roads, stream, rows, facilities, riverGeo, areas, sites, buildings, carRoutes] = await Promise.all([
+  const [boundary, roads, stream, rows, facilities, riverGeo, areas, sites, buildings, carRoutes, quizGeo] = await Promise.all([
     loadGeo('boundary'),
-    ...['roads', 'stream', 'site_rows', 'facilities', 'river', 'areas', 'sites', 'buildings', 'car_routes'].map(loadGeoOptional),
+    ...['roads', 'stream', 'site_rows', 'facilities', 'river', 'areas', 'sites', 'buildings', 'car_routes', 'quiz_points'].map(loadGeoOptional),
   ])
+
+  // 침수 미션에 쓰는 자료
+  // bedRings: 하천 전체(river의 bed) 모양. 침수 미션에서 강물이 차오르는 면으로 써요
+  const bedRings = []
+  for (const f of riverGeo?.features || []) {
+    if (f.properties.type === 'bed') for (const r of parts(f.geometry)) bedRings.push(openRing(r.map(toWorld)))
+  }
+
+  // 퀴즈가 뜰 자리 (quiz_points 레이어: QGIS에서 찍은 점). place 값이 같은 문제가 이 점에 떠요.
+  // 파일이 없거나 점이 없으면 빈 목록이 되고, 그때는 문제에 적힌 임시 위치(anchor)를 써요
+  const quizPoints = []
+  for (const f of quizGeo?.features || []) {
+    const place = String(f.properties?.place ?? '').trim()
+    if (!place) continue // place를 안 적은 점은 어떤 문제를 띄울지 몰라서 건너뛰어요
+    for (const [p] of parts(f.geometry)) {
+      const [x, z] = toWorld(p)
+      quizPoints.push({ place, label: f.properties?.label ?? '', x, z })
+    }
+  }
 
   // 1) 캠핑장 바닥 (잔디)
   const ring = firstRing(boundary).map(toWorld)
@@ -171,12 +190,18 @@ export async function buildCampsite(terrain) {
 
   // 6) 시설 (facilities 레이어: 점으로 찍은 것)
   let start = null // 캐릭터 시작 위치. QGIS에서 type을 start로 적은 점이 있으면 거기서 시작해요
+  let exit = null  // 침수 미션 때 도망갈 출구. QGIS에서 type을 exit로 적은 점이 있으면 거기예요
   const lampSpots = [] // 가로등 위치 (type이 lamp인 점)
   for (const f of facilities?.features || []) {
     const type = f.properties.type
     if (type === 'start') {
       const [p] = parts(f.geometry)[0] || []
       if (p) start = toWorld(p)
+      continue
+    }
+    if (type === 'exit') {
+      const [p] = parts(f.geometry)[0] || []
+      if (p) exit = toWorld(p)
       continue
     }
     if (type === 'lamp') { // 가로등: 위치만 모아 두고 아래에서 한꺼번에 세워요
@@ -211,10 +236,6 @@ export async function buildCampsite(terrain) {
   // 7) 숲: forest 영역 안에 나무 심기
   //    캠핑장 안(+여유), 강바닥, 도로, 개울 위에는 심지 않아요
   if (forestZones.length) {
-    const bedRings = []
-    for (const f of riverGeo?.features || []) {
-      if (f.properties.type === 'bed') for (const r of parts(f.geometry)) bedRings.push(r.map(toWorld))
-    }
     const avoid = (x, z) =>
       pointInRing(x, z, ring) || distToSegs(x, z, ring, true) < FOREST.margin ||
       bedRings.some((r) => pointInRing(x, z, r)) ||
@@ -225,6 +246,7 @@ export async function buildCampsite(terrain) {
     console.log(`나무 ${forest.count}그루를 심었어요`)
   }
 
+  let treeSpots = []
   // 8) 작은 나무: small_tree 영역 안에 심기
   //    캠핑장 안에도 심어요. 도로·건물·텐트·카라반·개울 위에는 심지 않아요
   if (smallTreeZones.length) {
@@ -239,6 +261,8 @@ export async function buildCampsite(terrain) {
       for (const t of small.spots) colliders.push({ x: t.x, z: t.z, hw: SMALL_TREE.block, hd: SMALL_TREE.block, angle: 0 })
     }
     console.log(`작은 나무 ${small.count}그루를 심었어요`)
+    // 캠핑장 안에 있는 작은 나무 자리. 벌 퀴즈처럼 "나무 옆"에 떠야 하는 문제가 써요
+    treeSpots = small.spots.filter((t) => pointInRing(t.x, t.z, ring))
   }
 
   // 9) 달리는 자동차 (car_routes 레이어의 선을 따라가요)
@@ -254,5 +278,11 @@ export async function buildCampsite(terrain) {
     for (const a of animated) a.userData.update(dt)
   }
 
-  return { group, center, start, ring, streamLines, roadLines, colliders, river, lamps, update }
+  // quiz_points에 place를 exit로 적은 점이 있으면 그것도 출구로 써요 (facilities의 exit 점이 먼저예요)
+  if (!exit) {
+    const p = quizPoints.find((q) => q.place === 'exit')
+    if (p) exit = [p.x, p.z]
+  }
+
+  return { group, center, start, exit, ring, streamLines, roadLines, colliders, lamps, quizPoints, bedRings, treeSpots, carObjects: cars.objects, update }
 }

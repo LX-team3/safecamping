@@ -82,6 +82,8 @@ export function buildCars(routes, toWorld, heightAt, group, colliders = []) {
 
   return {
     count: cars.length,
+    // 달리는 차들의 3D 물체 목록. "캠핑장 안 운전" 퀴즈가 이 차를 따라다녀요
+    objects: cars.map((c) => c.obj),
     // who: 캐릭터 위치 { x, z }. 차 앞길에 있으면 차가 멈추고, 비키면 다시 달려요
     update(dt, who) {
       for (const c of cars) {

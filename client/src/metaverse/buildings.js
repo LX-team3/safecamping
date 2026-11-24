@@ -232,10 +232,12 @@ function makeRecycle(ring, toward) {
     g.add(edgePanel(a, b, 1.4, 0.1, new THREE.MeshStandardMaterial({ map: louverTex(len) }))) // 아래 루버 벽
     g.add(edgePanel(a, b, 0.9, 1.6, clear, 0.04))                                            // 위 반투명 판
   }
-  const roof = new THREE.Mesh(extrude(scaleRing(ring, 1.05), 0.12, 0xffffff).geometry, clear) // 반투명 지붕
-  roof.position.y = H
+  // 지붕판과 지붕 틀의 윗면이 같은 높이에 겹치면 화면이 반짝거려요(두 면이 서로 앞에 나오려고 다툼).
+  // 그래서 틀을 낮추고 지붕판을 그 위로 6cm 띄워서, 두 면이 겹치지 않게 했어요
+  const roof = new THREE.Mesh(extrude(scaleRing(ring, 1.05), 0.12, 0xffffff).geometry, clear) // 반투명 지붕 (H+0.08 ~ H+0.20)
+  roof.position.y = H + 0.08
   g.add(roof)
-  const roofFrame = extrude(scaleRing(ring, 1.06), 0.2, 0x3e4247)                          // 지붕 테두리 (안쪽은 지붕판이 가려요)
+  const roofFrame = extrude(scaleRing(ring, 1.06), 0.1, 0x3e4247)                          // 지붕 틀 (H-0.08 ~ H+0.02)
   roofFrame.position.y = H - 0.08
   g.add(roofFrame)
 
