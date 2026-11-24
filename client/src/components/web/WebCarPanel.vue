@@ -1,11 +1,22 @@
 <script setup>
 // 차박지 찾기 (설계 4-1-5): 왼쪽 패널. 서버의 차박 후보지(공공데이터상 제한 없는 곳)를 안전점수 높은 순으로 보여 준다
 // 한 줄 팁은 설계의 예시라 서버 값(응급실까지 시간)으로 대신한다
+// 설계의 "차박할 땐 이것만 챙겨요" 고정 문구 상자는 뺐다 (데이터와 무관한 고정 글이고, 출발 준비 체크리스트 · 진단 조심할 것과 겹침)
+// 지도 아무 곳이나 누르면 그 자리를 판정한다 (WebExploreView → 차박지 상세)
+// "지도에 보일 것" 필터 (앱 차박 지도의 필터 시트와 같은 내용, utils/chabak.js 의 LAYER_CHIPS · SAFETY_FILTERS)
+//  - 갈 수 있는 곳(점): 차박 후보지 · 등록 야영장 — 목록과 지도 핀에 같이 적용
+//  - 피해야 할 곳(면): 불가 구역 · 주의 구역 — 지도에 반투명 면으로 칠함 (처음엔 꺼 둠: 켜면 지도가 덮여서)
+//  - 안전점수: 전체 · 위험 제외(40↑) · 안전만(70↑) — 점에만 적용
+import { LAYER_CHIPS, SAFETY_FILTERS, VERDICT } from '@/utils/chabak'
+
 defineProps({
-  camps: { type: Array, default: () => [] }, // [{ id, name, safetyScore, grade, tier, area, erDriveMin }]
+  camps: { type: Array, default: () => [] }, // [{ id, kind: open·camp, name, safetyScore, grade, tier, area, erDriveMin }]
   selectedId: { type: [Number, String], default: null },
+  layerOn: { type: Object, default: () => ({}) }, // { open, camp, no, caution } 켜짐
+  safety: { type: String, default: 'all' }, // SAFETY_FILTERS 의 key
+  zoneLoading: { type: Boolean, default: false }, // 구역을 처음 받는 중 (무거운 계산이라 몇 초 걸릴 수 있음)
 })
-const emit = defineEmits(['back', 'pick'])
+const emit = defineEmits(['back', 'pick', 'toggle-layer', 'safety'])
 const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
 </script>
 
@@ -19,22 +30,42 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
       <b>🚙 차박지 찾기</b>
     </div>
     <div class="body">
-      <div class="prep">
-        <b>차박할 땐 이것만 챙겨요</b>
-        <span>🪟 창문 살짝 열고 자기 (일산화탄소)<br />🌧 비 예보 땐 물가에서 떨어져 주차<br />📶 휴대폰 신호 미리 확인</span>
+      <!-- 지도에 보일 것 -->
+      <div class="filter">
+        <span class="flabel">갈 수 있는 곳</span>
+        <div class="fchips">
+          <button v-for="c in LAYER_CHIPS.filter((x) => x.section === 'go')" :key="c.type" type="button" class="fchip"
+            :class="{ on: layerOn[c.type] }" :aria-pressed="!!layerOn[c.type]" :title="c.note" @click="emit('toggle-layer', c.type)">
+            <i :style="{ background: `var(${VERDICT[c.verdict].colorVar})` }" />{{ c.label }}
+          </button>
+        </div>
+        <span class="flabel">피해야 할 곳 <small>지도에 칠해져요</small></span>
+        <div class="fchips">
+          <button v-for="c in LAYER_CHIPS.filter((x) => x.section === 'avoid')" :key="c.type" type="button" class="fchip"
+            :class="{ on: layerOn[c.type] }" :aria-pressed="!!layerOn[c.type]" :title="c.note" @click="emit('toggle-layer', c.type)">
+            <i :style="{ background: `var(${VERDICT[c.verdict].colorVar})` }" />{{ c.label }}
+          </button>
+        </div>
+        <p v-if="zoneLoading" class="fnote">구역을 불러오는 중이에요 (처음 한 번은 몇 초 걸려요)</p>
+        <span class="flabel">안전점수</span>
+        <div class="fchips">
+          <button v-for="f in SAFETY_FILTERS" :key="f.key" type="button" class="fchip" :class="{ on: safety === f.key }"
+            :aria-pressed="safety === f.key" @click="emit('safety', f.key)">{{ f.label }}</button>
+        </div>
       </div>
+
       <div class="count-row">
-        <b>차박 후보지 {{ camps.length }}곳</b>
+        <b>차박지 {{ camps.length }}곳</b>
         <span>안전점수 높은 순</span>
       </div>
-      <p v-if="!camps.length" class="state">차박 후보지가 아직 없어요.</p>
+      <p v-if="!camps.length" class="state">조건에 맞는 곳이 없어요. 필터를 넓혀 보세요.</p>
       <div class="rows">
         <button v-for="c in camps" :key="c.id" type="button" class="row" :class="{ on: c.id === selectedId }"
           :aria-pressed="c.id === selectedId" @click="emit('pick', c.id)">
           <span class="score" :class="c.tier"><span class="gl">{{ GRADE_LABEL[c.grade] }}</span><span class="num">{{ c.safetyScore ?? '-' }}<small>점</small></span></span>
           <span class="info">
             <span class="line"><b>{{ c.name }}</b><span class="pill" :class="c.tier">{{ GRADE_LABEL[c.grade] }}</span></span>
-            <span class="meta">차박 후보지 · {{ c.area }}</span>
+            <span class="meta">{{ c.kind === 'camp' ? '등록 야영장' : '차박 후보지' }} · {{ c.area }}</span>
             <span v-if="c.erDriveMin != null" class="tip">응급실 차로 {{ c.erDriveMin }}분</span>
           </span>
         </button>
@@ -82,22 +113,6 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-.prep {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: var(--web-bg-prep);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.prep b {
-  font-size: 15px;
-}
-.prep span {
-  font-size: 14px;
-  color: var(--web-text-prep);
-  line-height: 1.6;
 }
 .count-row {
   display: flex;
@@ -200,5 +215,57 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
   font-size: 13px;
   color: var(--web-grade-safe);
   font-weight: 600;
+}
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0 4px;
+}
+.flabel {
+  font-size: 13px;
+  font-weight: 700;
+}
+.flabel small {
+  font-weight: 400;
+  color: var(--web-text-sub);
+}
+.fchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fchip {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--web-line-panel);
+  background: var(--web-bg);
+  color: var(--web-text-sub);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.fchip i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  opacity: 0.35;
+}
+.fchip.on {
+  border-color: var(--web-green);
+  color: var(--web-text);
+  font-weight: 700;
+}
+.fchip.on i {
+  opacity: 1;
+}
+.fnote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--web-text-sub);
 }
 </style>

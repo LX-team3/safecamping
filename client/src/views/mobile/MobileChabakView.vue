@@ -19,6 +19,7 @@ import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/f
 import { GRADE_LABEL, INJE_CENTER, LAYER_CHIPS, SAFETY_FILTERS, VERDICT, distanceText, driveMinOf } from '@/utils/chabak'
 import { vHscroll } from '@/utils/hscroll'
 import { useDragSheet, useElementHeight } from '@/utils/dragSheet'
+import { useFavoriteStore } from '@/stores/favorite'
 
 const mapRef = ref(null)
 const picked = ref(null) // 누른 지점 { lat, lng }
@@ -335,6 +336,7 @@ const planTarget = computed(() => {
 
 // 내 캠핑 카드에서 들어온 경우 (/chabak?lat=&lng=): 지도가 준비되면 그 자리로 가서 판정
 const route = useRoute()
+const favorite = useFavoriteStore() // 하트: 등록 야영장만 저장 탭 '관심 캠핑장'에 담는다 (stores/favorite.js)
 function onMapReady() {
   const lat = Number(route.query.lat)
   const lng = Number(route.query.lng)
@@ -451,7 +453,7 @@ const parcelLine = computed(() =>
             <p v-else-if="!listItems.length" class="state">조건에 맞는 곳이 없어요. 안전점수 기준을 넓혀 보세요</p>
             <ol v-else class="spot-list">
               <MobileSpotRow v-for="(it, i) in listItems" :key="`${it.kind}-${it.id ?? it.name}-${it.lat}`" :item="it"
-                :rank="i + 1" @open="pickFromList" />
+                :rank="i + 1" :favorite="it.kind === 'camp' && favorite.has(it.id)" @open="pickFromList" @favorite="favorite.toggle" />
             </ol>
           </template>
 
@@ -563,6 +565,15 @@ const parcelLine = computed(() =>
 
             <button v-if="!expanded" type="button" class="outline" @click="snap = 'full'">자세히 보기</button>
             <!-- 내 캠핑에 일정 등록 (캠핑장 상세와 같은 시트). 등록 야영장도 후보지도 찍은 자리도 가능 -->
+            <!-- 등록 야영장이면 저장(하트) — 저장 탭 '관심 캠핑장'에 담긴다. 차박 후보지는 캠핑장 표에 없어 저장 불가 -->
+            <button v-if="selectedCamp" type="button" class="outline save-btn" :class="{ on: favorite.has(selectedCamp.id) }"
+              :aria-pressed="favorite.has(selectedCamp.id)" @click="favorite.toggle(selectedCamp.id)">
+              <svg viewBox="0 0 24 24" width="18" height="18" :fill="favorite.has(selectedCamp.id) ? 'currentColor' : 'none'"
+                stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" />
+              </svg>
+              {{ favorite.has(selectedCamp.id) ? '저장됨' : '관심 캠핑장에 저장' }}
+            </button>
             <button v-if="planTarget" type="button" class="primary" aria-haspopup="dialog" @click="planOpen = true">
               내 캠핑에 등록하기
             </button>
@@ -1045,5 +1056,15 @@ h2 {
   margin: 4px 0 0;
   font-size: 11px;
   color: var(--color-text-sub);
+}
+.save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.save-btn.on {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 </style>

@@ -1,18 +1,18 @@
 <script setup>
 // 웹 저장 (설계 4-3 로그인 전 · 4-4 로그인 후)
 //  - 로그인 전: 왼쪽에 로그인 안내, 오른쪽은 지도 (캠핑장 핀 · 시설 칩 · 기상특보)
-//  - 로그인 후: 왼쪽에 관심 캠핑장(하트) 목록 + 체크(최대 3곳), 오른쪽에 체크한 캠핑장 비교표
+//  - 로그인 후: 왼쪽에 관심 캠핑장(하트) 목록 + 체크(최대 3곳), 오른쪽은 지도(관심 캠핑장 핀)
+//              체크한 캠핑장 비교표는 지도 위, 관심 캠핑장 목록 바로 옆 패널에 뜬다 (✕ 로 닫고, 체크를 바꾸면 다시 열림)
 // 데이터: 관심 캠핑장 GET /api/saved/favorites, 캠핑장 GET /api/camps · /api/camps/{id} (비교 값은 가까운 시설 차로 n분)
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import WebMapShell from '@/components/web/WebMapShell.vue'
 import WebCampMap from '@/components/web/WebCampMap.vue'
 import WebFacChips from '@/components/web/WebFacChips.vue'
-import WebWeatherBar from '@/components/web/WebWeatherBar.vue'
+import WebChabakToggle from '@/components/web/WebChabakToggle.vue'
 import { api } from '@/utils/api'
 import { facilityOn } from '@/utils/facilityLayers'
 import { useMapFacilities } from '@/utils/webMapFacilities'
-import { shortSido } from '@/utils/place'
 import { useAuthStore } from '@/stores/auth'
 import { useFavoriteStore } from '@/stores/favorite'
 
@@ -102,36 +102,31 @@ const rows = computed(() =>
     }
   }),
 )
-const cols = computed(() => `120px repeat(${Math.max(chosen.value.length, 1)}, minmax(0, 1fr))`)
+const cols = computed(() => `64px repeat(${Math.max(chosen.value.length, 1)}, minmax(0, 1fr))`)
 const anyDummy = computed(() => chosen.value.some((c) => details.value[c.id]?.dummy))
 const limitText = computed(() =>
   full.value ? '비교는 최대 3곳까지예요 · 하나를 빼고 골라 주세요' : `체크해서 비교에 담기 · 최대 3곳 (${picked.value.length}/${MAX_PICK})`,
 )
 
-// ---- 로그인 전: 지도 ----
+// ---- 지도 (로그인 전 · 후 모두) ----
+// 로그인 전: 모든 캠핑장 핀 / 로그인 후: 관심 캠핑장 핀만 (비교하는 곳이 지도 어디인지 보이게)
 const { layers, mapFacilities, loadLayers, toggleChip, onBounds } = useMapFacilities()
-const mapCamps = computed(() => allCamps.value.filter((c) => TIER_BY_GRADE[c.grade]).map((c) => ({ ...c, tier: TIER_BY_GRADE[c.grade] })))
-const warnings = ref(null)
-const warnRegion = ref('')
-async function loadWarnings() {
-  const sido = allCamps.value[0]?.sido
-  warnRegion.value = shortSido(sido || '강원특별자치도')
-  try {
-    const res = await api('/api/alerts', { params: { sido: warnRegion.value } })
-    warnings.value = res.activeWarnings?.length ?? null // 발효 중 특보 목록(배열)의 개수
-  } catch {
-    warnings.value = null
-  }
-}
+const pinOf = (c) => ({ ...c, tier: TIER_BY_GRADE[c.grade] })
+const mapCamps = computed(() =>
+  (auth.isLoggedIn ? favCamps.value : allCamps.value).filter((c) => TIER_BY_GRADE[c.grade]).map(pinOf),
+)
+
+// ---- 비교 패널 열고 닫기 (로그인 후) ----
+// ✕ 로 닫으면 지도를 넓게 볼 수 있고, 왼쪽에서 체크를 바꾸면 다시 열린다
+const cmpOpen = ref(true)
+watch(picked, () => (cmpOpen.value = true))
 
 onMounted(async () => {
   await loadCamps()
+  loadLayers() // 지도 시설 칩 (로그인 전 · 후 모두 지도가 있다)
   if (auth.isLoggedIn) {
     await loadFavorites()
     picked.value = favIds.value.slice(0, MAX_PICK) // 처음엔 앞의 3곳을 비교해 보여 준다
-  } else {
-    loadLayers()
-    loadWarnings()
   }
 })
 </script>
@@ -188,18 +183,25 @@ onMounted(async () => {
       </div>
     </template>
 
-    <!-- 로그인 전: 지도 -->
-    <template v-if="!auth.isLoggedIn">
-      <WebCampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="null" :fit-key="mapCamps.length" @bounds="onBounds" />
-      <WebFacChips :layers="layers" :on="facilityOn" @toggle="toggleChip" />
-      <WebWeatherBar :region="warnRegion" :count="warnings" />
-    </template>
+    <!-- 지도 (로그인 전: 모든 캠핑장 / 로그인 후: 관심 캠핑장) -->
+    <WebCampMap :camps="mapCamps" :facilities="mapFacilities" :selected-id="null" :fit-key="mapCamps.length" @bounds="onBounds">
+      <!-- 차박지 찾기로 가는 버튼 (검색 지도와 같은 자리) -->
+      <template #top-right><WebChabakToggle /></template>
+    </WebCampMap>
+    <!-- 비교 패널이 열려 있으면 칩을 패널 오른쪽으로 옮긴다 (가려지지 않게) -->
+    <WebFacChips :layers="layers" :on="facilityOn" :class="{ 'beside-cmp': auth.isLoggedIn && favCamps.length && cmpOpen }" @toggle="toggleChip" />
 
-    <!-- 로그인 후: 비교표 -->
-    <div v-else class="compare">
-      <div class="paper">
+    <!-- 로그인 후: 비교 패널 (지도 위, 관심 캠핑장 목록 바로 옆) -->
+    <template v-if="auth.isLoggedIn && favCamps.length">
+      <section v-if="cmpOpen" class="cmp" aria-label="관심 캠핑장 비교">
         <div class="ptop">
-          <h1>관심 캠핑장 비교</h1>
+          <div class="ptitle">
+            <h1>관심 캠핑장 비교</h1>
+            <button type="button" class="pclose" aria-label="비교 닫기" @click="cmpOpen = false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
           <p>항목마다 가장 좋은 값은 <b>초록 칸</b>으로 보여요.</p>
         </div>
 
@@ -233,8 +235,10 @@ onMounted(async () => {
           <span class="a">2곳 이상 골라야 비교할 수 있어요</span>
           <span class="b">왼쪽 관심 캠핑장에서 체크해 주세요.</span>
         </div>
-      </div>
-    </div>
+      </section>
+      <!-- 닫았을 때: 다시 여는 버튼 -->
+      <button v-else type="button" class="cmp-open" @click="cmpOpen = true">비교 보기 ({{ chosen.length }}곳)</button>
+    </template>
   </WebMapShell>
 </template>
 
@@ -435,32 +439,68 @@ onMounted(async () => {
 }
 
 /* ---- 로그인 후 오른쪽 비교표 ---- */
-.compare {
+.cmp {
   position: absolute;
-  inset: 0;
+  top: 16px;
+  left: 16px;
+  bottom: 16px;
+  z-index: 5; /* 지도 위 */
+  width: 520px;
+  max-width: calc(100% - 96px); /* 오른쪽 차박 버튼과 겹치지 않게 */
   overflow-y: auto;
-  background: var(--web-bg-gray);
-  padding: 32px;
-  box-sizing: border-box;
-}
-.paper {
-  max-width: 960px;
-  margin: 0 auto;
   background: var(--web-bg);
   border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
 }
+.ptitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pclose {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--web-line-panel);
+  background: var(--web-bg);
+  color: var(--web-text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.beside-cmp {
+  left: 552px; /* 비교 패널 너비(520) + 여백 — scoped 스타일이 자식 부품의 바깥 요소에도 걸리는 점을 이용 */
+}
+.cmp-open {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--web-green);
+  color: var(--web-white);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
 .ptop {
-  padding: 28px 32px 8px;
+  padding: 20px 20px 4px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 .ptop h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.3px;
 }
@@ -476,7 +516,7 @@ onMounted(async () => {
   border-radius: 4px;
 }
 .heads {
-  margin: 16px 32px 8px;
+  margin: 12px 20px 4px;
   display: grid;
   gap: 12px;
   align-items: end;
@@ -488,7 +528,7 @@ onMounted(async () => {
   min-width: 0;
 }
 .photo {
-  height: 120px;
+  height: 84px;
   border-radius: 12px;
   background: var(--web-photo-empty);
   color: var(--web-text-mute);
@@ -502,7 +542,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
 }
 .hname button {
@@ -519,7 +559,7 @@ onMounted(async () => {
   cursor: pointer;
 }
 .rows {
-  padding: 8px 32px 24px;
+  padding: 4px 20px 16px;
 }
 .crow {
   display: grid;
@@ -533,11 +573,11 @@ onMounted(async () => {
   color: var(--web-text-sub);
 }
 .cell {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 10px;
   background: var(--web-cell);
   color: var(--web-text-cell);
-  font-size: 15px;
+  font-size: 14px;
 }
 .cell.best {
   background: var(--web-best);
@@ -545,13 +585,13 @@ onMounted(async () => {
   font-weight: 700;
 }
 .pfoot {
-  padding: 20px 32px 28px;
+  padding: 14px 20px 18px;
   border-top: 1px solid var(--web-line-panel-soft);
   font-size: 13px;
   color: var(--web-text-sub);
 }
 .notenough {
-  padding: 80px 32px;
+  padding: 40px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;

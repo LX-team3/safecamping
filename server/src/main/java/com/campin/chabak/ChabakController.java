@@ -35,7 +35,8 @@ public class ChabakController {
         return ApiResponse.ok(chabakService.facilities(lat, lng));
     }
 
-    // 찍은 지점의 안전점수 (캠핑장 안전점수와 같은 계산): GET /api/chabak/score?lat=38.07&lng=128.32
+    // 찍은 지점의 안전점수: GET /api/chabak/score?lat=38.07&lng=128.32
+    // 직선거리 + raw.score_weights 기준 (예전 캠핑장 점수 방식). 지금 캠핑장 점수(camp.safety_score)는 카카오 차 시간 + ScoreRules 라 기준이 다르다
     // { score, grade: safe·caution·danger·unknown, erDriveMin(추정), items: [{ type, distM, weight, part }] }
     @GetMapping("/score")
     public ApiResponse<ChabakScoreResponse> score(@RequestParam(required = false) Double lat,
@@ -45,7 +46,7 @@ public class ChabakController {
 
     // 차박 지도 레이어 (위쪽 칩): GET /api/chabak/layer?type=no
     // type: no 불가 구역 · caution 주의 구역 (면: geometry) / open 차박 후보지 · camp 등록 야영장 (점: lat·lng)
-    // [{ id, name, lat, lng, geometry }]. 그 밖의 type 은 400
+    // [{ id, name, lat, lng, score, grade, area, imageUrl, erDriveMin, geometry }] (ChabakLayerItem). 그 밖의 type 은 400
     @GetMapping("/layer")
     public ApiResponse<List<ChabakLayerItem>> layer(@RequestParam(required = false) String type) {
         return ApiResponse.ok(chabakService.layer(type));

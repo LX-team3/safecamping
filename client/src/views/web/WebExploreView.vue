@@ -9,7 +9,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import WebMapShell from '@/components/web/WebMapShell.vue'
 import WebCampMap from '@/components/web/WebCampMap.vue'
+import WebChabakToggle from '@/components/web/WebChabakToggle.vue'
 import WebCarPanel from '@/components/web/WebCarPanel.vue'
+import WebChabakDetailPanel from '@/components/web/WebChabakDetailPanel.vue'
 import WebCampDetailPanel from '@/components/web/WebCampDetailPanel.vue'
 import WebFacilityPanel from '@/components/web/WebFacilityPanel.vue'
 import WebTripModal from '@/components/web/WebTripModal.vue'
@@ -17,6 +19,7 @@ import { api } from '@/utils/api'
 import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { directionsUrl } from '@/utils/place'
 import { shortLabel } from '@/utils/date'
+import { LAYER_CHIPS, SAFETY_FILTERS, verdictColor } from '@/utils/chabak'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTripStore } from '@/stores/trip'
 import { useAuthStore } from '@/stores/auth'
@@ -143,30 +146,91 @@ const sections = computed(() =>
 )
 const toggleMore = (key) => (more.value = { ...more.value, [key]: !more.value[key] })
 
-// 차박지 찾기: 서버의 차박 후보지(GET /api/chabak/layer?type=open, 공공데이터상 제한 없는 곳), 안전점수 높은 순
-// 후보지에는 캠핑장 id 가 없어서 순서로 만든 키(open-0 …)를 쓴다
-const spots = ref([])
+// ---- 차박지 찾기 (앱 차박 지도와 같은 레이어 · 필터) ----
+// 점: 차박 후보지(GET /api/chabak/layer?type=open) · 등록 야영장(type=camp)
+// 면: 불가 구역(type=no) · 주의 구역(type=caution) — 켤 때 처음 한 번 받는다 (서버도 처음 한 번만 계산해 기억)
+// 지도 핀을 누르면 왼쪽에 차박지 상세(WebChabakDetailPanel: 판정 · 안전점수 · 가까운 시설)
+// 키: 후보지는 캠핑장 id 가 없어 'open-0' …, 야영장은 'camp-12' (검색 탭 캠핑장 id 와 겹치지 않게)
+const spots = ref([]) // 후보지 + 야영장 [{ id, kind, name, lat, lng, safetyScore, grade, tier, area, erDriveMin, imageUrl, campId }]
+const layerOn = ref(Object.fromEntries(LAYER_CHIPS.map((c) => [c.type, c.on]))) // 처음: 점은 켬, 구역은 끔
+const safety = ref('all')
+const zoneData = ref({}) // { no: geometry, caution: geometry }
+const zoneLoading = ref(false)
+const toSpot = (kind) => (s, i) => ({
+  id: kind === 'camp' ? `camp-${s.id}` : `open-${i}`,
+  kind, name: s.name, lat: s.lat, lng: s.lng, safetyScore: s.score, grade: s.grade,
+  tier: TIER_BY_GRADE[s.grade] || 'warn', area: s.area, erDriveMin: s.erDriveMin, imageUrl: s.imageUrl,
+  campId: kind === 'camp' ? s.id : null,
+})
 async function loadSpots() {
   if (spots.value.length) return
   try {
-    const list = await api('/api/chabak/layer', { params: { type: 'open' } })
-    spots.value = list
-      .filter((s) => s.score != null)
-      .map((s, i) => ({ id: `open-${i}`, name: s.name, lat: s.lat, lng: s.lng, safetyScore: s.score, grade: s.grade, tier: TIER_BY_GRADE[s.grade] || 'warn', area: s.area, erDriveMin: s.erDriveMin }))
-      .sort((a, b) => b.safetyScore - a.safetyScore)
+    const [open, campList] = await Promise.all([
+      api('/api/chabak/layer', { params: { type: 'open' } }),
+      api('/api/chabak/layer', { params: { type: 'camp' } }),
+    ])
+    spots.value = [...open.map(toSpot('open')), ...campList.map(toSpot('camp'))]
   } catch (e) {
     error.value = e.message
   }
 }
+async function toggleLayer(type) {
+  layerOn.value = { ...layerOn.value, [type]: !layerOn.value[type] }
+  const chip = LAYER_CHIPS.find((c) => c.type === type)
+  if (!chip?.zone || !layerOn.value[type] || zoneData.value[type]) return
+  zoneLoading.value = true
+  try {
+    const list = await api('/api/chabak/layer', { params: { type } })
+    zoneData.value = { ...zoneData.value, [type]: list[0]?.geometry ?? null } // 한 덩어리로 합친 구역 하나
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    zoneLoading.value = false
+  }
+}
 watch(view, (v) => { if (v === 'car') { selectedId.value = null; loadSpots() } }, { immediate: true })
-const carCamps = computed(() => spots.value)
+// 목록 · 지도 핀: 켠 종류 + 안전점수 기준 (점수가 없는 곳은 '전체'에서만), 안전점수 높은 순
+const carCamps = computed(() => {
+  const min = SAFETY_FILTERS.find((f) => f.key === safety.value)?.min
+  return spots.value
+    .filter((s) => layerOn.value[s.kind])
+    .filter((s) => min == null || (s.safetyScore != null && s.safetyScore >= min))
+    .sort((a, b) => (b.safetyScore ?? -1) - (a.safetyScore ?? -1))
+})
+// 지도에 칠할 구역 (켠 것 중 받아 온 것만). 주의 → 불가 순서로 그려서 불가가 위에 보이게
+const carZones = computed(() =>
+  ['caution', 'no']
+    .filter((t) => layerOn.value[t] && zoneData.value[t])
+    .map((t) => ({ key: t, geometry: zoneData.value[t], color: verdictColor(LAYER_CHIPS.find((c) => c.type === t).verdict) })),
+)
+const carSpot = computed(() => (view.value === 'car' ? spots.value.find((s) => s.id === selectedId.value) || pickedAlt.value : null))
+const carParcel = ref(null) // 고른 자리의 필지 경계 (상세 패널이 판정을 받으면 알려 줌)
+// 상세의 "근처 차박 후보"를 누르면 그 자리로 (후보지 목록에 없을 수도 있어 따로 기억)
+const pickedAlt = ref(null)
+function pickAlt(a) {
+  pickedAlt.value = { id: `alt-${a.jibun}`, kind: 'open', name: a.jibun, lat: a.lat, lng: a.lng, area: a.owner }
+  selectedId.value = pickedAlt.value.id
+}
+// 지도 아무 곳이나 누름 → 그 자리를 판정 (앱 차박 지도와 같음). 검색 탭에서는 아무 일 없음
+// 핀 이름은 "찍은 자리", 지번은 판정 결과가 오면 상세 이름 줄에 나온다
+// 상세가 점수를 받으면 찍은 자리 · 근처 후보 핀에도 붙인다 (목록의 후보지 · 야영장은 이미 점수가 있음)
+function onSpotScore({ score, grade }) {
+  if (!pickedAlt.value || pickedAlt.value.id !== selectedId.value) return
+  pickedAlt.value = { ...pickedAlt.value, safetyScore: score, grade, tier: TIER_BY_GRADE[grade] || 'warn' }
+}
+let pointNo = 0
+function onMapClick({ lat, lng }) {
+  if (view.value !== 'car') return
+  pickedAlt.value = { id: `pt-${++pointNo}`, kind: 'point', name: '찍은 자리', lat, lng, area: '' }
+  selectedId.value = pickedAlt.value.id
+}
 // 지도에는 켠 등급 + 고른 캠핑장 (차박지 찾기는 차박·노지만, 상세·시설 상세는 그 캠핑장 하나만)
 const mapCamps = computed(() => {
   if (view.value === 'detail' || view.value === 'facility') {
     const c = detailCamp.value
     return c ? [{ ...withBonus(c), tier: TIER_BY_GRADE[c.grade] || 'safe' }] : [] // 상세 핀도 내 유형 점수
   }
-  if (view.value === 'car') return carCamps.value
+  if (view.value === 'car') return pickedAlt.value ? [...carCamps.value, { ...pickedAlt.value, tier: pickedAlt.value.tier || 'safe' }] : carCamps.value
   return camps.value.filter((c) => (tiers.value[c.tier] && matches(c)) || c.id === selectedId.value)
 })
 const fitKey = computed(() => mapCamps.value.length + tierChips.value.filter((t) => t.on).length * 1000 + (view.value === 'browse' ? 0 : 7))
@@ -177,7 +241,11 @@ const tierLabel = (c) => (c.tier === 'rec' ? '추천' : GRADE_LABEL[c.grade])
 
 // 목록·핀을 누르면 정보 카드, 같은 곳을 한 번 더 누르면 상세
 function pick(id) {
-  if (view.value === 'car') return (selectedId.value = selectedId.value === id ? null : id) // 차박 후보지는 상세가 없어 고르기만 한다
+  if (view.value === 'car') { // 차박지는 고르면 바로 왼쪽에 상세가 뜬다
+    pickedAlt.value = null
+    selectedId.value = id
+    return
+  }
   if (selectedId.value === id) openDetail(id)
   else selectedId.value = id
 }
@@ -347,24 +415,20 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
       </div>
       </template>
 
-      <WebCarPanel v-else-if="view === 'car'" :camps="carCamps" :selected-id="selectedId" @back="toBrowse" @pick="pick" />
+      <WebChabakDetailPanel v-else-if="view === 'car' && carSpot" :spot="carSpot"
+        @back="selectedId = null; pickedAlt = null" @parcel="(p) => (carParcel = p)" @pick="pickAlt" @score="onSpotScore" />
+      <WebCarPanel v-else-if="view === 'car'" :camps="carCamps" :selected-id="selectedId" :layer-on="layerOn" :safety="safety"
+        :zone-loading="zoneLoading" @back="toBrowse" @pick="pick" @toggle-layer="toggleLayer" @safety="(k) => (safety = k)" />
       <WebFacilityPanel v-else-if="view === 'facility'" :fac-id="facId" :camp-id="campId" @back="backFromFacility" @close="toBrowse" @routes="(r) => (mapRoutes = r)" />
       <WebCampDetailPanel v-else :camp-id="campId" :focus-key="focusKey" @back="toBrowse" @camp="onCamp" @routes="(r) => (mapRoutes = r)" @focus="(k) => (focusKey = k)" />
     </template>
 
     <!-- 지도 -->
     <WebCampMap :camps="mapCamps" :facilities="view === 'browse' || view === 'car' ? mapFacilities : []" :selected-id="selectedId" :fit-key="fitKey"
-      :routes="mapRoutes" :focus-key="focusKey" @select="pick" @bounds="onBounds">
+      :routes="mapRoutes" :focus-key="focusKey" :zones="view === 'car' ? carZones : []" :hide-names="view === 'car'" :parcel="view === 'car' && carSpot ? carParcel : null"
+      @select="pick" @bounds="onBounds" @mapclick="onMapClick">
       <template #top-right>
-        <RouterLink :to="view === 'car' ? '/web/explore' : '/web/chabak'" class="car" :class="{ on: view === 'car' }" aria-label="안전한 차박지 찾기" :aria-pressed="view === 'car'">
-          <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M16.8 0.8a6.4 6.4 0 0 0-6.4 6.4c0 4.9 6.4 13.6 6.4 13.6s6.4-8.7 6.4-13.6A6.4 6.4 0 0 0 16.8 0.8Z" class="ink" />
-            <circle cx="16.8" cy="7.2" r="2.3" class="bg" />
-            <path d="M1.6 19.4v-2.6c0-1 .7-1.9 1.7-2.1l1.4-2.4c.5-.8 1.3-1.3 2.2-1.3h4.4c.9 0 1.7.5 2.2 1.3l1.4 2.4c1 .2 1.7 1.1 1.7 2.1v2.6c0 .5-.4.9-.9.9H2.5c-.5 0-.9-.4-.9-.9Z" class="ink stroke" />
-            <path d="M6.2 12.4c.2-.3.5-.5.9-.5h1.6v2.7H4.9Z M10 11.9h1.6c.4 0 .7.2.9.5l1.3 2.2H10Z" class="bg" />
-            <circle cx="5.2" cy="20.2" r="2.1" class="ink stroke" /><circle cx="12.8" cy="20.2" r="2.1" class="ink stroke" />
-          </svg>
-        </RouterLink>
+        <WebChabakToggle :on="view === 'car'" />
       </template>
     </WebCampMap>
 
@@ -741,23 +805,6 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
 .fac.etc.on { border: 1.5px solid var(--web-green); background: var(--web-bg-soft); }
 
 /* 차박지 찾기 버튼 (지도 오른쪽 위, 지도 종류 버튼 아래) */
-.car {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: var(--web-green);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-.car.on { background: var(--web-white); }
-.car.on .ink { fill: var(--web-green); }
-.car.on .bg { fill: var(--web-white); }
-.car.on .stroke { stroke: var(--web-white); }
-.car .ink { fill: var(--web-white); }
-.car .bg { fill: var(--web-green); }
-.car .stroke { stroke: var(--web-green); stroke-width: 1.4; paint-order: stroke; }
 
 /* ---- 정보 카드 ---- */
 .card {
