@@ -1,14 +1,14 @@
 <script setup>
 // 웹 내 주변 (설계 4-2): 내 위치 + 반경(5·10·20km) 안 캠핑장 목록 → 캠핑장을 고르면 가까운 안전시설까지 경로
 // 데이터: 캠핑장 GET /api/camps (내 위치에서 거리는 여기서 계산), 시설 GET /api/nearby?lat=&lng= (고른 캠핑장 좌표 기준),
-//         칩 GET /api/nearby/layers, 기상특보 GET /api/alerts?sido=
+//         칩 GET /api/nearby/layers
 // 경로: 카카오 도로 경로(GET /api/camps/{id}/routes)를 받으면 그 길을 따라 그리고, 못 받은 시설만 직선 · 서버 시간(차로 n분)을 쓴다
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import WebMapShell from '@/components/web/WebMapShell.vue'
 import WebCampMap from '@/components/web/WebCampMap.vue'
 import WebFacChips from '@/components/web/WebFacChips.vue'
-import WebWeatherBar from '@/components/web/WebWeatherBar.vue'
+import WebChabakToggle from '@/components/web/WebChabakToggle.vue'
 import { api } from '@/utils/api'
 import { FACILITY_LABEL, shortSido } from '@/utils/place'
 
@@ -47,26 +47,11 @@ async function loadMe() {
     const res = await api('/api/nearby', { params: me.value })
     const b = res.basis
     placeLabel.value = b ? [shortSido(b.sido), b.sigungu, b.eupmyeon].filter(Boolean).join(' ') : ''
-    loadWarnings(b?.sido)
   } catch {
     placeLabel.value = ''
   }
 }
 
-// ---- 기상특보 (없어도 화면은 보인다) ----
-const warnings = ref(null)
-const warnRegion = ref('')
-async function loadWarnings(sido) {
-  warnings.value = null
-  if (!sido) return
-  warnRegion.value = shortSido(sido)
-  try {
-    const res = await api('/api/alerts', { params: { sido: shortSido(sido) } })
-    warnings.value = res.activeWarnings?.length ?? null // 발효 중 특보 목록(배열)의 개수
-  } catch {
-    warnings.value = null
-  }
-}
 
 // ---- 캠핑장 + 거리 ----
 const allCamps = ref([])
@@ -255,9 +240,11 @@ watch(() => route.query.camp, (v) => {
       </template>
     </template>
 
-    <WebCampMap :camps="mapCamps" :selected-id="selectedId" :fit-key="fitKey" :me="me" :routes="routes" :focus-key="focusKey" @select="pick" />
+    <WebCampMap :camps="mapCamps" :selected-id="selectedId" :fit-key="fitKey" :me="me" :routes="routes" :focus-key="focusKey" @select="pick">
+      <!-- 차박지 찾기로 가는 버튼 (검색 지도와 같은 자리) -->
+      <template #top-right><WebChabakToggle /></template>
+    </WebCampMap>
     <WebFacChips :layers="layers" :on="on" @toggle="toggleChip" />
-    <WebWeatherBar :region="warnRegion" :count="warnings" />
     <RouterLink v-if="selected" :to="`/web/camps/${selected.id}`" class="detail-link">캠핑장 상세 ›</RouterLink>
   </WebMapShell>
 </template>

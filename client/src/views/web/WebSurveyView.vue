@@ -1,13 +1,13 @@
 <script setup>
 // 웹 1분 진단 (설계 2-1 설문 · 2-2 결과표): 헤더·하단이 없는 한 화면. 질문 8개에 답하면 결과표가 같은 주소에서 바뀐다
 // 질문·유형·점수 계산은 utils/webSurvey.js (설계서 그대로). 추천 캠핑장은 실제 캠핑장 안전점수 순
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import WebIllust from '@/components/web/WebIllust.vue'
 import { api } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
-import { ALLQ, KID_OPTS, PARTS, answeredCount, computeResult, emptyAnswers, isReady, loadSavedResult, pickAnswer, saveResult, campTypeOf } from '@/utils/webSurvey'
+import { ALLQ, KID_OPTS, PARTS, answeredCount, computeResult, emptyAnswers, isReady, loadSavedResult, pickAnswer, saveResult, campTypeOf, needsErBonus } from '@/utils/webSurvey'
 import '@/styles/tokens-web.css'
 
 const auth = useAuthStore()
@@ -55,12 +55,17 @@ function restart() {
 }
 
 // 추천 캠핑장: "어디서 주무세요?" 답에 맞는 유형(campType)만 거르고, 안전점수 높은 순 5곳 + 그 캠핑장의 가까운 시설 시간 (상세 API)
-// 유형 말고 다른 답(누구와·계절 등)은 추천 순서에 쓰지 않는다 (근거 자료가 아직 없음)
+// 내 유형 점수(응급실 가산점, 지도와 같은 규칙)를 켜 뒀고 해당 답(아이·어르신·차박·겨울·걸어서)이 있으면
+//   가산점을 더한 점수 순(sort=bonus)으로 고르고, 점수도 더한 값으로 보여 준다 (지도 · 캠핑장 상세와 같은 숫자)
 async function loadCamps(campType) {
   if (campsLoaded.value) return
+  const useBonus = needsErBonus(A.value) && survey.bonusOn
   try {
-    const list = await api('/api/camps', { params: { sort: 'score', ...(campType ? { campType } : {}) } })
-    const top = list.filter((c) => c.safetyScore != null).slice(0, 5)
+    const list = await api('/api/camps', { params: { sort: useBonus ? 'bonus' : 'score', ...(campType ? { campType } : {}) } })
+    const top = list
+      .filter((c) => c.safetyScore != null)
+      .slice(0, 5)
+      .map((c) => (useBonus && c.erBonus ? { ...c, safetyScore: Math.min(100, c.safetyScore + c.erBonus) } : c))
     camps.value = await Promise.all(top.map(async (c) => {
       try {
         const d = await api(`/api/camps/${c.id}`)
@@ -77,6 +82,28 @@ async function loadCamps(campType) {
   campsLoaded.value = true
 }
 const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
+// 캐릭터 그림을 못 불러오면 이모지 글자로 대신 (다시 진단하면 다시 시도)
+const imgFailed = ref(false)
+// 캐릭터 누르기: 다음 팁으로 (마지막 다음은 처음), 젤리처럼 눌렸다 출렁
+const tipIdx = ref(0)
+const tapped = ref(false) // 한 번이라도 눌렀으면 "캐릭터를 눌러 보세요" 안내를 숨긴다
+const jumping = ref(false)
+function nextTip() {
+  tapped.value = true
+  tipIdx.value = (tipIdx.value + 1) % r.value.type.tips.length
+  jumping.value = false
+  requestAnimationFrame(() => (jumping.value = true)) // 연달아 눌러도 매번 다시 튀게
+}
+const onFaceAnimEnd = (e) => { if (e.animationName.includes('char-jump')) jumping.value = false }
+watch(r, () => {
+  imgFailed.value = false
+  tipIdx.value = 0
+  tapped.value = false
+})
+// 추천 기준 한 줄 (실제로 고른 방식 그대로): 내 유형 점수(응급실 가산점)를 썼으면 그걸 포함한 순
+const recWhy = computed(() =>
+  needsErBonus(A.value) && survey.bonusOn ? '안전점수(내 유형 점수 포함)가 높은 순으로 골랐어요' : '안전점수가 높은 순으로 골랐어요',
+)
 const shownCamps = computed(() => camps.value.slice(0, more.value ? 5 : 3))
 
 // ---- 체크리스트 ----
@@ -96,6 +123,8 @@ function save() {
 }
 const hadSaved = computed(() => auth.isLoggedIn && !!loadSavedResult(auth.member.id))
 const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['check', '대비할 것']]
+// 대비할 것: 내 유형에 특히 중요한 항목(must)을 위로 올린다 (같은 무리 안에서는 원래 순서 유지)
+const mustFirst = (list) => [...list.filter((c) => c.must), ...list.filter((c) => !c.must)]
 </script>
 
 <template>
@@ -150,7 +179,8 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
         <div class="head">
           <span class="pill">1분 진단 결과</span>
           <h1>나의 캠핑 안전 유형</h1>
-          <p class="res"><b :class="`c-${r.type.color}`">{{ r.type.lack }}</b>{{ r.lackTail }} <b>‘{{ r.type.nick }}’</b>이 나왔어요</p>
+          <!-- 유형 = 조심할 것 1위 분야의 캐릭터 (utils/webSurvey.js 의 CHARACTERS) -->
+          <p class="res"><b :class="`c-${r.type.color}`">{{ r.type.ax }}</b>를 가장 조심해야 하는 <b>‘{{ r.type.nick }}’</b> 유형이에요</p>
         </div>
         <WebIllust />
       </div>
@@ -158,14 +188,24 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
         <div class="rwrap">
           <!-- 유형 카드 -->
           <div class="tcard">
-            <div class="tinfo">
-              <span class="risk" :class="`bg-${r.type.color}`">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17h.01" /></svg>{{ r.type.risk }}
-              </span>
-              <h2 :class="`c-${r.type.color}`">{{ r.type.nick }}</h2>
-              <p class="catch">{{ r.type.catch }}</p>
-              <p class="who">{{ r.who }} · {{ r.siteName }}</p>
-              <div class="kws"><span v-for="k in r.keywords" :key="k">{{ k }}</span></div>
+            <!-- 시안 배치: 위쪽 양옆에 말풍선 두 개(왼쪽 = 성격, 오른쪽 = 지켜야 할 행동), 가운데 캐릭터, 그 아래 이름,
+                 오른쪽 아래에 ⚠ 주의 꼬리표와 해시태그. 좁은 화면에서는 세로로 쌓는다 -->
+            <div class="tinfo char">
+              <p class="bubble b-trait" :class="`tint-${r.type.color}`">{{ r.type.trait }}</p>
+              <!-- 캐릭터를 누르면: 젤리처럼 눌렸다 출렁 + 오른쪽 말풍선이 다음 안전 팁으로 바뀌며 다시 뿅 -->
+              <button type="button" class="face" :class="{ jump: jumping }" :aria-label="`${r.type.nick} 누르면 다음 안전 팁`"
+                @click="nextTip" @animationend="onFaceAnimEnd">
+                <img v-if="!imgFailed" :src="r.type.img" alt="" width="220" height="220" @error="imgFailed = true" />
+                <span v-else aria-hidden="true">{{ r.type.emoji }}</span>
+              </button>
+              <p :key="tipIdx" class="bubble b-act" :class="[`fill-${r.type.color}`, { again: tipIdx > 0 || tapped }]" aria-live="polite">{{ r.type.tips[tipIdx] }}</p>
+              <h2 class="cname" :class="`c-${r.type.color}`">{{ r.type.nick }}<small v-if="!tapped" class="tap-hint">캐릭터를 눌러 보세요</small></h2>
+              <div class="meta">
+                <span class="risk" :class="`bg-${r.type.color}`">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17h.01" /></svg>{{ r.type.risk }}
+                </span>
+                <div class="kws"><span v-for="k in r.keywords" :key="k">{{ k }}</span></div>
+              </div>
             </div>
           </div>
 
@@ -179,7 +219,7 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
 
             <!-- 조심할 것 -->
             <section v-if="tab === 'rules'" class="panel">
-              <div class="ph"><h3>{{ r.type.nick }}은 이것부터 조심해요</h3><span>내 답변에서 위험이 큰 순서예요</span></div>
+              <div class="ph"><h3>이것부터 조심해요</h3><span>내 답변에서 위험이 큰 순서예요</span></div>
               <div v-for="ru in r.rules" :key="ru.ax" class="rule">
                 <button type="button" class="rbtn" :aria-expanded="openRule === ru.ax" @click="openRule = openRule === ru.ax ? null : ru.ax">
                   <span class="emoji" aria-hidden="true">{{ ru.emoji }}</span>
@@ -198,19 +238,21 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
             <!-- 대비할 것 -->
             <section v-else-if="tab === 'check'" class="panel">
               <div class="ph"><h3>이렇게 대비해요</h3><span>눌러서 체크해요 · {{ checkDone }}/{{ checkTotal }} 완료</span></div>
+              <!-- "꼭" 글자 대신 색으로 강조: 내 유형이 가장 조심할 분야(조심할 것 상위 2개)에 해당하는 항목 -->
+              <p class="must-legend"><i aria-hidden="true"></i>색이 칠해진 항목은 내 유형에 특히 중요해요</p>
               <div class="cgrid">
                 <div class="cgroup">
                   <b>출발 전에 챙겨요</b><span>내 유형에 필요한 용품이에요</span>
-                  <button v-for="c in r.checks" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id] }" @click="toggleCheck(c.id)">
+                  <button v-for="c in mustFirst(r.checks)" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id], must: c.must }" @click="toggleCheck(c.id)">
                     <span class="box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg></span>
-                    <span class="ct">{{ c.text }}</span><span v-if="c.must" class="must">꼭</span>
+                    <span class="ct">{{ c.text }}<span v-if="c.must" class="sr-only"> (내 유형에 특히 중요)</span></span>
                   </button>
                 </div>
                 <div class="cgroup">
                   <b>미리 알아둬요</b><span>떠나기 전에 한 번 읽어 두세요</span>
-                  <button v-for="c in r.know" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id] }" @click="toggleCheck(c.id)">
+                  <button v-for="c in mustFirst(r.know)" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id], must: c.must }" @click="toggleCheck(c.id)">
                     <span class="box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg></span>
-                    <span class="ct">{{ c.text }}</span><span v-if="c.must" class="must">꼭</span>
+                    <span class="ct">{{ c.text }}<span v-if="c.must" class="sr-only"> (내 유형에 특히 중요)</span></span>
                   </button>
                 </div>
               </div>
@@ -218,7 +260,7 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
 
             <!-- 캠핑장 고르기 -->
             <section v-else class="panel">
-              <h3 class="rech">{{ r.type.recWhy }}으로 골랐어요</h3>
+              <h3 class="rech">{{ recWhy }}</h3>
               <p v-if="!campsLoaded" class="state">추천 캠핑장을 불러오는 중이에요...</p>
               <p v-else-if="!camps.length" class="state">고른 방식에 맞는 캠핑장을 찾지 못했어요</p>
               <RouterLink v-for="(c, i) in shownCamps" :key="c.id" :to="`/web/camps/${c.id}`" class="rec">
@@ -502,6 +544,7 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
 
 /* ---- 결과 ---- */
 .rwrap {
+  word-break: keep-all; /* 결과 화면 전체(조심할 것 · 대비할 것 포함) 한글 낱말 중간 줄바꿈 방지 */
   max-width: 880px;
   margin: 0 auto;
   padding: 32px 20px 64px;
@@ -543,16 +586,226 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
   flex-direction: column;
   align-items: flex-start;
 }
+.char {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    'trait face act'
+    '.     name meta';
+  align-items: start;
+  column-gap: 56px; /* 이름과 오른쪽 꼬리표·해시태그 사이를 넉넉히 (28 → 56) */
+  row-gap: 6px;
+}
+.meta {
+  grid-area: meta;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.meta .kws {
+  margin-top: 0;
+}
+/* 가운데 캐릭터 (동그라미 없이 크게, 바닥에 옅은 그림자) */
+.face {
+  grid-area: face;
+  justify-self: center;
+  font-size: 140px;
+  line-height: 1;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.12));
+}
+/* ---- 결과 등장 애니메이션 (A 캐릭터 등장 → C 말풍선 차례로 → B 캐릭터 둥실둥실) ----
+   결과 화면이 그려질 때(v-if) 한 번 실행된다. 다시 진단하면 화면이 새로 그려져 다시 실행 */
+/* A: 아래에서 튀어 올라와 통통 */
+.face {
+  opacity: 0;
+  animation: char-rise 0.8s cubic-bezier(0.2, 1.5, 0.4, 1) 0.1s forwards;
+}
+/* B: 등장이 끝나면 위아래로 둥실둥실 (그림에만 걸어서 A 와 겹치지 않게) */
+.face img,
+.face > span {
+  animation: char-float 3s ease-in-out 1s infinite;
+}
+/* C: 말풍선이 캐릭터 쪽 모서리에서 뿅 하고 커지며 차례로 (성격 → 행동) */
+.b-trait,
+.b-act {
+  opacity: 0;
+  animation: bubble-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+.b-trait {
+  transform-origin: right bottom; /* 캐릭터 쪽(오른쪽 아래)에서 튀어나옴 */
+  animation-delay: 0.75s;
+}
+.b-act {
+  transform-origin: left bottom;
+  animation-delay: 1.05s;
+}
+/* 이름 · 꼬리표 · 해시태그는 캐릭터 뒤에 살짝 떠오르며 */
+.cname,
+.meta {
+  opacity: 0;
+  animation: fade-up 0.5s ease-out 0.55s forwards;
+}
+.meta {
+  animation-delay: 1.3s;
+}
+/* 캐릭터는 버튼 (누르면 반응) */
+button.face {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+button.face:focus-visible {
+  outline: 3px solid var(--web-green);
+  outline-offset: 6px;
+  border-radius: 24px;
+}
+/* 누르는 동안 살짝 눌리고, 떼면 젤리처럼 출렁 (아래쪽 기준으로 찌그러졌다 늘어남) */
+button.face {
+  position: relative;
+}
+button.face:active img,
+button.face:active > span {
+  transform: scale(1.06, 0.9);
+  transition: transform 0.08s;
+}
+.face.jump img,
+.face.jump > span {
+  transform-origin: 50% 90%;
+  animation: char-jump 0.6s ease-out;
+}
+/* 3: 팁이 바뀐 말풍선은 기다리지 않고 바로 뿅 */
+.b-act.again {
+  animation-delay: 0s;
+}
+.tap-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--web-text-sub);
+  animation: hint-blink 1.6s ease-in-out 2s infinite;
+}
+@keyframes char-jump {
+  0% { transform: scale(1.06, 0.9); }
+  30% { transform: scale(0.94, 1.08); }
+  50% { transform: scale(1.04, 0.96); }
+  70% { transform: scale(0.98, 1.02); }
+  100% { transform: scale(1); }
+}
+@keyframes hint-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes char-rise {
+  0% { opacity: 0; transform: translateY(70px) scale(0.6); }
+  60% { opacity: 1; transform: translateY(-12px) scale(1.06); }
+  80% { transform: translateY(4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes char-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes bubble-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+/* 움직임 줄이기 설정을 켠 사람: 애니메이션 없이 바로 보이게 */
+@media (prefers-reduced-motion: reduce) {
+  .face, .face img, .face > span, .b-trait, .b-act, .cname, .meta, .tap-hint {
+    animation: none;
+    opacity: 1;
+  }
+}
+.face img {
+  width: 220px; /* 캐릭터 얼굴 크게 (160 → 220) */
+  height: 220px;
+  display: block;
+}
+.cname {
+  grid-area: name;
+  justify-self: center;
+  text-align: center;
+}
+/* 말풍선 공통: 테두리 없이 그림자로 띄우고, 캐릭터 쪽 모서리만 뾰족하게 (메신저 말풍선 느낌) */
+.bubble {
+  word-break: keep-all; /* 한글을 낱말 중간에서 자르지 않고 띄어쓰기에서만 줄바꿈 */
+  text-wrap: balance; /* 여러 줄이면 줄 길이를 고르게 (지원 안 하는 브라우저는 그냥 무시) */
+  margin: 0;
+  padding: 14px 20px;
+  border-radius: 24px;
+  background: var(--web-bg);
+  box-shadow: 0 6px 20px rgba(28, 29, 27, 0.08), 0 1px 3px rgba(28, 29, 27, 0.06);
+  font-size: 16px;
+  line-height: 1.55;
+  letter-spacing: -0.2px;
+}
+/* 왼쪽 가운데: 성격 — 오른쪽 아래 모서리가 캐릭터를 향함 */
+/* 성격 말풍선: 흰 카드 위에서 묻히지 않게 유형 색을 옅게 깔고 테두리 (행동 말풍선은 진하게 채움 → 둘이 구분됨) */
+.b-trait.tint-fire {
+  background: var(--web-warn-ink-bg);
+  border: 1.5px solid var(--web-terracotta);
+  color: var(--web-warn-ink);
+}
+.b-trait.tint-water {
+  background: var(--web-sky-track);
+  border: 1.5px solid var(--web-water);
+  color: var(--web-water);
+}
+.b-trait {
+  grid-area: trait;
+  font-weight: 600;
+  text-align: center;
+  justify-self: end;
+  align-self: start;
+  margin-top: 16px;
+  max-width: 280px;
+  border-bottom-right-radius: 6px;
+  color: var(--web-text);
+}
+/* 오른쪽 위: 지켜야 할 행동 — 유형 색으로 채우고 흰 글씨, 왼쪽 아래 모서리가 캐릭터를 향함 */
+.b-act {
+  grid-area: act;
+  text-align: center;
+  justify-self: start;
+  align-self: start;
+  max-width: 320px;
+  border-bottom-left-radius: 6px;
+  font-weight: 700;
+  color: var(--web-white);
+  background: var(--web-terracotta);
+  box-shadow: 0 8px 22px rgba(187, 105, 73, 0.28);
+}
+.b-act.fill-water {
+  background: var(--web-water);
+  box-shadow: 0 8px 22px rgba(62, 90, 102, 0.28); /* --web-water 색 그림자 */
+}
+/* 좁은 화면: 캐릭터 → 이름 → 말풍선 차례로 세로 */
+@media (max-width: 760px) {
+  .char {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'face' 'name' 'trait' 'act' 'meta';
+    justify-items: center;
+    row-gap: 12px;
+  }
+  .b-trait, .b-act { justify-self: center; margin-top: 0; }
+  .meta { align-items: center; }
+}
 .tinfo h2 {
   margin: 8px 0 0;
-  font-size: 54px;
+  font-size: 40px; /* 동물 얼굴 옆이라 54 → 40 */
   line-height: 1.1;
   font-weight: 900;
   letter-spacing: -2px;
-}
-.catch {
-  margin: 10px 0 0;
-  font-size: 18px;
 }
 .who {
   margin: 6px 0 0;
@@ -786,14 +1039,54 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
   color: var(--web-arrow);
   text-decoration: line-through;
 }
-.must {
-  flex: 0 0 auto;
-  padding: 2px 10px;
-  border-radius: 999px;
+/* 내 유형에 특히 중요한 항목: "꼭" 글자 대신 색으로 (연한 주황 바탕 + 왼쪽 띠 + 굵은 글씨) */
+.ck.must {
+  border-color: var(--web-grade-danger-fg);
   background: var(--web-grade-danger-bg);
-  color: var(--web-grade-danger-fg);
-  font-size: 13px;
+  box-shadow: inset 4px 0 0 var(--web-grade-danger-fg); /* 왼쪽 강조 띠 */
+}
+.ck.must .ct {
   font-weight: 700;
+  color: var(--web-grade-danger-fg);
+}
+.ck.must .box {
+  border-color: var(--web-grade-danger-fg);
+}
+/* 체크하면 강조를 거두고 다른 체크한 항목과 같게 (다 챙겼으니) */
+.ck.must.on {
+  border-color: var(--web-border);
+  background: var(--web-bg);
+  box-shadow: none;
+}
+.ck.must.on .ct {
+  font-weight: 400;
+  color: var(--web-arrow);
+}
+.ck.must.on .box {
+  border-color: var(--web-green);
+}
+.must-legend {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--web-text-sub);
+}
+.must-legend i {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--web-grade-danger-bg);
+  border: 1px solid var(--web-grade-danger-fg);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .rech {
   margin: 0;

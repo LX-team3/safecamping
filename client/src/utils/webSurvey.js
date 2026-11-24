@@ -19,8 +19,8 @@ const EXP = { first: '첫 캠핑', few: '몇 번 해봄', often: '캠핑 자주'
 
 // 질문 (o: [코드, 글씨, (퀴즈면 점수 | 보조글씨)])
 export const PARTS = [
-  { chip: 'map', title: '어떤 캠핑을 가나요?', feature: '안전지도', desc: '주무시는 방식에 맞는 캠핑장을 골라 드려요', qs: [
-    { k: 'who', t: '누구와 가세요?', h: '여러 개 골라도 돼요', multi: true, solo: 'solo', o: [['solo', '혼자'], ['group', '성인 일행'], ['child', '아이'], ['senior', '어르신', '65세 이상']] },
+  { chip: 'map', title: '어떤 캠핑을 가나요?', feature: '', desc: '선택에 따라 추천 캠핑장 점수가 달라집니다', qs: [
+    { k: 'who', t: '누구와 가세요?', multi: true, solo: 'solo', o: [['solo', '혼자'], ['group', '성인 일행'], ['child', '아이'], ['senior', '어르신', '65세 이상']] },
     { k: 'site', t: '어디서 주무세요?', o: [['glamping', '글램핑·카라반'], ['auto', '오토캠핑 텐트'], ['carcamp', '차박']] },
     { k: 'season', t: '언제 가세요?', o: [['spring', '봄'], ['summer', '여름'], ['fall', '가을'], ['winter', '겨울']] },
     { k: 'exp', t: '캠핑 경험은요?', o: [['first', '처음'], ['few', '몇 번'], ['often', '자주']] },
@@ -40,7 +40,14 @@ export const PARTS = [
 export const ALLQ = PARTS.flatMap((p) => p.qs)
 const QUIZ = ALLQ.filter((q) => q.quiz)
 export const AX = QUIZ.map((q) => q.ax) // 일산화탄소 · 화재 · 물·호우
-export const KID_OPTS = [['baby', '영유아 0~6세'], ['kid', '어린이 7~12세']]
+// 가장 어린 아이 나이. 13세 이상(teen)은 고를 수 있지만 결과는 바뀌지 않는다 (성인 일행과 같게 — 팀 결정 2026-11-24)
+//   근거: 한국소비자원 캠핑장 사고 통계가 13세 미만을 따로 묶음 (13세 미만이 사고의 61.2%) → 아이 규칙은 12세 이하에만 적용
+export const KID_OPTS = [['baby', '영유아 0~6세'], ['kid', '어린이 7~12세'], ['teen', '청소년 13세 이상']]
+// 아이 규칙(물·호우 +1 · 아이 체크리스트 · 지도 응급실 가산점)을 적용할지: 아이를 골랐고 12세 이하일 때만
+const hasYoungChild = (A) => !!A?.who?.includes('child') && A.kid !== 'teen'
+// 해시태그의 "누구와" 칸: 아이는 나이만 (#영유아 · #어린이 · #청소년), 나이를 안 골랐으면 #아이 동반. 나머지는 WHO 의 row
+const KID_TAG = { baby: '영유아', kid: '어린이', teen: '청소년' }
+const whoTag = (w, A) => (w === 'child' && KID_TAG[A.kid]) || WHO[w].row
 export const emptyAnswers = () => ({ who: [], kid: null, site: null, season: null, exp: null, car: null, q5: null, q6: null, q7: null })
 
 // 모든 질문에 답했는지 (아이를 골랐다면 나이대까지)
@@ -67,12 +74,45 @@ export function pickAnswer(A, k, val) {
   return next
 }
 
-// 유형 = 가장 대비가 약한 분야 (무엇을 조심해야 하는 사람인지)
-const TYPES = {
-  '물·호우': { lack: '침수 · 호우 대비가', nick: '물가 낙관형', risk: '침수 · 호우 주의', catch: '"비 조금 오는 건 괜찮겠지" 하고 물가에 머무는 편이에요', color: 'water', recTitle: '침수 걱정 적은 캠핑장', recWhy: '하천에서 떨어진 높은 사이트 · 대피로가 가까운 순' },
-  '일산화탄소': { lack: '일산화탄소 대비가', nick: '난로 믿음형', risk: '일산화탄소 주의', catch: '"따뜻하면 됐지" 하고 난로를 켠 채 잠들기 쉬워요', color: 'fire', recTitle: '난방 걱정 적은 캠핑장', recWhy: '전기 난방 가능 · 일산화탄소 경보기 대여 순' },
-  '화재': { lack: '화재 대비가', nick: '불멍 몰입형', risk: '화재 주의', catch: '불멍에 빠져 마지막 불씨 정리를 깜빡하기 쉬워요', color: 'fire', recTitle: '불 관리가 쉬운 캠핑장', recWhy: '개별 화로대 · 소화기가 가까운 순' },
-  safe: { lack: '모든 분야 대비가', nick: '든든 대비형', risk: '지금처럼만', catch: '대부분 안전하게 답했어요! 이대로 떠나도 좋아요', color: 'safe', recTitle: '안전점수 높은 캠핑장', recWhy: '안전점수가 높은 순' },
+// ---- 유형: 캐릭터 6개 (팀 결정 2026-11-24) ----
+// 1) 조심할 분야 = "조심할 것" 1위 (퀴즈 점수 − 상황 가중치 × 5, 동점이면 일산화탄소 → 화재 → 물·호우 — 가장 치명적인 것부터)
+// 2) 그 분야에 점수를 준 답으로 캐릭터를 고른다 (위가 우선). 상황 답 없이 퀴즈로만 1위가 되면 기본 캐릭터
+//    일산화탄소: 차박(계절 무관, 시동·공회전) → 거북이 / 겨울(텐트·글램핑 난로) → 곰 / 기본 거북이 (계절에 안 묶여서)
+//    화재:      오토캠핑 → 너구리 / 봄·가을(산불 조심 기간) → 다람쥐 / 기본 너구리
+//    물·호우:   아이(12세 이하) → 오리 가족 / 여름(장마·집중호우) → 개구리 / 기본 개구리
+// 문구 = 캐릭터 성격(trait) + 지켜야 할 행동 하나(act). 이름은 재밌게, 안전 안내(조심할 것 · 대비할 것)는 그대로 정확하게
+// 예전 유형(물가 낙관형 · 난로 믿음형 · 불멍 몰입형 · 든든 대비형)은 없앴다. 퀴즈 정답 여부는 결과에 따로 알리지 않는다 (사용자 결정)
+// img: 캐릭터 그림 (Microsoft Fluent Emoji 3D, MIT 라이선스 — client/public/survey/characters/LICENSE-fluentui-emoji.txt)
+//   이모지 글자는 기기마다 그림이 달라서(Windows · 아이폰 · 안드로이드) 어디서나 같은 그림 파일로 통일 (사용자 결정 2026-11-24)
+//   emoji 는 그림을 못 불러올 때 대신 보여 주는 글자
+const IMG = (name) => `/survey/characters/${name}.png`
+const CHARACTERS = {
+  turtle: { img: IMG('turtle'), emoji: '🐢', nick: '등껍질 거북이', trait: '어디서든 꽁꽁 닫고 들어가 있어야 마음이 편한 타입', act: '차 안에서 잘 땐 시동 끄고 창문 조금 열어 두세요' },
+  bear: { img: IMG('bear'), emoji: '🐻', nick: '이불 속 곰', trait: '추운 건 질색이라 일단 따뜻하게 만들고 보는 타입', act: '잠들기 전에 난로는 꼭 끄세요' },
+  raccoon: { img: IMG('raccoon'), emoji: '🦝', nick: '불멍 너구리', trait: '불 앞에 앉으면 시간 가는 줄 모르는 타입', act: '자리 뜨기 전에 물 붓고 손 대 봐서 안 뜨거운지 확인하세요' },
+  squirrel: { img: IMG('chipmunk'), emoji: '🐿️', nick: '낙엽 다람쥐', trait: '마른 숲, 바스락거리는 낙엽길을 제일 좋아하는 타입', act: '불은 정해진 화로에서만 쓰고, 다 꺼진 불도 다시 한번 보세요' },
+  ducks: { img: IMG('duck'), emoji: '🦆', nick: '꼬마 오리 가족', trait: '어딜 가든 아이 챙기느라 바쁜 타입', act: '물가에선 아이가 손 닿는 거리에 있는지 계속 보세요' },
+  // 여름 물·호우 가중치의 근거는 장마·집중호우 → 계곡에 가는지는 묻지 않으므로 "비" 캐릭터로 (예전 계곡 수달)
+  frog: { img: IMG('frog'), emoji: '🐸', nick: '장마 개구리', trait: '비 오는 날도 캠핑은 못 참는 타입', act: '비가 많이 오면 물가 자리는 피하고, 물이 불어나면 바로 높은 곳으로 가세요' },
+}
+// 캐릭터를 누르면 말풍선에 차례로 나오는 안전 팁 (분야별). 새로 지어내지 않고 이 파일의 조심할 것(RULES) ·
+// 대비할 것(CHECKS · KNOW) 문장에서 가져온 것만 쓴다 — 첫 번째는 캐릭터 자기 행동(act)
+const AXIS_TIPS = {
+  '일산화탄소': ['일산화탄소는 냄새도 색도 없어요', '난로를 꼭 켜야 하면 일산화탄소 경보기와 환기를 함께 하세요', '두통이나 어지럼이 느껴지면 바로 밖으로 나오세요'],
+  '화재': ['캠핑장이 정한 화로대 · 불 피우는 구역만 쓰세요', '바람이 센 날은 불을 피우지 마세요', '불씨 끄기용 물 양동이를 곁에 두세요'],
+  '물·호우': ['흙탕물 · 갑자기 불어나는 물은 상류에 비가 온 신호예요', '짐보다 사람이 먼저예요', '떠나기 전에 기상특보를 확인하세요'],
+}
+// 분야별: 꼬리표 · 색 · 캐릭터 고르는 순서 ([조건, 캐릭터], 마지막은 기본)
+const AXIS_TYPES = {
+  '일산화탄소': { risk: '일산화탄소 주의', color: 'fire', pick: [[(A) => A.site === 'carcamp', 'turtle'], [(A) => A.season === 'winter', 'bear']], base: 'turtle' },
+  '화재': { risk: '화재 주의', color: 'fire', pick: [[(A) => A.site === 'auto', 'raccoon'], [(A) => A.season === 'spring' || A.season === 'fall', 'squirrel']], base: 'raccoon' },
+  '물·호우': { risk: '물가 · 호우 주의', color: 'water', pick: [[hasYoungChild, 'ducks'], [(A) => A.season === 'summer', 'frog']], base: 'frog' },
+}
+function typeOf(A, ax) {
+  const t = AXIS_TYPES[ax]
+  const key = t.pick.find(([when]) => when(A))?.[1] ?? t.base
+  const c = CHARACTERS[key]
+  return { key, ax, ...c, risk: t.risk, color: t.color, tips: [c.act, ...AXIS_TIPS[ax]] }
 }
 export const RULES = {
   '화재': { emoji: '🔥', title: '불멍은 지정 화로대에서만', body: '캠핑장이 정한 화로대 · 불 피우는 구역만 이용해요. 바람이 센 날은 불을 피우지 않고, 자리를 비우기 전에는 물을 부어 완전히 꺼요.' },
@@ -92,7 +132,17 @@ const CHECKS = [
   { id: 'water', text: '물 양동이 (불씨 끄기용)', ax: '화재', when: (A) => A.site !== 'glamping' },
   { id: 'kit', text: '구급상자 · 상비약', ax: '', when: () => true },
   { id: 'light', text: '랜턴 · 여분 배터리', ax: '', when: () => true },
-  { id: 'kid', text: '아이 상비약 · 해열제', ax: '', when: (A) => A.who.includes('child') },
+  // ---- 아이 (나이별, 12세 이하만) ----
+  // 근거: 소방청 캠핑 안전수칙 "아이가 화기·난방기구 주변에 혼자 가지 않도록 관찰", 한국소비자원 13세 미만 사고 61.2% · 화상 30%
+  //       물가 항목은 설계서의 "아이 → 물·호우" 가중치. 숫자 기준(몇 m 등)은 근거가 없어 넣지 않는다
+  //  영유아(0~6세): 보호자가 붙어 있어야 하는 나이 → 거리 · 감시 / 어린이(7~12세): 혼자 움직이는 나이 → 약속 · 연락
+  { id: 'kid', text: '아이 상비약 · 해열제', ax: '', when: (A) => A.kid === 'kid' && hasYoungChild(A) },
+  { id: 'baby-med', text: '아이 상비약 · 해열제 · 체온계', ax: '', when: (A) => A.kid === 'baby' && hasYoungChild(A) },
+  { id: 'baby-fire', text: '화로 · 난로 주변에 아이가 혼자 못 가게 거리 두기 (안전망 · 울타리)', ax: '화재', when: (A) => A.kid === 'baby' && hasYoungChild(A) },
+  { id: 'baby-water', text: '물가에서는 손 닿는 거리에서 지켜보기', ax: '물·호우', when: (A) => A.kid === 'baby' && hasYoungChild(A) },
+  { id: 'kid-fire', text: '화로 · 버너는 만지지 않기로 미리 약속하기', ax: '화재', when: (A) => A.kid === 'kid' && hasYoungChild(A) },
+  { id: 'child-vest', text: '아이용 구명조끼 (계곡 · 물가 갈 때)', ax: '물·호우', when: hasYoungChild },
+  { id: 'kid-card', text: '이름 · 보호자 연락처 카드, 호루라기 (길 잃었을 때)', ax: '', when: (A) => A.kid === 'kid' && hasYoungChild(A) },
   { id: 'warm', text: '방한용품 (침낭 · 핫팩)', ax: '', when: (A) => A.season === 'winter' || A.season === 'fall' },
   { id: 'rain', text: '우비 · 높은 곳 대피 경로 확인', ax: '물·호우', when: (A) => A.season === 'summer' || A.season === 'spring' },
   { id: 'vent', text: '차량 창문 틈 · 환기 확인', ax: '일산화탄소', when: (A) => A.site === 'carcamp' },
@@ -102,7 +152,7 @@ const CHECKS = [
 export function answerTags(A) {
   const w = PRIORITY.find((p) => A.who.includes(p)) || 'solo'
   return [
-    WHO[w].row + (A.kid ? (A.kid === 'baby' ? ' · 영유아' : ' · 어린이') : ''),
+    whoTag(w, A),
     SITE[A.site]?.col,
     SEASON[A.season],
     EXP[A.exp],
@@ -121,7 +171,7 @@ export const campTypeOf = (A) => ({ glamping: 'glamping', auto: 'auto', carcamp:
 // 여기서는 "이 사람에게 가산점을 쓸지"만 정한다. 저장된 안전점수 · 등급은 그대로 (화면이 "79 +5" 로 따로 보여 줌)
 // 이동 답(걸어서)은 가산점에만 쓰고 조심할 것 · 대비할 것에는 쓰지 않는다 (팀 결정 2026-11-23)
 const BONUS_REASONS = [
-  [(A) => A.who?.includes('child'), '아이 동반'],
+  [hasYoungChild, '아이 동반'], // 13세 이상(청소년)은 가산점 없음
   [(A) => A.who?.includes('senior'), '어르신 동반'],
   [(A) => A.site === 'carcamp', '차박'],
   [(A) => A.season === 'winter', '겨울'],
@@ -144,17 +194,15 @@ export function computeResult(A) {
   if (A.site === 'auto') risk['화재'] += 1
   if (A.season === 'spring' || A.season === 'fall') risk['화재'] += 1
   if (A.season === 'summer') risk['물·호우'] += 2
-  if (A.who.includes('child')) risk['물·호우'] += 1
+  if (hasYoungChild(A)) risk['물·호우'] += 1 // 13세 이상(청소년)은 성인과 같게
   const byWeak = (a, b) => sc[a] - risk[a] * 5 - (sc[b] - risk[b] * 5)
   const weak = [...AX].sort(byWeak).slice(0, 2)
   const order = [...AX].sort(byWeak).slice(0, 4)
 
-  const total = Math.round(AX.reduce((a, x) => a + sc[x], 0) / AX.length) // 상황 문항(AX) 점수 평균
-  const safe = total >= 80 && sc[weak[0]] >= 60
-  const type = TYPES[safe ? 'safe' : weak[0]]
+  const type = typeOf(A, weak[0]) // 조심할 것 1위 분야의 캐릭터
 
   const tags = [
-    WHO[w].row + (A.kid ? (A.kid === 'baby' ? ' · 영유아' : ' · 어린이') : ''),
+    whoTag(w, A),
     site.col,
     SEASON[A.season],
     EXP[A.exp],
@@ -166,8 +214,7 @@ export function computeResult(A) {
     '물·호우': `계절 · ${SEASON[A.season]}`,
   }
   return {
-    who: WHO[w].label, siteName: site.name, siteDesc: site.desc, weak, safe, total,
-    lackTail: safe ? ' 고르게 높아서' : ` ${sc[weak[0]]}점으로 가장 낮아서`,
+    who: WHO[w].label, siteName: site.name, siteDesc: site.desc, weak,
     type, keywords: tags.slice(0, 3).map((t) => `#${t}`),
     bars: AX.map((a) => ({ label: a, v: sc[a], width: Math.max(6, sc[a]) })),
     rules: order.map((ax) => ({ ax, tag: tagOf[ax], ...RULES[ax] })),

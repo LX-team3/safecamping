@@ -2,6 +2,7 @@
 // 웹 캠핑장 지도: 카카오맵 위에 설계(4-1)의 물방울 핀 + 안전점수를 올린다
 //  - 추천(내 유형 TOP 5)은 금빛→초록 그라데이션 큰 핀, 나머지는 등급 색 작은 핀, 고른 것은 가장 큰 핀 + 이름표
 //  - 켜 둔 안전시설(facilities)은 모바일 지도와 같은 동그라미 배지 (utils/facilityIcon.js)
+//  - 차박지 찾기: 판정 구역(zones, 불가·주의 면)과 고른 자리의 필지 경계(parcel)를 판정 색 면으로 그린다
 // 카카오 키가 없으면(.env.local) 지도 대신 안내를 보여 준다
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { facilityBadgeEl } from '@/utils/facilityIcon'
@@ -17,9 +18,16 @@ const props = defineProps({
   // 고른 캠핑장에서 시설까지 가는 경로: [{ key, type, name, lat, lng, color, label, path? }] (path: [[위도, 경도], ...] 도로 경로)
   routes: { type: Array, default: () => [] },
   focusKey: { type: String, default: null }, // 강조할 경로 key (나머지는 흐리게)
+  // 차박 판정 구역 (면): [{ key, geometry: GeoJSON(Polygon·MultiPolygon), color }] — 색은 utils/chabak 의 verdictColor() 값
+  zones: { type: Array, default: () => [] },
+  parcel: { type: Object, default: null }, // 고른 차박 자리의 필지 경계 { geometry, color } (판정 색으로 진하게)
+  // 핀 아래 이름표 숨기기 (차박지 찾기: 후보지 이름은 "475-3 잡종지" 처럼 지번뿐이라 의미가 적고 서로 겹침)
+  // 숨겨도 고른 핀과 이름이 있는 등록 야영장(kind: 'camp')은 보인다
+  hideNames: { type: Boolean, default: false },
 })
 // bounds: 지도가 멈췄을 때 보이는 범위 (부모가 켠 시설을 이 범위로 받는다)
-const emit = defineEmits(['select', 'bounds'])
+// mapclick: 핀이 아닌 지도 바닥을 눌렀을 때 그 위치 { lat, lng } (차박지 찾기에서 그 자리를 판정)
+const emit = defineEmits(['select', 'bounds', 'mapclick'])
 
 const DEFAULT_CENTER = { lat: 38.0697, lng: 128.1707 } // 캠핑장이 없을 때 (인제군청 근처)
 const PIN_PATH = 'M12 1C5.9 1 1.5 5.6 1.5 11.4c0 7.2 8.4 15.6 9.6 16.8a1.3 1.3 0 0 0 1.8 0c1.2-1.2 9.6-9.6 9.6-16.8C22.5 5.6 18.1 1 12 1z'
@@ -56,6 +64,8 @@ onMounted(async () => {
   stopSizing = keepMapSized(map, el.value)
   applyMapType(kakao, map)
   kakao.maps.event.addListener(map, 'idle', emitBounds)
+  // 핀은 clickable 오버레이라 핀을 누르면 이 이벤트가 오지 않는다 → 바닥을 누른 것만 온다
+  kakao.maps.event.addListener(map, 'click', (e) => emit('mapclick', { lat: e.latLng.getLat(), lng: e.latLng.getLng() }))
   draw()
   fit()
 })
@@ -96,7 +106,10 @@ function pinEl(camp) {
   const name = document.createElement('span')
   name.className = 'pin-name'
   name.textContent = camp.name
-  btn.append(drop, name)
+  const showName = !props.hideNames || selected || camp.kind === 'camp'
+  if (showName) btn.append(drop, name)
+  else btn.append(drop) // 이름은 마우스를 올리면 보이게 (title)
+  if (!showName) btn.title = camp.name
   btn.addEventListener('click', () => emit('select', camp.id))
   return btn
 }
@@ -116,6 +129,7 @@ function draw() {
       zIndex: selected ? 10 : camp.tier === 'rec' ? 5 : 2,
     })
   })
+  drawZones()
   drawRoutes()
   drawMe()
   props.facilities.forEach((f) => {
@@ -123,6 +137,31 @@ function draw() {
     badge.title = f.name
     overlays.push(new kakao.maps.CustomOverlay({ map, position: new kakao.maps.LatLng(f.lat, f.lng), content: badge, zIndex: 3, clickable: true }))
   })
+}
+
+// GeoJSON 면 → 카카오 다각형 경로 목록 (Polygon 하나 또는 MultiPolygon 여러 개, 구멍(안쪽 고리)도 함께)
+// 좌표는 [경도, 위도] 순서라 LatLng(위도, 경도) 로 뒤집는다
+function toPaths(geo) {
+  if (!geo) return []
+  const polys = geo.type === 'MultiPolygon' ? geo.coordinates : geo.type === 'Polygon' ? [geo.coordinates] : []
+  return polys.map((rings) => rings.map((ring) => ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng))))
+}
+// 차박 판정 구역(반투명) + 고른 자리 필지(진하게). 핀보다 아래에 깔린다 (다각형은 오버레이보다 항상 아래)
+function drawZones() {
+  props.zones.forEach((z) =>
+    toPaths(z.geometry).forEach((path) =>
+      overlays.push(new kakao.maps.Polygon({
+        map, path, strokeWeight: 1, strokeColor: z.color, strokeOpacity: 0.6, fillColor: z.color, fillOpacity: 0.22,
+      })),
+    ),
+  )
+  if (props.parcel?.geometry) {
+    toPaths(props.parcel.geometry).forEach((path) =>
+      overlays.push(new kakao.maps.Polygon({
+        map, path, strokeWeight: 3, strokeColor: props.parcel.color, strokeOpacity: 1, fillColor: props.parcel.color, fillOpacity: 0.35,
+      })),
+    )
+  }
 }
 
 // 고른 캠핑장 → 시설 경로: 직선 + 시설 배지 + "약 N분" (실제 도로 경로가 아니라 직선이다)
@@ -175,7 +214,7 @@ function fit() {
 watch(() => props.camps, draw)
 watch(() => props.fitKey, fit)
 watch(() => props.facilities, draw)
-watch([() => props.routes, () => props.focusKey, () => props.me], draw)
+watch([() => props.routes, () => props.focusKey, () => props.me, () => props.zones, () => props.parcel, () => props.hideNames], draw)
 watch(() => props.selectedId, (id) => {
   draw()
   const camp = props.camps.find((c) => c.id === id)

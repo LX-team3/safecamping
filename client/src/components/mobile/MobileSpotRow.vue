@@ -3,6 +3,8 @@
 //  - 등록 야영장: 고캠핑 사진, "응급실 차로 N분" (camp.er_drive_min — 캠핑장 목록과 같은 값)
 //  - 차박 후보지: 사진이 없어 그 자리 스카이뷰(카카오 정적 지도, 위성사진). 응급실 시간은 직선거리 어림값이라 줄에 안 보임
 // 줄을 누르면 open → 화면이 지도를 그 자리로 옮기고 판정 카드를 띄운다
+// 등록 야영장(캠핑장 id 가 있음)만 오른쪽에 하트 → 저장 탭 '관심 캠핑장'에 담긴다
+//   차박 후보지는 캠핑장 표(camp)에 없어 저장(saved_camp, camp.id 외래키)에 담을 수 없다 → 하트 없음
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { loadKakaoMap } from '@/utils/kakaoMap'
 import { GRADE_LABEL, VERDICT } from '@/utils/chabak'
@@ -10,8 +12,11 @@ import { GRADE_LABEL, VERDICT } from '@/utils/chabak'
 const props = defineProps({
   item: { type: Object, required: true }, // { kind: open·camp, name, area, imageUrl, lat, lng, score, grade, erDriveMin }
   rank: { type: Number, required: true },
+  favorite: { type: Boolean, default: false }, // 하트가 켜져 있는지 (등록 야영장만 의미 있음)
 })
-defineEmits(['open'])
+defineEmits(['open', 'favorite'])
+
+const canSave = props.item.kind === 'camp' && props.item.id != null
 
 const verdict = props.item.kind === 'camp' ? '야영 가능' : '제한 없음'
 
@@ -75,14 +80,26 @@ onBeforeUnmount(() => observer?.disconnect())
       </span>
       <span class="arrow" aria-hidden="true">›</span>
     </button>
+    <!-- 등록 야영장만 저장 (탐색 목록 CampRow 의 하트와 같음) -->
+    <button v-if="canSave" type="button" class="heart" :class="{ on: favorite }" :aria-pressed="favorite"
+      :aria-label="favorite ? `${item.name} 저장 취소` : `${item.name} 저장`" @click="$emit('favorite', item.id)">
+      <svg viewBox="0 0 24 24" width="22" height="22" :fill="favorite ? 'currentColor' : 'none'" stroke="currentColor"
+        stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" />
+      </svg>
+    </button>
   </li>
 </template>
 
 <style scoped>
 .spot-row {
+  display: flex; /* 줄 본문 + (야영장이면) 하트 */
+  align-items: center;
   border-bottom: 1px solid var(--color-track);
 }
 .main {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   display: flex;
   align-items: center;
@@ -203,5 +220,17 @@ onBeforeUnmount(() => observer?.disconnect())
   flex: none;
   font-size: 20px;
   color: var(--color-arrow);
+}
+.heart {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  color: var(--color-text-sub);
+  cursor: pointer;
+}
+.heart.on {
+  color: var(--color-danger);
 }
 </style>
