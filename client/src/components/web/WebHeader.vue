@@ -1,9 +1,10 @@
 <script setup>
-// 웹(PC) 상단 헤더 (설계 ① 상단 헤더): 로고 · 메뉴 · 로그인/검색/알림/전체 메뉴
+// 웹(PC) 상단 헤더 (설계 ① 상단 헤더): 로고 · 메뉴 · 로그인/앱 화면 전환/알림/전체 메뉴 (검색 버튼은 기능이 없어 뺐다)
 // 아직 웹 화면이 없는 주소는 "PC 화면 준비 중" 안내가 뜬다
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { webToAppPath } from '@/utils/webLinks'
 import WebGuideModal from './WebGuideModal.vue'
 import WebMenuDrawer from './WebMenuDrawer.vue'
 
@@ -12,6 +13,16 @@ const initial = computed(() => auth.member?.name?.slice(0, 1) ?? '')
 
 const menuOpen = ref(false)
 const guideOpen = ref(false)
+
+// 웹 ⇄ 앱 전환 (시연용): 지금 보는 웹 화면과 같은 앱 화면으로. 같은 화면이 없으면 앱 첫 화면(탐색)
+// 로그인은 같은 서버 세션이라 앱으로 가도 그대로 유지된다
+const route = useRoute()
+const router = useRouter()
+const appPath = computed(() => {
+  const target = webToAppPath(route.path)
+  if (target && router.resolve(target).matched.length) return { path: target, query: route.query }
+  return '/app/explore'
+})
 </script>
 
 <template>
@@ -25,18 +36,19 @@ const guideOpen = ref(false)
         <RouterLink to="/web/explore" class="menu">안전지도</RouterLink>
         <RouterLink to="/web/nearby" class="menu">지역 찾기</RouterLink>
         <RouterLink to="/web/survey" class="menu">캠핑유형 진단</RouterLink>
-        <RouterLink v-if="auth.isLoggedIn" to="/web/my-booking" class="menu">내 예약</RouterLink>
-        <button v-else type="button" class="menu" @click="guideOpen = true">내 예약</button>
+        <RouterLink v-if="auth.isLoggedIn" to="/web/my-booking" class="menu">내 캠핑</RouterLink>
+        <button v-else type="button" class="menu" @click="guideOpen = true">내 캠핑</button>
       </nav>
 
       <div class="tools">
         <RouterLink v-if="!auth.isLoggedIn" to="/web/login" class="login">로그인</RouterLink>
         <RouterLink v-else to="/web/my-info" class="avatar" :aria-label="`내 정보 (${auth.member?.name})`">{{ initial }}</RouterLink>
 
-        <button type="button" class="icon-btn" aria-label="검색">
+        <!-- 검색 자리: 웹 ⇄ 앱 전환 (같은 화면의 앱으로). 글자 없이 휴대폰 아이콘만 -->
+        <RouterLink :to="appPath" class="icon-btn" aria-label="같은 화면을 앱(모바일)으로 보기" title="앱 화면으로 보기">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-        </button>
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18h2" /></svg>
+        </RouterLink>
         <RouterLink to="/web/alerts" class="icon-btn" aria-label="알림">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -51,7 +63,7 @@ const guideOpen = ref(false)
     </div>
 
     <WebMenuDrawer :open="menuOpen" @close="menuOpen = false" />
-    <WebGuideModal :open="guideOpen" text="내 예약과 여행 중 안전 안내는&#10;로그인하면 확인할 수 있어요." @close="guideOpen = false" />
+    <WebGuideModal :open="guideOpen" text="내 캠핑과 여행 중 안전 안내는&#10;로그인하면 확인할 수 있어요." @close="guideOpen = false" />
   </header>
 </template>
 

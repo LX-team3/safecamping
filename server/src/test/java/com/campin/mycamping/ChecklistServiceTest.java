@@ -24,6 +24,7 @@ import com.campin.weather.DayForecast;
 class ChecklistServiceTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 18);
+    private static final java.util.Set<Long> FAMILY = java.util.Set.of(1L, 3L);  // 같은 가족방 회원 id
 
     private final List<CampPlan> plans = new ArrayList<>();
     private Optional<List<ChecklistResponse.Warning>> warnings = Optional.of(List.of());
@@ -39,6 +40,7 @@ class ChecklistServiceTest {
                 Member m = new Member();
                 if ("camper01".equals(loginId)) m.setId(1L);
                 else if ("camper02".equals(loginId)) m.setId(2L);
+                else if ("family03".equals(loginId)) m.setId(3L);  // camper01 과 같은 가족방
                 else return null;
                 m.setLoginId(loginId);
                 return m;
@@ -50,6 +52,12 @@ class ChecklistServiceTest {
             @Override public List<CampPlan> findByMemberId(Long memberId) { return List.of(); }
             @Override public CampPlan findById(Long memberId, Long planId) {
                 return plans.stream().filter(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId))
+                        .findFirst().orElse(null);
+            }
+            // SQL 과 같은 조건: 내 것이거나 같은 가족방(1번·3번 회원) 사람의 것
+            @Override public CampPlan findVisible(Long memberId, Long planId) {
+                return plans.stream().filter(p -> p.getId().equals(planId)
+                        && (p.getMemberId().equals(memberId) || (FAMILY.contains(memberId) && FAMILY.contains(p.getMemberId()))))
                         .findFirst().orElse(null);
             }
             @Override public boolean exists(Long memberId, Long campId, LocalDate checkIn) { return false; }
@@ -203,6 +211,16 @@ class ChecklistServiceTest {
 
         assertThrows(NotFoundException.class, () -> service.find("camper02", 1L, TODAY));
         assertThrows(NotFoundException.class, () -> service.find("camper01", 77L, TODAY));
+    }
+
+    @Test
+    void 같은_가족방_사람의_일정은_출발_준비를_볼_수_있다() {
+        plan(1, 10L, 5);  // camper01(1번) 의 일정
+
+        ChecklistResponse r = service.find("family03", 1L, TODAY);  // 같은 가족방 3번 회원
+
+        assertEquals(1L, r.plan().id());
+        assertThrows(NotFoundException.class, () -> service.find("camper02", 1L, TODAY));  // 가족이 아니면 그대로 404
     }
 
     private static DayForecast day(LocalDate date, double min, double max) {

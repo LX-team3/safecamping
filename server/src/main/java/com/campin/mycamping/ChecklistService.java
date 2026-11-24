@@ -53,8 +53,8 @@ public class ChecklistService {
         if (member == null) {
             throw new NotFoundException("회원 정보를 찾을 수 없습니다.");
         }
-        // member_id 조건이 붙은 조회라 남의 일정 id 는 없는 것처럼 404
-        CampPlan plan = campPlanMapper.findById(member.getId(), planId);
+        // 내 일정이거나 같은 가족방 사람의 일정만 (가족 캠핑 카드에서도 출발 준비를 본다). 그 밖은 없는 것처럼 404
+        CampPlan plan = campPlanMapper.findVisible(member.getId(), planId);
         if (plan == null) {
             throw new NotFoundException("등록한 캠핑을 찾을 수 없습니다.");
         }

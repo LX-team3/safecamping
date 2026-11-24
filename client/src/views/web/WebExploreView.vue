@@ -19,6 +19,9 @@ import { directionsUrl } from '@/utils/place'
 import { shortLabel } from '@/utils/date'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTripStore } from '@/stores/trip'
+import { useAuthStore } from '@/stores/auth'
+import { useSurveyStore } from '@/stores/survey'
+import { erBonusReasons } from '@/utils/webSurvey'
 
 const props = defineProps({
   mode: { type: String, default: 'browse' }, // browse | car
@@ -48,10 +51,25 @@ const recommend = ref({ camps: [], excluded: [] })
 const loading = ref(false)
 const error = ref('')
 
+// ---- 내 유형 점수 (응급실 가산점) — 앱 탐색과 같은 규칙 ----
+// 진단에서 아이·어르신·차박·겨울·걸어서 중 하나를 골랐으면 버튼이 보이고, 켜면 점수 옆에 "+5" 를 따로 붙이고
+// 추천 · 목록을 "안전점수 + 가산점" 순(서버 sort=bonus)으로 받는다. 등급(색 · 묶음)은 저장된 안전점수 그대로
+const auth = useAuthStore()
+const survey = useSurveyStore()
+onMounted(() => survey.load(auth.isLoggedIn).catch(() => {})) // 로그인했으면 이 브라우저에 저장된 내 진단 답
+const bonusReasons = computed(() => erBonusReasons(survey.answers))
+const bonusActive = computed(() => bonusReasons.value.length > 0 && survey.bonusOn)
+// 웹은 "+5" 를 따로 붙이지 않고 점수 숫자 자체를 바꿔 보여 준다 (사용자 결정). 등급(grade · 색 · 묶음)은 저장된 점수 그대로
+// baseScore 에 저장된 점수를 남겨 둔다 (정보 카드 · 상세의 설명용)
+const withBonus = (c) =>
+  bonusActive.value && c.erBonus && c.safetyScore != null
+    ? { ...c, baseScore: c.safetyScore, safetyScore: Math.min(100, c.safetyScore + c.erBonus) }
+    : c
+
 async function load() {
   loading.value = true
   error.value = ''
-  const params = { sido: trip.state.sido?.name, sigungu: trip.state.sigungu?.name, sort: 'score' }
+  const params = { sido: trip.state.sido?.name, sigungu: trip.state.sigungu?.name, sort: bonusActive.value ? 'bonus' : 'score' }
   try {
     const [all, rec] = await Promise.all([
       api('/api/camps', { params }),
@@ -67,12 +85,16 @@ async function load() {
   }
 }
 onMounted(load)
-watch([() => trip.state.sido, () => trip.state.sigungu], load)
+watch([() => trip.state.sido, () => trip.state.sigungu, bonusActive], load)
 
 const topIds = computed(() => new Set(recommend.value.camps.map((c) => c.id)))
 const tierOf = (c) => (topIds.value.has(c.id) ? 'rec' : TIER_BY_GRADE[c.grade] || null)
 // 지도·목록에 쓰는 캠핑장 (등급 묶음 정보를 붙임)
-const camps = computed(() => allCamps.value.map((c) => ({ ...c, tier: tierOf(c) })).filter((c) => c.tier))
+const camps = computed(() =>
+  allCamps.value
+    .map((c) => ({ ...withBonus(c), tier: tierOf(c) }))
+    .filter((c) => c.tier),
+)
 
 // ---- 검색 · 등급 칩 ----
 const query = ref('')
@@ -142,7 +164,7 @@ const carCamps = computed(() => spots.value)
 const mapCamps = computed(() => {
   if (view.value === 'detail' || view.value === 'facility') {
     const c = detailCamp.value
-    return c ? [{ ...c, tier: TIER_BY_GRADE[c.grade] || 'safe' }] : []
+    return c ? [{ ...withBonus(c), tier: TIER_BY_GRADE[c.grade] || 'safe' }] : [] // 상세 핀도 내 유형 점수
   }
   if (view.value === 'car') return carCamps.value
   return camps.value.filter((c) => (tiers.value[c.tier] && matches(c)) || c.id === selectedId.value)
@@ -284,10 +306,17 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
         </div>
       </div>
 
+      <!-- 내 유형 점수: 가산점에 해당하는 진단 답이 있을 때만 -->
+      <div v-if="bonusReasons.length" class="bonusbar">
+        <button type="button" class="chip bonus-chip" :class="{ on: survey.bonusOn }" :aria-pressed="survey.bonusOn"
+          @click="survey.bonusOn = !survey.bonusOn">내 유형 점수 {{ survey.bonusOn ? '켜짐' : '꺼짐' }}</button>
+        <span v-if="survey.bonusOn" class="bonus-note">{{ bonusReasons.join(' · ') }}에 해당해 응급실이 가까운 곳의 점수를 올려 보여 드려요 (등급은 그대로)</span>
+      </div>
+
       <!-- 결과 헤더 -->
       <div class="result-head">
         <div class="title">{{ listTitle }} <span class="count">{{ listCount }}</span></div>
-        <span class="sort">안전점수순</span>
+        <span class="sort">{{ bonusActive ? '안전점수 + 내 유형 점수순' : '안전점수순' }}</span>
       </div>
 
       <!-- 결과 목록 -->
@@ -518,6 +547,22 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
 }
 .count {
   color: var(--web-grade-safe);
+}
+.bonusbar {
+  padding: 0 20px 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bonus-chip.on {
+  border-color: var(--web-green);
+  background: var(--web-green);
+  color: var(--web-white);
+}
+.bonus-note {
+  font-size: 12px;
+  color: var(--web-text-sub);
 }
 .sort {
   font-size: 13px;

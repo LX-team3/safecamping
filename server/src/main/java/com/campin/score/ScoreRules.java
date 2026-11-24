@@ -47,6 +47,21 @@ public final class ScoreRules {
     // 카카오 호출 사이 쉬는 시간(ms). 한꺼번에 몰아 부르지 않게
     static final long CALL_INTERVAL_MS = 100;
 
+    // ---- 진단 유형 가산점 (지도의 "내 유형 기준") ----
+    // 진단에서 아이·어르신·차박·겨울·걸어서 중 하나를 고른 사람에게, 응급실이 가까운 캠핑장일수록 점수를 조금 더 얹는다
+    // (어느 답이 해당하는지는 화면 utils/webSurvey.js 의 needsErBonus — 진단 답은 브라우저에만 있어서)
+    // 크기: 응급실 부분점수(위 TIME 의 er 기준: 30분 안 1 → 60분 넘으면 0) × 최대 5점, 반올림
+    //   5점 = 응급실 배점(25점)의 5분의 1. 10점은 60점대가 안전 등급(70)으로 넘어가 너무 커서 줄였다 (팀 결정 2026-11-23)
+    // 저장된 안전점수(camp.safety_score)·등급은 바꾸지 않는다. 화면이 "79 + 응급실 +5" 로 따로 보여 준다
+    public static final int ER_BONUS_MAX = 5;
+
+    // 응급실 분 → 가산점 0~5. 응급실 정보가 없으면 0
+    public static int erBonus(Integer erDriveMin) {
+        if (erDriveMin == null) return 0;
+        TimeRule er = TIME.get("er");
+        return (int) Math.round(ER_BONUS_MAX * SafetyScoreService.part(erDriveMin, er.fullMin(), er.zeroMin()));
+    }
+
     private ScoreRules() {
     }
 

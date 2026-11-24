@@ -16,6 +16,7 @@ const props = defineProps({
   selectedId: { type: Number, default: null },
   bottomInset: { type: Number, default: 0 }, // 아래 시트가 가리는 높이(px) → 버튼·마커를 그 위로 올린다
 })
+
 // layers: 오른쪽 위 지도 설정 버튼을 눌렀다 (시트는 부모가 연다)
 // bounds: 지도를 움직이고 멈췄다 → 보이는 범위 { swLat, swLng, neLat, neLng } (부모가 켠 시설을 이 범위로 받아 온다)
 const emit = defineEmits(['select', 'layers', 'bounds'])
@@ -94,7 +95,7 @@ function markerEl(camp) {
     icon.className = 'camp-icon'
     icon.innerHTML = facilityIcon('camp')
     btn.appendChild(icon)
-    btn.appendChild(document.createTextNode(camp.safetyScore ?? '-'))
+    btn.appendChild(document.createTextNode(camp.safetyScore ?? '-')) // 내 유형 점수를 켜면 탐색 화면이 가산점을 더한 값을 넘겨 준다
   }
   btn.addEventListener('click', () => emit('select', camp.id))
   return btn

@@ -6,10 +6,12 @@ import { RouterLink } from 'vue-router'
 import WebIllust from '@/components/web/WebIllust.vue'
 import { api } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
-import { ALLQ, KID_OPTS, PARTS, answeredCount, computeResult, emptyAnswers, isReady, loadSavedResult, pickAnswer, saveResult } from '@/utils/webSurvey'
+import { useSurveyStore } from '@/stores/survey'
+import { ALLQ, KID_OPTS, PARTS, answeredCount, computeResult, emptyAnswers, isReady, loadSavedResult, pickAnswer, saveResult, campTypeOf } from '@/utils/webSurvey'
 import '@/styles/tokens-web.css'
 
 const auth = useAuthStore()
+const survey = useSurveyStore() // 앱과 같은 진단 저장소 → 지도(웹·앱 탐색)의 "내 유형 점수"가 이 답을 읽는다
 const step = ref('survey') // survey | result
 const A = ref(emptyAnswers())
 const tab = ref('recs') // recs | rules | check
@@ -26,6 +28,7 @@ const showKid = (q) => q.k === 'who' && A.value.who.includes('child')
 // ---- 결과 ----
 const r = ref(null)
 const camps = ref([]) // 추천 캠핑장 (실제 데이터)
+const campsLoaded = ref(false) // 받아 오기를 끝냈는지 (결과가 0곳이어도 "불러오는 중"으로 남지 않게)
 const more = ref(false)
 const openRule = ref(null)
 const checked = ref({})
@@ -33,25 +36,30 @@ const checked = ref({})
 async function submit() {
   if (!ready.value) return
   r.value = computeResult(A.value)
+  survey.save(A.value, auth.isLoggedIn) // 로그인했으면 이 브라우저에 사용자별로, 아니면 이 탭에만 (stores/survey.js)
   openRule.value = r.value.rules[0]?.ax ?? null
   checked.value = {}
   tab.value = 'recs'
   step.value = 'result'
   window.scrollTo(0, 0)
-  loadCamps()
+  loadCamps(campTypeOf(A.value))
 }
 function restart() {
-  A.value = emptyAnswers()
+  camps.value = [] // 다시 진단하면 새 답으로 추천을 다시 받는다
+  campsLoaded.value = false
+  more.value = false
+  // 고른 답은 지우지 않는다: 다시 진단해도 이전 선택이 그대로 남아 있어 바꿀 것만 고치면 된다
   r.value = null
   step.value = 'survey'
   window.scrollTo(0, 0)
 }
 
-// 추천 캠핑장: 안전점수 높은 순 5곳 + 그 캠핑장의 가까운 시설 시간 (상세 API)
-async function loadCamps() {
-  if (camps.value.length) return
+// 추천 캠핑장: "어디서 주무세요?" 답에 맞는 유형(campType)만 거르고, 안전점수 높은 순 5곳 + 그 캠핑장의 가까운 시설 시간 (상세 API)
+// 유형 말고 다른 답(누구와·계절 등)은 추천 순서에 쓰지 않는다 (근거 자료가 아직 없음)
+async function loadCamps(campType) {
+  if (campsLoaded.value) return
   try {
-    const list = await api('/api/camps', { params: { sort: 'score' } })
+    const list = await api('/api/camps', { params: { sort: 'score', ...(campType ? { campType } : {}) } })
     const top = list.filter((c) => c.safetyScore != null).slice(0, 5)
     camps.value = await Promise.all(top.map(async (c) => {
       try {
@@ -66,6 +74,7 @@ async function loadCamps() {
   } catch {
     camps.value = []
   }
+  campsLoaded.value = true
 }
 const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
 const shownCamps = computed(() => camps.value.slice(0, more.value ? 5 : 3))
@@ -111,7 +120,7 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
           <div class="parts">
             <section v-for="p in PARTS" :key="p.title" class="part">
               <h2>{{ p.title }}</h2>
-              <p class="pdesc"><span class="chip" :class="p.chip">{{ p.feature }}</span>{{ p.desc }}</p>
+              <p class="pdesc"><span v-if="p.feature" class="chip" :class="p.chip">{{ p.feature }}</span>{{ p.desc }}</p>
               <div class="qs" :class="{ two: p.qs.every((q) => !q.quiz) }">
                 <div v-for="q in p.qs" :key="q.k" class="q">
                   <div class="qt"><span class="no">{{ qNo(q) }}</span>{{ q.t }}<small v-if="q.h">{{ q.h }}</small></div>
@@ -157,16 +166,6 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
               <p class="catch">{{ r.type.catch }}</p>
               <p class="who">{{ r.who }} · {{ r.siteName }}</p>
               <div class="kws"><span v-for="k in r.keywords" :key="k">{{ k }}</span></div>
-            </div>
-            <div class="bars">
-              <div v-for="b in r.bars" :key="b.label" class="bar">
-                <span class="bl">{{ b.label }}</span>
-                <span class="bt">
-                  <i class="grid"></i>
-                  <i class="fill" :style="{ width: b.width + '%', backgroundSize: (10000 / b.width).toFixed(1) + '% 100%' }"></i>
-                </span>
-                <span class="bv">{{ b.v }}</span>
-              </div>
             </div>
           </div>
 
@@ -220,7 +219,8 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
             <!-- 캠핑장 고르기 -->
             <section v-else class="panel">
               <h3 class="rech">{{ r.type.recWhy }}으로 골랐어요</h3>
-              <p v-if="!camps.length" class="state">추천 캠핑장을 불러오는 중이에요...</p>
+              <p v-if="!campsLoaded" class="state">추천 캠핑장을 불러오는 중이에요...</p>
+              <p v-else-if="!camps.length" class="state">고른 방식에 맞는 캠핑장을 찾지 못했어요</p>
               <RouterLink v-for="(c, i) in shownCamps" :key="c.id" :to="`/web/camps/${c.id}`" class="rec">
                 <span class="rphoto">
                   <img v-if="c.imageUrl" :src="c.imageUrl" :alt="`${c.name} 전경`" />
@@ -570,50 +570,6 @@ const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['che
   border-radius: 999px;
   background: var(--web-hash-bg);
   font-size: 14px;
-}
-.bars {
-  padding-top: 20px;
-  border-top: 1px solid var(--web-line);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.bar {
-  display: grid;
-  grid-template-columns: 80px 1fr 36px;
-  align-items: center;
-  gap: 12px;
-}
-.bl {
-  font-size: 16px;
-  font-weight: 500;
-}
-.bv {
-  font-size: 16px;
-  font-weight: 700;
-  text-align: right;
-}
-.bt {
-  position: relative;
-  height: 16px;
-  border-radius: 999px;
-  background: var(--web-bar-bg);
-  overflow: hidden;
-}
-.bt i {
-  position: absolute;
-}
-.bt .grid {
-  inset: 0;
-  background-image: repeating-linear-gradient(90deg, transparent 0 calc(20% - 2px), var(--web-white) calc(20% - 2px) 20%);
-}
-.bt .fill {
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 999px;
-  background-image: linear-gradient(90deg, var(--web-brand-1) 0%, var(--web-brand-2) 25%, var(--web-brand-3) 50%, var(--web-brand-4) 75%, var(--web-brand-5) 100%);
-  background-repeat: no-repeat;
 }
 .tabwrap {
   display: flex;

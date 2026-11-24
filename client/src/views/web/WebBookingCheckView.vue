@@ -138,7 +138,7 @@ async function save() {
         <p><b>{{ camp?.name }}</b> · {{ dateRange }}</p>
         <p>캠핑 당일에 맞춰 안전 정보와 기상특보를 알려 드릴게요.</p>
         <div class="dbtns">
-          <RouterLink to="/web/my-booking" class="primary">내 예약 보기</RouterLink>
+          <RouterLink to="/web/my-booking" class="primary">내 캠핑 보기</RouterLink>
           <RouterLink to="/web/explore" class="ghost">안전지도로 가기</RouterLink>
         </div>
       </div>
