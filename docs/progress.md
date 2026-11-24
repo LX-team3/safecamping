@@ -1,5 +1,47 @@
 # 진행 상황
 
+## 2026-11-24 푸시 토큰 등록 버그 수정 (브랜치 `lyh-aibrief`)
+- 증상: 앱에서 로그인한 직후 토큰 등록이 403 으로 실패 → PC 에서 저장하면 "브리핑 푸시 안 보냄: 등록된 폰 없음". 화면을 새로 불러오면(`location.href` 등) 등록됨
+- 원인: 로그인 직후 서버가 CSRF 쿠키를 지우는데, 새 쿠키를 받기 전에 POST 를 보냄
+- 수정: `utils/pushNotify.js` `registerToken` — GET 으로 새 쿠키를 받은 뒤 등록, 403 이면 한 번만 다시. 서버 · SecurityConfig 변경 없음
+- 확인: 쿠키 없이 POST → 같은 403 문구, GET 뒤 POST → CSRF 통과(로그인 안 해서 401), `npm run build` 통과. 확인 못 함: 실제 폰에서 로그인 → 등록 → 알림
+
+## 2026-11-24 PC 웹에서 일정 저장 → 10초 뒤 폰에 브리핑 푸시 — 5번 (브랜치 `lyh-aibrief`)
+- 결정: 저장 10초 뒤 발송(시연용), 10초 안에 일정을 지우거나 고쳐도 알림은 그대로 감. DB · SecurityConfig · 라이브러리 변경 없음
+- `server` `push/BriefPushService`: 10초 뒤 그 회원의 폰 토큰을 찾아 발송(`path=/app/my-camping`, `brief=일정id`). 등록된 폰이 없거나 실패해도 일정 저장은 그대로 성공. 로그에는 일정 id 만
+- `CampPlanRequest` 에 `notifyPhone` 추가, `CampPlanController` 등록(POST)이 성공했을 때만 예약 (고치기 PUT 은 안 보냄)
+- `stores/myCamping.js`: 앱이 아닐 때만 `notifyPhone: true` (앱은 로컬 알림이 이미 떠서)
+- `MobileMyCampingView`: 내 캠핑 화면이 떠 있을 때 알림을 누르면, 목록에 없는 일정이면 다시 받아 브리핑을 펼침. 지난 캠핑을 거르던 조건이 동작하지 않던 것 수정(`p.past` → `checkOut`)
+- 확인: `.\mvnw.cmd test` 208개 통과(새 테스트 8개, 가짜 발송), `npm run build` 통과. 확인 못 함: 실제 Firebase 발송, 실제 폰 수신 · 눌러서 브리핑 열기, 브라우저에서 저장해 보기
+- 남음: 폰에서 확인
+
+## 2026-11-24 폰 주소(푸시 토큰) 등록 — 4번 (브랜치 `lyh-aibrief`)
+- 결정: 토큰은 서버 메모리에 보관(시연용, 재시작하면 비워짐), 회원당 폰 한 대(나중에 로그인한 폰). DB · SecurityConfig · 라이브러리 변경 없음
+- `server` `push/`: `PushTokenStore`(주소록) · `PushTokenController`(`POST`·`DELETE /api/member/push-token`) · `PushTokenRequest`(로그에 토큰이 안 보이게 가림)
+- 앱: `utils/pushNotify.js` `linkPushToken`(토큰과 로그인이 모두 준비되면 등록) · `unlinkPushToken`(로그아웃 직전에 삭제, `stores/auth.js`), `main.js` 연결. 토큰을 콘솔에 찍던 줄 삭제. PC 웹 · 모바일 브라우저에서는 아무 일도 안 함
+- 알림 테스트 화면에 "서버 등록" 상태 한 줄 추가
+- 확인: `.\mvnw.cmd test` 200개 통과(새 테스트 10개), `npm run build` 통과. 실제 키 파일로 "Firebase 연결 준비됨" 로그 확인(서버 전체를 띄우는 테스트에서). 확인 못 함: 실제 폰에서 로그인 · 로그아웃할 때 등록 · 삭제, 로그인 안 한 요청의 401, 실제 발송
+- 남음: 5번 일정 저장 뒤 발송 예약
+
+## 2026-11-24 서버에서 Firebase 푸시를 보낼 준비 (브랜치 `lyh-aibrief`)
+- 라이브러리 추가(승인): `firebase-admin` 9.12.0 (`server/pom.xml`). DB · 로그인 설정 · `application.properties` 변경 없음
+- `server` `push/`: `PushSender`(테스트용 인터페이스) · `FcmPushSender`(Firebase 발송, 채널 `push-alert`). 키가 없거나 잘못돼도 경고만 남기고 서버는 그대로 켜짐
+- 키: 환경변수 `GOOGLE_APPLICATION_CREDENTIALS` 에 서비스 계정 키 파일 경로. 키는 프로젝트 폴더 밖에 두고, 만일을 위해 `.gitignore` 에 `*firebase-adminsdk*.json` 추가
+- 확인: `.\mvnw.cmd test` 190개 통과(새 테스트 5개, 가짜 키 사용). 확인 못 함: 진짜 키로 서버 켜기 · 실제 폰 발송
+- 남음: 토큰 등록 API + 폰 앱이 로그인하면 토큰 보내기, 일정 저장 뒤 발송 예약
+- 정리 문서 `docs/push-notification.md` 저장: 개념 설명 · 흐름 · 설정 · 남은 작업
+
+## 2026-11-23 Firebase 푸시 알림(FCM) 받기 — 콘솔 테스트 발송용 (브랜치 `lyh-aibrief`)
+- 라이브러리 추가: `@capacitor/push-notifications@^8.1.3` (서버 · DB 변경 없음, 기존 로컬 알림 그대로)
+- `utils/pushNotify.js`: 앱 시작 때(`main.js`) 권한 확인 → FCM 등록 → 기기 토큰을 받아 알림 테스트 화면(`/app/test/notify`)에 표시 · 복사 버튼
+  - 앱이 켜져 있을 때 받은 푸시는 로컬 알림으로 한 번 더 띄움 (안드로이드는 앱이 앞에 있으면 알림창에 안 띄우므로)
+  - 알림을 누르면 맞춤 데이터 `path` 로 이동, 나머지 값은 query (예: `path=/app/disaster`, `demo=warning` → 호우경보 예시 재난지도)
+- 안드로이드: `AndroidManifest.xml` 에 기본 알림 채널 `push-alert`(중요도 높음 · 잠금화면 내용 표시), `npx cap sync android` 로 플러그인 반영
+- `client/android/app/google-services.json` 은 `android/.gitignore` 로 커밋 제외 → 팀원끼리 따로 전달
+- 테스트 방법: 앱 › 알림 테스트 화면에서 토큰 복사 → Firebase 콘솔 › Messaging › 새 캠페인 › 알림 › 테스트 메시지 전송 → 토큰 붙여 넣기
+- 정리 문서: `docs/push-notification.md` (구조 · 설정 · 시연 방법 · 서버 발송 계획)
+- 확인: `npm run build` 통과, `cap sync` 플러그인 2개 인식. 확인 못 함: 실제 폰에서 토큰 받기 · 푸시 수신 · 알림 눌러 이동 (안드로이드 스튜디오로 다시 설치 필요)
+
 ## 2026-11-23 인제군 호우특보 예시 알림 → 재난지도 (시연용 더미, 브랜치 `lyh-aibrief`)
 - 더미: `data/rainWarningDemo.js` — 호우주의보(3시간 65mm · 준비) · 호우경보(3시간 95mm · 대피). 기상청 기준(60 · 90mm)을 넘는 값, 실제 특보 아님. 알림 제목에 "[예시]"
 - 알림 테스트 화면(`/app/test/notify`)에 버튼 2개 → 5초 뒤 잠금화면 알림(채널 `disaster-alert`, 브리핑과 따로). 잠금화면에는 제목 + 첫 줄, 펼치면 3줄(`largeBody`)

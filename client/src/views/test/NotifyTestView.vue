@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { RAIN_DEMOS } from '@/data/rainWarningDemo'
 import { scheduleRainDemoNotice } from '@/utils/localNotify'
+import { linkStatus, pushStatus, pushToken } from '@/utils/pushNotify'
 
 const status = ref('버튼을 눌러 테스트하세요.')
 
@@ -61,6 +62,17 @@ const RAIN_MSG = {
 async function sendRain(key) {
   status.value = RAIN_MSG[await scheduleRainDemoNotice(key, RAIN_DEMOS[key])]
 }
+
+// Firebase 푸시 토큰 복사 (콘솔 › Messaging › 테스트 메시지 전송에 붙여 넣는다)
+const copyMsg = ref('')
+async function copyToken() {
+  try {
+    await navigator.clipboard.writeText(pushToken.value)
+    copyMsg.value = '복사했어요.'
+  } catch {
+    copyMsg.value = '복사하지 못했어요. 토큰 칸을 길게 눌러 직접 복사해 주세요.'
+  }
+}
 </script>
 
 <template>
@@ -82,5 +94,15 @@ async function sendRain(key) {
     <button type="button" style="display:block; width:100%; padding:16px; margin-top:12px" @click="sendRain('warning')">
       호우경보 예시 (3시간 95mm · 대피)
     </button>
+
+    <h2 style="margin-top: 32px; font-size: 18px">Firebase 푸시 토큰</h2>
+    <p style="font-size: 13px">{{ pushStatus }}</p>
+    <p style="font-size: 13px">서버 등록: {{ linkStatus }}</p>
+    <!-- readonly textarea: 토큰이 길어서 줄바꿈해 보여 주고, 길게 눌러 직접 복사도 할 수 있게 -->
+    <textarea :value="pushToken" readonly rows="5" style="display:block; width:100%; font-size:12px; word-break:break-all" />
+    <button type="button" :disabled="!pushToken" style="display:block; width:100%; padding:16px; margin-top:12px" @click="copyToken">
+      토큰 복사
+    </button>
+    <p v-if="copyMsg" style="font-size: 13px">{{ copyMsg }}</p>
   </main>
 </template>

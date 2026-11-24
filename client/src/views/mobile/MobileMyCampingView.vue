@@ -56,7 +56,7 @@ async function toggleBrief(p) {
     }
   }
 }
-// 알림을 눌러 들어온 경우: 그 일정 카드가 전날 카드면 브리핑을 펼치고 카드가 보이게 내린다
+// 알림을 눌러 들어온 경우: 그 일정 카드의 브리핑을 펼치고 카드가 보이게 내린다
 async function openBriefFromQuery() {
   const id = Number(route.query.brief)
   const card = cards.value.find((c) => c.id === id)
@@ -67,7 +67,12 @@ async function openBriefFromQuery() {
 }
 // 이미 내 캠핑 화면에 있을 때 알림을 누르면 화면을 새로 만들지 않고 주소만 바뀐다
 // (같은 알림을 또 눌러도 반응하도록 알림 쪽에서 누른 시각 t 를 함께 붙인다)
-watch(() => [route.query.brief, route.query.t], ([v]) => v && openBriefFromQuery())
+// 방금 PC 에서 등록한 일정은 이 화면의 목록에 아직 없다 → 목록을 다시 받는다 (load 가 끝에 브리핑도 펼친다)
+watch(() => [route.query.brief, route.query.t], ([v]) => {
+  if (!v) return
+  if (myCamping.plans.some((p) => p.id === Number(v))) openBriefFromQuery()
+  else load()
+})
 
 // ---- 지난 캠핑 후기 ----
 // 일정 id → 서버 후기 { planId, content, photos: [{ id, url }], createdAt, updatedAt }
@@ -164,7 +169,7 @@ const cards = computed(() => {
     const nights = nightsBetween(p.checkIn, p.checkOut)
     const eve = p.checkIn > today && nightsBetween(today, p.checkIn) === 1 // 내일 출발 = 오늘이 캠핑 전날
     // 브리핑 알림을 눌러 들어온 일정은 전날이 아니어도 브리핑을 보여 준다 (시연용 5초 알림이 아무 날짜에나 오므로)
-    const fromNotice = !p.past && String(p.id) === route.query.brief
+    const fromNotice = p.checkOut >= today && String(p.id) === route.query.brief // 지난 캠핑은 빼고
     const briefable = eve || fromNotice
     const checklist = myCamping.checklists[p.id]
     return {

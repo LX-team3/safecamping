@@ -33,6 +33,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Firebase 푸시: 채널을 따로 정하지 않고 보낸 알림이 들어갈 기본 채널 (utils/pushNotify.js 의 PUSH_CHANNEL_ID 와 같아야 함) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="push-alert" />
     </application>
 
     <!-- Permissions -->
