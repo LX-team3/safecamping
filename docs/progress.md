@@ -861,3 +861,6 @@
 - 수정: `DisasterRules.judgeWarnings` 추가 — 인제에 걸린 호우주의보 → 1 준비, 호우경보 → 2 대피. 최종 단계 = 비 · 수위 · 호우특보 중 가장 높은 쪽 (`DisasterService`). 특보는 기상청이 "3시간 60·90mm 이상 예상" 때 내리는 예보 기반 경고라 새 숫자 기준은 없음
 - 호우특보가 없을 때는 판단 재료에서 뺌(특보가 없다고 "안전"이라 하지 않음). 한파·건조 등 다른 특보는 단계와 상관없음. 까닭 줄에 "기상청 호우경보 발효"가 나와 앱·웹 막대 아래 관측 줄에 함께 보임 (화면 코드 변경 없음, `disasterLive.js` 주석만)
 - 확인: 서버 테스트 185개 통과(재난지도 15개, 새 테스트 4개: 특보만으로 단계 올림 · 비가 더 크면 비를 따름 · 호우 아닌 특보는 무관 · 특보가 없다고 안전이라 하지 않음). 확인 못 함: 실제 호우특보 발효 중 화면(지금은 특보 없음)
+
+## 2026-11-24 차박 서버 주석 정리 (동작 변경 없음)
+- "캠핑장 안전점수와 같은 계산" 주석을 바로잡음: 차박 /score·후보지 점수는 직선거리 + raw.score_weights(예전 방식), 지금 camp.safety_score 는 카카오 차 시간 + ScoreRules → 기준이 다름 (ChabakController·Service·Mapper·ScoreResponse·LayerItem, server/CLAUDE.md). layer 응답 칸 목록 갱신, 없는 06_shared_db_after_restore.sql 언급을 README 절차로. 컴파일 확인

@@ -2,7 +2,8 @@ package com.campin.chabak;
 
 import java.util.List;
 
-// 찍은 지점의 안전점수 (캠핑장 안전점수와 같은 계산 — db/merge_to_public.sql 8 단계)
+// 찍은 지점의 안전점수 (db/merge_to_public.sql 8 단계의 직선거리 + raw.score_weights 계산)
+// 지금 캠핑장 점수(camp.safety_score)는 카카오 차 시간 + ScoreRules 로 계산해서 기준이 다르다
 public record ChabakScoreResponse(
         Integer score,          // 0~100 (계산할 시설 데이터가 없으면 null)
         String grade,           // safe 70↑ · caution 40↑ · danger · unknown (CampService.gradeOf 와 같음)

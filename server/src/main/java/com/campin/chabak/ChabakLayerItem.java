@@ -8,7 +8,7 @@ public record ChabakLayerItem(
         String name,        // 구역 이름 · 지번 · 야영장 이름
         Double lat,
         Double lng,
-        Integer score,      // 안전점수 (후보지·야영장, 캠핑장과 같은 계산). 구역·데이터 없음은 null
+        Integer score,      // 안전점수. 후보지 = 직선거리 + raw.score_weights (/score 와 같은 계산), 야영장 = camp.safety_score (카카오 차 시간 기준) → 두 기준이 다름. 구역·데이터 없음은 null
         String grade,       // safe 70↑ · caution 40↑ · danger (score 가 null 이면 null) — 화면 "주변 안전" 필터
         String area,        // 목록 둘째 줄 (야영장 "인제군 북면" · 후보지 "군유지"). 구역은 null
         String imageUrl,    // 야영장 사진. 후보지·구역은 null

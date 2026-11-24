@@ -51,7 +51,9 @@ public class ChabakService {
                 .toList());
     }
 
-    // 찍은 지점의 안전점수: 캠핑장 안전점수와 같은 계산 (db/merge_to_public.sql 8 단계, 기준은 raw.score_weights)
+    // 찍은 지점의 안전점수: db/merge_to_public.sql 8 단계와 같은 계산 (직선거리, 기준은 raw.score_weights)
+    // 주의: 지금 캠핑장 점수(camp.safety_score)는 score/SafetyScoreService 가 카카오 차 시간 + ScoreRules 로 계산해 기준이 다르다
+    // 차박 자리 일정의 출발 준비 체크리스트(mycamping/ChecklistLookup)도 이 메서드를 부른다
     //   점수 = Σ(가중치 × 부분점수) ÷ Σ(데이터가 있는 종류의 가중치) × 100
     public ChabakScoreResponse score(Double lat, Double lng) {
         checkPosition(lat, lng);
@@ -117,7 +119,7 @@ public class ChabakService {
                 });
                 return toItems(spots);
             });
-            // 등록 야영장: camp.safety_score 그대로 (같은 계산으로 merge 가 넣어 둔 값)
+            // 등록 야영장: camp.safety_score 그대로 (카카오 차 시간 기준 — 후보지 점수와 기준이 달라 한 목록에서 비교할 때 주의)
             case "camp" -> toItems(chabakMapper.findCamps());
             default -> throw new InvalidRequestException("레이어 종류(type)는 no · caution · open · camp 중 하나입니다.");
         };
