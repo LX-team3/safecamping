@@ -22,7 +22,8 @@ public record CampDetailResponse(
         String reservationUrl,
         boolean dummy,
         List<Facility> facilities,
-        List<PlaceInfo> infos) {
+        List<PlaceInfo> infos,
+        int erBonus) {        // 진단 유형 가산점 0~5 (ScoreRules.erBonus). 화면이 진단 답에 따라 "71 +5" 로 따로 보여 준다
 
     // tone: safe(초록) / caution(주황) — DriveTone 참고
     public record Facility(Long id, String type, String name, double lat, double lng,

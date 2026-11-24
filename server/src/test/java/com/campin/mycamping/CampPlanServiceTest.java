@@ -25,6 +25,8 @@ class CampPlanServiceTest {
     private static final LocalDate TODAY = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
     private final List<CampPlan> table = new ArrayList<>();
+    private final FakeCampReviewMapper reviews = new FakeCampReviewMapper();
+    private final FakeReviewPhotoStore photoStore = new FakeReviewPhotoStore();
     private CampPlanService service;
 
     @BeforeEach
@@ -50,6 +52,7 @@ class CampPlanServiceTest {
                 return table.stream().filter(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId))
                         .findFirst().orElse(null);
             }
+            @Override public CampPlan findVisible(Long memberId, Long planId) { return findById(memberId, planId); }  // 이 테스트에서는 가족 없음
             @Override public boolean exists(Long memberId, Long campId, LocalDate checkIn) {
                 return table.stream().anyMatch(p -> p.getMemberId().equals(memberId)
                         && campId.equals(p.getCampId()) && p.getCheckIn().equals(checkIn));
@@ -63,23 +66,29 @@ class CampPlanServiceTest {
                 table.add(plan);
                 return 1;
             }
+            @Override public int update(CampPlan plan) {
+                // 서비스가 표에 있는 같은 객체를 고쳐서 넘기므로 따로 바꿀 것이 없다 (남의 일정이면 0줄)
+                return table.stream().anyMatch(p -> p.getId().equals(plan.getId()) && p.getMemberId().equals(plan.getMemberId())) ? 1 : 0;
+            }
             @Override public int delete(Long memberId, Long planId) {
-                return table.removeIf(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId)) ? 1 : 0;
+                boolean removed = table.removeIf(p -> p.getId().equals(planId) && p.getMemberId().equals(memberId));
+                if (removed) reviews.cascadeDeletePlan(planId);  // DB 의 ON DELETE CASCADE 흉내
+                return removed ? 1 : 0;
             }
         };
-        service = new CampPlanService(fakeMembers, fakePlans);
+        service = new CampPlanService(fakeMembers, fakePlans, reviews, photoStore);
     }
 
     // 오늘에서 며칠 뒤 체크인, nights 박
     private static CampPlanRequest plan(long campId, int daysLater, int nights) {
         LocalDate in = TODAY.plusDays(daysLater);
-        return new CampPlanRequest(campId, " 설하캠핑장 ", "강원 인제군 북면", null, null, in, in.plusDays(nights), "  ");
+        return new CampPlanRequest(campId, " 설하캠핑장 ", "강원 인제군 북면", null, null, in, in.plusDays(nights), "  ", null);
     }
 
     // 캠핑장이 아닌 자리 (차박 후보지 · 찍은 자리): campId 없이 좌표
     private static CampPlanRequest spot(Double lat, Double lng, int daysLater) {
         LocalDate in = TODAY.plusDays(daysLater);
-        return new CampPlanRequest(null, "475-3 잡종지", "강원 인제군", lat, lng, in, in.plusDays(1), null);
+        return new CampPlanRequest(null, "475-3 잡종지", "강원 인제군", lat, lng, in, in.plusDays(1), null, null);
     }
 
     @Test
@@ -151,5 +160,59 @@ class CampPlanServiceTest {
 
         service.delete("camper01", id);
         assertTrue(service.findAll("camper01").isEmpty());
+    }
+
+    @Test
+    void 일정을_지우면_후기_사진_파일도_지운다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        CampReview r = new CampReview();
+        r.setPlanId(id);
+        r.setMemberId(1L);
+        reviews.insert(r);
+        CampReviewPhoto photo = new CampReviewPhoto();
+        photo.setReviewId(r.getId());
+        photo.setFileName("a.jpg");
+        photo.setSortOrder(0);
+        reviews.insertPhoto(photo);
+        photoStore.files.put("a.jpg", new byte[] {1});
+
+        assertThrows(NotFoundException.class, () -> service.delete("camper02", id));
+        assertTrue(photoStore.files.containsKey("a.jpg"));  // 남의 요청으로는 파일도 그대로
+
+        service.delete("camper01", id);
+        assertTrue(photoStore.files.isEmpty());
+        assertTrue(reviews.reviews.isEmpty());
+    }
+
+    // 예약 정보 확인 화면에서 고치기: 날짜 · 메모(인원 · 동행 · 이동 수단)만 바뀐다
+    @Test
+    void 고치면_날짜와_메모가_바뀐다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        LocalDate in = TODAY.plusDays(6);
+        CampPlanResponse r = service.update("camper01", id, new CampPlanUpdateRequest(in, in.plusDays(3), " 성인 2명 · 어린이 0명 · 친구·연인 · 자동차 "));
+
+        assertEquals(in, r.checkIn());
+        assertEquals("성인 2명 · 어린이 0명 · 친구·연인 · 자동차", r.memo());
+        assertEquals(1L, r.campId());   // 캠핑장은 그대로
+        assertEquals(1, service.findAll("camper01").size());   // 새로 생기지 않는다
+    }
+
+    @Test
+    void 고칠_때도_날짜_규칙과_중복을_본다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        service.add("camper01", plan(1L, 10, 1));
+        LocalDate d5 = TODAY.plusDays(5), d10 = TODAY.plusDays(10), past = TODAY.minusDays(1);
+
+        assertThrows(InvalidRequestException.class, () -> service.update("camper01", id, new CampPlanUpdateRequest(d5, d5, null)));         // 체크아웃 = 체크인
+        assertThrows(InvalidRequestException.class, () -> service.update("camper01", id, new CampPlanUpdateRequest(past, d5, null)));       // 지난 날짜로 옮기기
+        assertThrows(InvalidRequestException.class, () -> service.update("camper01", id, new CampPlanUpdateRequest(d10, d10.plusDays(1), null)));  // 같은 캠핑장 · 같은 체크인
+        service.update("camper01", id, new CampPlanUpdateRequest(d5, d5.plusDays(2), "메모만"));   // 체크인 그대로면 중복 검사 안 함
+    }
+
+    @Test
+    void 남의_일정은_고칠_수_없다() {
+        Long id = service.add("camper01", plan(1L, 5, 1)).id();
+        LocalDate in = TODAY.plusDays(5);
+        assertThrows(NotFoundException.class, () -> service.update("camper02", id, new CampPlanUpdateRequest(in, in.plusDays(1), null)));
     }
 }

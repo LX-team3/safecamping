@@ -22,6 +22,9 @@ const ICONS = {
   // 약국: 알약 (Lucide pill)
   pharmacy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>',
 
+  // 차박 후보지(차박 지도에서 지도를 확대했을 때): 자동차 (Lucide car, 다른 시설 아이콘과 같은 계열·같은 선 굵기)
+  car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>',
+
   // 캠핑장(탐색 지도 마커 · 경로 지도 출발지): 채운 텐트 (Phosphor tent fill) — 마커 안 17px 흰 그림이라 채운 모양이 또렷함. 시설은 아니지만 같은 배지 모양을 쓰려고 여기에 둔다
   camp: '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M255.31,188.75l-64-144A8,8,0,0,0,184,40H72a8,8,0,0,0-7.31,4.75h0l0,.12v0L.69,188.75A8,8,0,0,0,8,200H248a8,8,0,0,0,7.31-11.25ZM64,184H20.31L64,85.7Zm16,0V85.7L123.69,184Z"/></svg>',
 }

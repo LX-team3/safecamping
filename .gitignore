@@ -4,6 +4,8 @@
 application-local.properties
 .env
 .env.local
+# Firebase 서비스 계정 키 (서버 발송용). 프로젝트 폴더 밖에 두는 것이 원칙이고, 실수로 넣었을 때를 막는다
+*firebase-adminsdk*.json
 
 # ===========================
 # Eclipse 워크스페이스
@@ -59,3 +61,8 @@ Thumbs.db
 db/chabak_pipeline/*.dump
 db/chabak_pipeline/*.sql
 db/chabak_pipeline/__pycache__/
+
+# ===========================
+# 후기 사진 등 업로드 파일 (서버 폴더, 환경변수 CAMPIN_UPLOAD_DIR 로 바꿀 수 있음)
+# ===========================
+uploads/

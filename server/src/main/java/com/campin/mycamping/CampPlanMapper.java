@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 // camp_plan 테이블 SQL. 테이블 정의는 db/schema.sql
 // 모든 SQL 에 member_id 조건을 붙인다 → 남의 등록 id 를 보내도 보이지도 지워지지도 않는다
@@ -34,6 +35,21 @@ public interface CampPlanMapper {
             """)
     CampPlan findById(@Param("memberId") Long memberId, @Param("planId") Long planId);
 
+    // 볼 수 있는 일정 하나: 내 것이거나, 같은 가족방 사람의 것 (출발 준비 체크리스트를 가족끼리 같이 본다)
+    // 그 밖이면 null → 없는 것처럼 404. 고치기·지우기·후기는 위 findById(내 것만)를 쓴다
+    @Select("""
+            SELECT cp.id, cp.member_id AS memberId, cp.camp_id AS campId, cp.camp_name AS campName, cp.place, cp.lat, cp.lng,
+                   cp.check_in AS checkIn, cp.check_out AS checkOut, cp.memo
+              FROM camp_plan cp
+             WHERE cp.id = #{planId}
+               AND (cp.member_id = #{memberId}
+                    OR cp.member_id IN (SELECT other.member_id
+                                          FROM family_member me
+                                          JOIN family_member other ON other.family_room_id = me.family_room_id
+                                         WHERE me.member_id = #{memberId}))
+            """)
+    CampPlan findVisible(@Param("memberId") Long memberId, @Param("planId") Long planId);
+
     @Select("""
             SELECT EXISTS (SELECT 1 FROM camp_plan
                             WHERE member_id = #{memberId} AND camp_id = #{campId} AND check_in = #{checkIn})
@@ -56,6 +72,14 @@ public interface CampPlanMapper {
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     int insert(CampPlan plan);
+
+    // 날짜 · 메모만 고친다 (member_id 조건으로 남의 일정은 0줄)
+    @Update("""
+            UPDATE camp_plan
+               SET check_in = #{checkIn}, check_out = #{checkOut}, memo = #{memo}
+             WHERE id = #{id} AND member_id = #{memberId}
+            """)
+    int update(CampPlan plan);
 
     @Delete("DELETE FROM camp_plan WHERE id = #{planId} AND member_id = #{memberId}")
     int delete(@Param("memberId") Long memberId, @Param("planId") Long planId);

@@ -4,6 +4,10 @@
 거북이 캐릭터로 캠핑장을 돌아다니며 위험 지점을 찾아 퀴즈를 풀어요. 시작할 때 아이·어른을 고르고, 문제는 하나씩 무작위로 나타나요 (제한 시간 없음, 나가기 버튼으로 끝냄).
 팀 프로젝트 "캠핀(CAMPIN)"의 메타버스 파트예요.
 
+> **2026-11-22부터 게임 코드는 client 안에 있어요.** 이 `metaverse/` 폴더에는 QGIS 원본(`gis/`)과 문서(`docs/`, 이 파일)만 남았어요.
+> - 3D 코드: `client/src/metaverse/` · 화면: `client/src/views/metaverse/MetaverseView.vue` · 데이터: `client/public/metaverse/data/`
+> - 주소: client의 `/metaverse` (라우트는 `client/src/router/index.js`)
+
 ## 먼저 읽을 것
 
 - **docs/작업기록.md**: Claude 채팅에서 지금까지 진행한 내용, 결정 사항, 해결한 문제, 남은 할 일이 정리돼 있어요. 새 작업 전에 꼭 읽어 주세요.
@@ -17,18 +21,22 @@
 - 파일을 고칠 때는 필요한 부분만 고치고, 관계없는 코드는 건드리지 마세요.
 - 새 기능은 가능하면 **QGIS 데이터(type 값)로 조절**할 수 있게 만들어 주세요. 코드에 좌표를 직접 적지 않아요.
 - `gis/camp.gpkg`, `gis/camp.qgz`는 원본 데이터예요. **절대 지우거나 덮어쓰지 마세요.**
-- 바꾼 뒤에는 `npm run dev`로 확인할 수 있게 해 주세요.
+- 바꾼 뒤에는 client에서 `npm run dev`로 확인할 수 있게 해 주세요.
 
 ## 실행 방법
 
 ```bash
-npm install        # 처음 한 번
+cd client
+npm install        # 처음 한 번 (three.js도 client에 들어 있어요)
 npm run dev        # http://localhost:5173/metaverse
 ```
 
+- 퀴즈 40문제는 `client/public/metaverse/data/missions.json`에서 읽어요. DB와 서버(Spring)는 쓰지 않아서 서버가 꺼져 있어도 게임이 돼요.
+- 데이터 파일은 `` `${import.meta.env.BASE_URL}metaverse/data/...` ``로 불러요. `http://localhost:...` 같은 주소나 새 창(`target="_blank"`)은 쓰지 않아요 (나중에 앱 안에서 안 열려요).
+
 ## 기술 구성
 
-- **Vue 3 + Vite** (`src/`), 3D는 **three.js** (`src/metaverse/`)
+- **Vue 3 + Vite** (client와 같은 프로젝트), 3D는 **three.js** (`client/src/metaverse/`)
 - 팀 아키텍처: Vue(Firebase Hosting) → Spring Boot(Cloud Run) → PostgreSQL(Cloud SQL, PostGIS)
 - 좌표계: 모든 공간 데이터는 **EPSG:5179** (KGD2002 / Unified CS)
 - 3D 좌표 변환: `x = X - 중심X`, `z = -(Y - 중심Y)` (중심은 terrain.asc 범위의 가운데, 북쪽 = -z)
@@ -36,8 +44,8 @@ npm run dev        # http://localhost:5173/metaverse
 ## 폴더 구조
 
 ```
-src/
-  views/MetaverseView.vue   화면(UI): 시작 화면(아이·어른 고르기), 위쪽 정보줄, 퀴즈 창, 침수 미션 알림, 끝 화면
+client/src/
+  views/metaverse/MetaverseView.vue   화면(UI): 시작 화면(아이·어른 고르기), 위쪽 정보줄, 퀴즈 창, 미니게임 안내, 터치 조이스틱·버튼, 침수 미션 알림, 끝 화면
   metaverse/
     scene.js                총감독: 순서대로 불러오고 매 프레임 업데이트, 다시 하기(restart)
     terrain.js              DEM 지형, 캠핑장 평평하게 깎기, 강바닥 파기, heightAt(x, z)
@@ -57,8 +65,8 @@ src/
     props.js                퀴즈 소품: 문제 상황을 보여 주는 3D 물건(모닥불, 버너, 난로, 벌집 등 28가지). 맨 아래 PROPS 표에 이름이 있어요
     minigame.js             퀴즈 앞 미니게임 "마시멜로 굽기": 1인칭 화면, Space·클릭으로 뒤집기, 10초 뒤 퀴즈 (맨 위 설정값은 게임용 값)
     flood.js                돌발 미션 "비와 침수 대피": 비, 차오르는 물, 출구 고리, 성공·실패 판정 (맨 위 설정값은 게임용 값)
-public/data/                QGIS에서 내보낸 GeoJSON, terrain.asc, missions.json(퀴즈 40문제)
-gis/                        QGIS 원본 (camp.gpkg, camp.qgz) — 수정은 QGIS에서만
+client/public/metaverse/data/  QGIS에서 내보낸 GeoJSON, terrain.asc, missions.json(퀴즈 40문제)
+metaverse/gis/               QGIS 원본 (camp.gpkg, camp.qgz) — 수정은 QGIS에서만
 ```
 
 ## 터치 조작 (휴대폰·태블릿, 2026-11-23)
@@ -67,7 +75,7 @@ gis/                        QGIS 원본 (camp.gpkg, camp.qgz) — 수정은 QGIS
 - 화면(`MetaverseView.vue`)이 `game.setMove(x, y)`, `game.setRun(켜짐)`, `game.jump()`를 부르고, `player.js`가 키보드와 같은 방식으로 움직여요.
 - 퀴즈·미니게임·대피 결과 창이 떠 있으면 조이스틱과 버튼은 숨겨져요. 마시멜로 굽기는 화면 아무 곳이나 터치하면 뒤집혀요.
 
-## QGIS 레이어 (camp.gpkg → public/data/*.geojson)
+## QGIS 레이어 (camp.gpkg → client/public/metaverse/data/*.geojson)
 
 | 레이어 | 도형 | 주요 필드 / type 값 |
 |---|---|---|
@@ -86,11 +94,11 @@ gis/                        QGIS 원본 (camp.gpkg, camp.qgz) — 수정은 QGIS
 
 GeoJSON 내보내기 설정: EPSG:5179, COORDINATE_PRECISION 1, RFC7946 NO, 같은 이름이면 **파일 덮어쓰기**.
 
-**한 번에 내보내기**: QGIS 파이썬 콘솔(Ctrl+Alt+P) 편집기에서 `gis/export_geojson.py`를 열고 ▶ 실행하면 camp.gpkg의 모든 레이어가 위 설정으로 `public/data/`에 내보내져요. (gpkg는 읽기만 해요. 레이어를 먼저 저장해야 해요)
+**한 번에 내보내기**: QGIS 파이썬 콘솔(Ctrl+Alt+P) 편집기에서 `gis/export_geojson.py`를 열고 ▶ 실행하면 camp.gpkg의 모든 레이어가 위 설정으로 `client/public/metaverse/data/`에 내보내져요. (gpkg는 읽기만 해요. 레이어를 먼저 저장해야 해요)
 
 ## 퀴즈
 
-- 40문제: 아이(child)·어른(adult) × 낮(day)·밤(night) 각 10문제. `public/data/missions.json`에만 있어요 (DB는 쓰지 않기로 함, 2026-11-19).
+- 40문제: 아이(child)·어른(adult) × 낮(day)·밤(night) 각 10문제. `client/public/metaverse/data/missions.json`에만 있어요 (DB는 쓰지 않기로 함, 2026-11-19).
 - 문제 필드: `audience`, `time`, `place`(장소 종류), `anchor`(임시 위치), `prop`(소품 이름), 그 밖에 제목·상황·질문·보기 4개·정답 번호·해설.
 - 소품(2026-11-23): 문제 자리에 그 상황을 보여 주는 3D 소품이 서요. 문제의 `prop` 값이 `props.js`의 PROPS 표에 있는 이름이면 그 소품이 나오고, `prop`이 없는 문제(주차장·도로·분수 3문제)는 고리만 떠요. 문제 자리가 데크 한가운데면 데크의 텐트·테이블 옆 빈자리에 맞춰 놓고, 밤에는 불·랜턴이 주변을 비춰요. 크기는 잘 보이게 실제보다 조금 크게 만든 게임용 크기예요.
 - 미니게임(2026-11-23): 문제에 `"minigame": "marshmallow"`가 있으면 고리에 닿았을 때 퀴즈보다 먼저 "마시멜로 굽기"가 열려요 (지금은 `c-d-burn` 하나). 1인칭으로 그릴을 보며 Space·클릭으로 뒤집고, 10초 뒤 "앗 뜨거!" 글자가 나온 다음 퀴즈가 떠요. 빼려면 `missions.json`의 그 한 줄만 지우면 돼요.

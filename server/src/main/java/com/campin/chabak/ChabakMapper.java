@@ -16,7 +16,8 @@ public interface ChabakMapper {
     String findVerdict(@Param("lat") double lat, @Param("lng") double lng);
 
     // 찍은 지점의 안전점수 재료: 종류마다 가장 가까운 시설까지 직선거리 + 부분점수
-    // 캠핑장 안전점수와 똑같은 계산 (db/merge_to_public.sql 8 단계) — 기준값은 팀이 넣은 raw.score_weights 그대로
+    // db/merge_to_public.sql 8 단계와 같은 계산 — 기준값은 팀이 넣은 raw.score_weights 그대로
+    // (지금 캠핑장 점수 camp.safety_score 는 score/SafetyScoreService 가 카카오 차 시간 + ScoreRules 로 다시 계산해서 이 계산과 다르다)
     //  - 쓰는 시설: 운영 중(is_active)이고 좌표가 있는 것, CCTV 는 방범용(role='safety')만
     //  - 데이터가 하나도 없는 종류는 빼고 계산 (점수 = 받은 가중치 합 ÷ 있는 종류 가중치 합)
     //  - 거리: 지구를 공으로 본 직선거리(하버사인, m) — merge 의 pg_temp.dist_m 과 같은 식
@@ -50,7 +51,7 @@ public interface ChabakMapper {
     List<ChabakScoreRow> findScoreParts(@Param("lat") double lat, @Param("lng") double lng);
 
     // 근처 등록 야영장 이름 → camp.id (판정 결과에는 이름만 있어서 캠핑장 상세로 가려면 id 가 필요)
-    // chabak.campsite 는 public.camp 이름 그대로 채운 것이라 이름으로 맞춘다 (06_shared_db_after_restore.sql)
+    // chabak.campsite 는 public.camp 이름 그대로 채운 것이라 이름으로 맞춘다 (채우는 절차: db/chabak_pipeline/README.md "공용 DB 반영" 5단계)
     @Select("""
             <script>
             SELECT id, name FROM camp WHERE name IN

@@ -2,10 +2,10 @@
 // 판정 4단계는 서버 GET /api/chabak/verdict 의 verdict 값 그대로 (server/CLAUDE.md)
 // 색은 styles/tokens.css 의 --color-verdict-* 변수 (화면은 var(), 카카오 지도는 verdictColor() 로 읽음)
 export const VERDICT = {
-  불가: { colorVar: '--color-verdict-no', title: '차박할 수 없는 곳이에요' },
-  주의: { colorVar: '--color-verdict-caution', title: '확인이 필요한 곳이에요' },
-  '제한 없음': { colorVar: '--color-verdict-open', title: '공공데이터상 제한이 없는 곳이에요' },
-  '야영 가능': { colorVar: '--color-verdict-camp', title: '등록된 야영장이에요' },
+  불가: { colorVar: '--color-verdict-no', title: '차박 불가' },
+  주의: { colorVar: '--color-verdict-caution', title: '확인 필요' },
+  '제한 없음': { colorVar: '--color-verdict-open', title: '공공데이터상 제한 없음' },
+  '야영 가능': { colorVar: '--color-verdict-camp', title: '등록된 야영장' },
 }
 
 // 카카오 지도 다각형은 CSS 변수를 못 읽어서, 변수에 들어 있는 실제 색 값을 꺼내 준다
@@ -15,7 +15,7 @@ export function verdictColor(verdict) {
 }
 
 // 차박 지도 레이어 — 서버 GET /api/chabak/layer?type=, "차박지 필터" 시트에서 켜고 끈다
-//  - section 'go'   갈 수 있는 곳 (점): 처음부터 켬 (on: true). "주변 안전" 필터가 적용됨
+//  - section 'go'   갈 수 있는 곳 (점): 처음부터 켬 (on: true). "안전점수" 필터가 적용됨
 //  - section 'avoid' 피해야 할 곳 (면, zone): 처음엔 꺼 둠 — 켜면 지도가 빨갛게 덮여 갈 수 있는 곳이 안 보여서
 //    구역 이름에 "구역"을 붙인 이유: 판정 단계 전체가 아니라 데이터로 보여 줄 수 있는 구역만 보이기 때문
 //    (예: 주의 구역을 켜도 사유지·급경사 같은 필지별 주의는 안 나온다 → 정확한 판정은 지도를 눌러서)
@@ -31,12 +31,12 @@ export const LAYER_CHIPS = [
     note: '하천 · 산림보호구역 등 · 사유지 · 급경사는 지도를 눌러야 보여요' },
 ]
 
-// "주변 안전" 필터 (차박 후보지 · 등록 야영장의 안전점수로 거름). 기준은 캠핑장 등급과 같음 (안전 70↑ · 주의 40↑)
+// "안전점수" 필터 (차박 후보지 · 등록 야영장의 안전점수로 거름). 기준은 캠핑장 등급과 같음 (안전 70↑ · 주의 40↑)
 // min 이 있으면 점수가 그 이상인 곳만 (점수가 없는 곳은 '전체'에서만 보임)
 export const SAFETY_FILTERS = [
-  { key: 'all', label: '전체', min: null },
-  { key: 'caution', label: '주의 이상', min: 40 },
-  { key: 'safe', label: '안전만', min: 70 },
+  { key: 'all', label: '전체', min: null, colorVar: null },
+  { key: 'caution', label: '위험 제외', min: 40, colorVar: '--color-caution' }, // 주의 + 안전 (점수 40 이상). 점 색 = 주의 주황
+  { key: 'safe', label: '안전만', min: 70, colorVar: '--color-green' }, // 점 색 = 안전 초록 (캠핑장 등급 배지와 같은 색)
 ]
 
 // 안전점수 (캠핑장 안전점수와 같은 등급·이름) — 서버 GET /api/chabak/score

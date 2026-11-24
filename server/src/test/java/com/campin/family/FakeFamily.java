@@ -40,12 +40,18 @@ final class FakeFamily {
             @Override public int insertRoom(FamilyRoom room) { return 0; }
             @Override public int insertMember(Long roomId, Long memberId) { return 0; }
             @Override public int deleteMember(Long memberId) { return 0; }
+            @Override public int deleteLocation(Long memberId) { return 0; }
             @Override public int deleteRoomIfEmpty(Long roomId) { return 0; }
             @Override public List<MeetingPlace> findPlaces(Long roomId) { return List.of(); }
             @Override public int insertPlace(MeetingPlace place) { return 0; }
             @Override public int deletePlace(Long roomId, Long placeId) { return 0; }
         };
         return new FamilyService(familyMapper, memberMapper);
+    }
+
+    // 회원 번호로 이름 찾기 (위치 테스트에서 새 줄을 만들 때 이름을 채우려고)
+    static String nameOf(Long memberId) {
+        return MEMBERS.values().stream().filter(m -> m.getId().equals(memberId)).findFirst().map(Member::getName).orElse(null);
     }
 
     private static Member member(Long id, String loginId, String name) {

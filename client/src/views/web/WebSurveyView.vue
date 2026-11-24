@@ -1,0 +1,1285 @@
+<script setup>
+// 웹 1분 진단 (설계 2-1 설문 · 2-2 결과표): 헤더·하단이 없는 한 화면. 질문 8개에 답하면 결과표가 같은 주소에서 바뀐다
+// 질문·유형·점수 계산은 utils/webSurvey.js (설계서 그대로). 추천 캠핑장은 실제 캠핑장 안전점수 순
+import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
+import WebIllust from '@/components/web/WebIllust.vue'
+import { api } from '@/utils/api'
+import { useAuthStore } from '@/stores/auth'
+import { useSurveyStore } from '@/stores/survey'
+import { ALLQ, KID_OPTS, PARTS, answeredCount, computeResult, emptyAnswers, isReady, loadSavedResult, pickAnswer, saveResult, campTypeOf, needsErBonus } from '@/utils/webSurvey'
+import '@/styles/tokens-web.css'
+
+const auth = useAuthStore()
+const survey = useSurveyStore() // 앱과 같은 진단 저장소 → 지도(웹·앱 탐색)의 "내 유형 점수"가 이 답을 읽는다
+const step = ref('survey') // survey | result
+const A = ref(emptyAnswers())
+const tab = ref('recs') // recs | rules | check
+const toast = ref('')
+let toastTimer = null
+
+const answered = computed(() => answeredCount(A.value))
+const ready = computed(() => isReady(A.value))
+const pick = (k, v) => (A.value = pickAnswer(A.value, k, v))
+const isOn = (q, code) => (q.multi ? A.value[q.k].includes(code) : A.value[q.k] === code)
+const qNo = (q) => ALLQ.indexOf(q) + 1
+const showKid = (q) => q.k === 'who' && A.value.who.includes('child')
+
+// ---- 결과 ----
+const r = ref(null)
+const camps = ref([]) // 추천 캠핑장 (실제 데이터)
+const campsLoaded = ref(false) // 받아 오기를 끝냈는지 (결과가 0곳이어도 "불러오는 중"으로 남지 않게)
+const more = ref(false)
+const openRule = ref(null)
+const checked = ref({})
+
+async function submit() {
+  if (!ready.value) return
+  r.value = computeResult(A.value)
+  survey.save(A.value, auth.isLoggedIn) // 로그인했으면 이 브라우저에 사용자별로, 아니면 이 탭에만 (stores/survey.js)
+  openRule.value = r.value.rules[0]?.ax ?? null
+  checked.value = {}
+  tab.value = 'recs'
+  step.value = 'result'
+  window.scrollTo(0, 0)
+  loadCamps(campTypeOf(A.value))
+}
+function restart() {
+  camps.value = [] // 다시 진단하면 새 답으로 추천을 다시 받는다
+  campsLoaded.value = false
+  more.value = false
+  // 고른 답은 지우지 않는다: 다시 진단해도 이전 선택이 그대로 남아 있어 바꿀 것만 고치면 된다
+  r.value = null
+  step.value = 'survey'
+  window.scrollTo(0, 0)
+}
+
+// 추천 캠핑장: "어디서 주무세요?" 답에 맞는 유형(campType)만 거르고, 안전점수 높은 순 5곳 + 그 캠핑장의 가까운 시설 시간 (상세 API)
+// 내 유형 점수(응급실 가산점, 지도와 같은 규칙)를 켜 뒀고 해당 답(아이·어르신·차박·겨울·걸어서)이 있으면
+//   가산점을 더한 점수 순(sort=bonus)으로 고르고, 점수도 더한 값으로 보여 준다 (지도 · 캠핑장 상세와 같은 숫자)
+async function loadCamps(campType) {
+  if (campsLoaded.value) return
+  const useBonus = needsErBonus(A.value) && survey.bonusOn
+  try {
+    const list = await api('/api/camps', { params: { sort: useBonus ? 'bonus' : 'score', ...(campType ? { campType } : {}) } })
+    const top = list
+      .filter((c) => c.safetyScore != null)
+      .slice(0, 5)
+      .map((c) => (useBonus && c.erBonus ? { ...c, safetyScore: Math.min(100, c.safetyScore + c.erBonus) } : c))
+    camps.value = await Promise.all(top.map(async (c) => {
+      try {
+        const d = await api(`/api/camps/${c.id}`)
+        const min = (type) => d.facilities.filter((f) => f.type === type).reduce((m, f) => Math.min(m, f.driveMin), Infinity)
+        const t = (v) => (Number.isFinite(v) ? v : null)
+        return { ...c, headline: d.headline, fire: t(min('fire')), er: t(min('er')), police: t(min('police')) }
+      } catch {
+        return { ...c } // 상세를 못 받아도 카드는 보인다
+      }
+    }))
+  } catch {
+    camps.value = []
+  }
+  campsLoaded.value = true
+}
+const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
+// 캐릭터 그림을 못 불러오면 이모지 글자로 대신 (다시 진단하면 다시 시도)
+const imgFailed = ref(false)
+// 캐릭터 누르기: 다음 팁으로 (마지막 다음은 처음), 젤리처럼 눌렸다 출렁
+const tipIdx = ref(0)
+const tapped = ref(false) // 한 번이라도 눌렀으면 "캐릭터를 눌러 보세요" 안내를 숨긴다
+const jumping = ref(false)
+function nextTip() {
+  tapped.value = true
+  tipIdx.value = (tipIdx.value + 1) % r.value.type.tips.length
+  jumping.value = false
+  requestAnimationFrame(() => (jumping.value = true)) // 연달아 눌러도 매번 다시 튀게
+}
+const onFaceAnimEnd = (e) => { if (e.animationName.includes('char-jump')) jumping.value = false }
+watch(r, () => {
+  imgFailed.value = false
+  tipIdx.value = 0
+  tapped.value = false
+})
+// 추천 기준 한 줄 (실제로 고른 방식 그대로): 내 유형 점수(응급실 가산점)를 썼으면 그걸 포함한 순
+const recWhy = computed(() =>
+  needsErBonus(A.value) && survey.bonusOn ? '안전점수(내 유형 점수 포함)가 높은 순으로 골랐어요' : '안전점수가 높은 순으로 골랐어요',
+)
+const shownCamps = computed(() => camps.value.slice(0, more.value ? 5 : 3))
+
+// ---- 체크리스트 ----
+const toggleCheck = (id) => (checked.value = { ...checked.value, [id]: !checked.value[id] })
+const checkTotal = computed(() => (r.value ? r.value.checks.length + r.value.know.length : 0))
+const checkDone = computed(() => (r.value ? [...r.value.checks, ...r.value.know].filter((c) => checked.value[c.id]).length : 0))
+
+// ---- 결과 저장 · 알림 ----
+function say(m) {
+  toast.value = m
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toast.value = ''), 2600)
+}
+function save() {
+  if (!auth.isLoggedIn) return say('로그인하면 결과를 저장할 수 있어요')
+  say(saveResult(auth.member.id, A.value, r.value) ? '결과를 저장했어요 (이 브라우저에 저장돼요)' : '저장하지 못했어요')
+}
+const hadSaved = computed(() => auth.isLoggedIn && !!loadSavedResult(auth.member.id))
+const TABS = [['recs', '캠핑장 고르기'], ['rules', '조심할 것'], ['check', '대비할 것']]
+// 대비할 것: 내 유형에 특히 중요한 항목(must)을 위로 올린다 (같은 무리 안에서는 원래 순서 유지)
+const mustFirst = (list) => [...list.filter((c) => c.must), ...list.filter((c) => !c.must)]
+</script>
+
+<template>
+  <div class="survey">
+    <!-- ===== 설문 ===== -->
+    <template v-if="step === 'survey'">
+      <div class="top">
+        <div class="head">
+          <span class="pill">1분 안전 진단</span>
+          <h1>나의 캠핑 안전 유형 알아보기</h1>
+          <p>{{ ALLQ.length }}문항 · 약 1분이면 내가 놓치기 쉬운 안전과 맞는 캠핑장을 알려 드려요</p>
+          <p v-if="hadSaved" class="again">저장한 결과가 있어요 · 다시 진단하면 새 결과로 바뀌어요</p>
+        </div>
+        <WebIllust />
+      </div>
+      <div class="body">
+        <div class="wrap">
+          <div class="progress">
+            <div class="prow"><span>{{ answered }} / {{ ALLQ.length }} 답했어요</span><span>약 1분</span></div>
+            <div class="track"><i :style="{ width: (answered / ALLQ.length) * 100 + '%' }"></i></div>
+          </div>
+          <div class="parts">
+            <section v-for="p in PARTS" :key="p.title" class="part">
+              <h2>{{ p.title }}</h2>
+              <p class="pdesc"><span v-if="p.feature" class="chip" :class="p.chip">{{ p.feature }}</span>{{ p.desc }}</p>
+              <div class="qs" :class="{ two: p.qs.every((q) => !q.quiz) }">
+                <div v-for="q in p.qs" :key="q.k" class="q">
+                  <div class="qt"><span class="no">{{ qNo(q) }}</span>{{ q.t }}<small v-if="q.h">{{ q.h }}</small></div>
+                  <div class="opts" :class="{ quiz: q.quiz }">
+                    <button v-for="o in q.o" :key="o[0]" type="button" class="opt" :class="{ on: isOn(q, o[0]) }" :aria-pressed="isOn(q, o[0])"
+                      @click="pick(q.k, o[0])">{{ o[1] }}<small v-if="!q.quiz && o[2]">{{ o[2] }}</small></button>
+                  </div>
+                  <div v-if="showKid(q)" class="kid">
+                    <b>가장 어린 아이는 몇 살이에요?</b>
+                    <div class="kopts">
+                      <button v-for="o in KID_OPTS" :key="o[0]" type="button" class="kopt" :class="{ on: A.kid === o[0] }" :aria-pressed="A.kid === o[0]" @click="pick('kid', o[0])">{{ o[1] }}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <button type="button" class="submit" :disabled="!ready" @click="submit">{{ ready ? '나의 안전 유형 보기' : '모든 질문에 답해 주세요' }}</button>
+            <RouterLink to="/web" class="later">나중에 할게요</RouterLink>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ===== 결과표 ===== -->
+    <template v-else-if="r">
+      <div class="top">
+        <div class="head">
+          <span class="pill">1분 진단 결과</span>
+          <h1>나의 캠핑 안전 유형</h1>
+          <!-- 유형 = 조심할 것 1위 분야의 캐릭터 (utils/webSurvey.js 의 CHARACTERS) -->
+          <p class="res"><b :class="`c-${r.type.color}`">{{ r.type.ax }}</b>를 가장 조심해야 하는 <b>‘{{ r.type.nick }}’</b> 유형이에요</p>
+        </div>
+        <WebIllust />
+      </div>
+      <div class="body">
+        <div class="rwrap">
+          <!-- 유형 카드 -->
+          <div class="tcard">
+            <!-- 시안 배치: 위쪽 양옆에 말풍선 두 개(왼쪽 = 성격, 오른쪽 = 지켜야 할 행동), 가운데 캐릭터, 그 아래 이름,
+                 오른쪽 아래에 ⚠ 주의 꼬리표와 해시태그. 좁은 화면에서는 세로로 쌓는다 -->
+            <div class="tinfo char">
+              <p class="bubble b-trait" :class="`tint-${r.type.color}`">{{ r.type.trait }}</p>
+              <!-- 캐릭터를 누르면: 젤리처럼 눌렸다 출렁 + 오른쪽 말풍선이 다음 안전 팁으로 바뀌며 다시 뿅 -->
+              <button type="button" class="face" :class="{ jump: jumping }" :aria-label="`${r.type.nick} 누르면 다음 안전 팁`"
+                @click="nextTip" @animationend="onFaceAnimEnd">
+                <img v-if="!imgFailed" :src="r.type.img" alt="" width="220" height="220" @error="imgFailed = true" />
+                <span v-else aria-hidden="true">{{ r.type.emoji }}</span>
+              </button>
+              <p :key="tipIdx" class="bubble b-act" :class="[`fill-${r.type.color}`, { again: tipIdx > 0 || tapped }]" aria-live="polite">{{ r.type.tips[tipIdx] }}</p>
+              <h2 class="cname" :class="`c-${r.type.color}`">{{ r.type.nick }}<small v-if="!tapped" class="tap-hint">캐릭터를 눌러 보세요</small></h2>
+              <div class="meta">
+                <span class="risk" :class="`bg-${r.type.color}`">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17h.01" /></svg>{{ r.type.risk }}
+                </span>
+                <div class="kws"><span v-for="k in r.keywords" :key="k">{{ k }}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 탭 -->
+          <div class="tabwrap">
+            <div class="tabs" role="tablist">
+              <button v-for="(t, i) in TABS" :key="t[0]" type="button" role="tab" :aria-selected="tab === t[0]" :class="{ on: tab === t[0] }" @click="tab = t[0]">
+                <span class="tn">{{ i + 1 }}</span>{{ t[1] }}
+              </button>
+            </div>
+
+            <!-- 조심할 것 -->
+            <section v-if="tab === 'rules'" class="panel">
+              <div class="ph"><h3>이것부터 조심해요</h3><span>내 답변에서 위험이 큰 순서예요</span></div>
+              <div v-for="ru in r.rules" :key="ru.ax" class="rule">
+                <button type="button" class="rbtn" :aria-expanded="openRule === ru.ax" @click="openRule = openRule === ru.ax ? null : ru.ax">
+                  <span class="emoji" aria-hidden="true">{{ ru.emoji }}</span>
+                  <span class="rt"><span class="rtitle">{{ ru.title }}</span><span class="rtag">{{ ru.tag }}</span></span>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+                    :style="{ transform: openRule === ru.ax ? 'rotate(180deg)' : 'none' }"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+                <p v-if="openRule === ru.ax" class="rbody">{{ ru.body }}</p>
+              </div>
+              <div class="call119">
+                <span class="emoji" aria-hidden="true">📞</span>
+                <span><b>위급하면 바로 119</b><span>캠핑장 이름 · 사이트 번호부터 말해요</span></span>
+              </div>
+            </section>
+
+            <!-- 대비할 것 -->
+            <section v-else-if="tab === 'check'" class="panel">
+              <div class="ph"><h3>이렇게 대비해요</h3><span>눌러서 체크해요 · {{ checkDone }}/{{ checkTotal }} 완료</span></div>
+              <!-- "꼭" 글자 대신 색으로 강조: 내 유형이 가장 조심할 분야(조심할 것 상위 2개)에 해당하는 항목 -->
+              <p class="must-legend"><i aria-hidden="true"></i>색이 칠해진 항목은 내 유형에 특히 중요해요</p>
+              <div class="cgrid">
+                <div class="cgroup">
+                  <b>출발 전에 챙겨요</b><span>내 유형에 필요한 용품이에요</span>
+                  <button v-for="c in mustFirst(r.checks)" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id], must: c.must }" @click="toggleCheck(c.id)">
+                    <span class="box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg></span>
+                    <span class="ct">{{ c.text }}<span v-if="c.must" class="sr-only"> (내 유형에 특히 중요)</span></span>
+                  </button>
+                </div>
+                <div class="cgroup">
+                  <b>미리 알아둬요</b><span>떠나기 전에 한 번 읽어 두세요</span>
+                  <button v-for="c in mustFirst(r.know)" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id], must: c.must }" @click="toggleCheck(c.id)">
+                    <span class="box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg></span>
+                    <span class="ct">{{ c.text }}<span v-if="c.must" class="sr-only"> (내 유형에 특히 중요)</span></span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- 캠핑장 고르기 -->
+            <section v-else class="panel">
+              <h3 class="rech">{{ recWhy }}</h3>
+              <p v-if="!campsLoaded" class="state">추천 캠핑장을 불러오는 중이에요...</p>
+              <p v-else-if="!camps.length" class="state">고른 방식에 맞는 캠핑장을 찾지 못했어요</p>
+              <RouterLink v-for="(c, i) in shownCamps" :key="c.id" :to="`/web/camps/${c.id}`" class="rec">
+                <span class="rphoto">
+                  <img v-if="c.imageUrl" :src="c.imageUrl" :alt="`${c.name} 전경`" />
+                  <span class="rrank">{{ i + 1 }}</span>
+                </span>
+                <span class="rinfo">
+                  <span class="rname"><b>{{ c.name }}</b><span>{{ [TYPE_LABEL[c.campType] || c.campType, c.eupmyeon].filter(Boolean).join(' · ') }}</span></span>
+                  <span v-if="c.headline" class="rreason">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>{{ c.headline }}
+                  </span>
+                  <span class="rchips">
+                    <span v-if="c.fire != null" class="c1">119 약 {{ c.fire }}분</span>
+                    <span v-if="c.er != null" class="c2">응급실 약 {{ c.er }}분</span>
+                    <span v-if="c.police != null" class="c3">파출소 약 {{ c.police }}분</span>
+                  </span>
+                </span>
+                <span class="rscore"><span>추천</span><b>{{ c.safetyScore }}<small>점</small></b></span>
+              </RouterLink>
+              <button v-if="camps.length > 3" type="button" class="morebtn" @click="more = !more">{{ more ? '접기' : `추천 캠핑장 ${camps.length - 3}곳 더보기` }}</button>
+            </section>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="save" @click="save">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>결과 저장
+            </button>
+            <RouterLink to="/web/explore" class="go">안전지도에서 확인하기
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </RouterLink>
+          </div>
+          <div class="links">
+            <button type="button" @click="restart">다시 진단하기</button>
+            <RouterLink to="/web">메인으로</RouterLink>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <div v-if="toast" class="toast" role="status">{{ toast }}</div>
+  </div>
+</template>
+
+<style scoped>
+.survey {
+  min-height: 100dvh;
+  background: var(--web-bg);
+  color: var(--web-text);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.top {
+  background: var(--web-bg);
+}
+.head {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 56px 20px 0;
+  text-align: center;
+}
+.pill {
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--web-best);
+  color: var(--web-green);
+}
+.head h1 {
+  margin: 8px 0 0;
+  font-size: 52px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -2px;
+}
+.head p {
+  margin: 14px auto 0;
+  font-size: 20px;
+  color: var(--web-text-sub);
+}
+.head p.res {
+  font-size: 21px;
+  color: var(--web-text-mid);
+}
+.head p.again {
+  font-size: 15px;
+  color: var(--web-green);
+}
+.top :deep(.art) {
+  padding-top: 24px;
+}
+.body {
+  border-top: 2px solid var(--web-green);
+  background: var(--web-bg-quiet);
+  min-height: 600px;
+}
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 18px 20px 0;
+}
+.progress {
+  padding: 10px 0;
+}
+.prow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--web-text-sub);
+}
+.track {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--web-track);
+  overflow: hidden;
+  margin-top: 6px;
+}
+.track i {
+  display: block;
+  height: 100%;
+  background: var(--web-green);
+  transition: width 0.2s ease;
+}
+.parts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 0 40px;
+}
+.part {
+  background: var(--web-bg);
+  border: 1px solid var(--web-border);
+  border-radius: 20px;
+  padding: 24px 30px 10px;
+}
+.part h2 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+.pdesc {
+  margin: 8px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--web-text-sub);
+}
+.chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.chip.map { background: var(--web-green); color: var(--web-white); }
+.chip.meta { background: var(--web-terracotta); color: var(--web-white); }
+.chip.flood { background: var(--web-sky); color: var(--web-text); }
+.qs {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 36px;
+}
+.qs.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.q {
+  padding: 14px 0 16px;
+  border-top: 1px solid var(--web-line-card);
+}
+.qs .q:first-child,
+.qs.two .q:nth-child(2) {
+  border-top: 0;
+}
+.qt {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+.qt small {
+  font-weight: 500;
+  color: var(--web-text-sub);
+  font-size: 12.5px;
+  margin-left: 6px;
+}
+.no {
+  color: var(--web-green);
+  margin-right: 6px;
+}
+.opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.opt {
+  padding: 10px 18px;
+  border: 1.5px solid var(--web-line-input);
+  border-radius: 999px;
+  background: var(--web-bg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  text-align: left;
+  color: var(--web-text);
+}
+.opt small {
+  color: var(--web-text-sub);
+  font-weight: 500;
+  font-size: 12px;
+  margin-left: 4px;
+}
+.opts.quiz .opt {
+  flex: 1 1 0;
+  min-height: 64px;
+  padding: 14px 18px;
+  border-radius: 14px;
+}
+.opt.on {
+  border-color: var(--web-green);
+  background: var(--web-best);
+  font-weight: 700;
+}
+.kid {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--web-best);
+}
+.kid b {
+  font-size: 15px;
+  color: var(--web-green);
+}
+.kopts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.kopt {
+  padding: 9px 14px;
+  border: 1.5px solid var(--web-line-input);
+  border-radius: 999px;
+  background: var(--web-bg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--web-text);
+}
+.kopt.on {
+  border-color: var(--web-green);
+  background: var(--web-best);
+  font-weight: 700;
+}
+.submit {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1.5px solid var(--web-green);
+  background: var(--web-green);
+  color: var(--web-white);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.later {
+  align-self: center;
+  color: var(--web-text-sub);
+  font-size: 14px;
+  text-decoration: underline;
+}
+
+/* ---- 결과 ---- */
+.rwrap {
+  word-break: keep-all; /* 결과 화면 전체(조심할 것 · 대비할 것 포함) 한글 낱말 중간 줄바꿈 방지 */
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.c-water { color: var(--web-water); }
+.c-fire { color: var(--web-terracotta); }
+.c-prep { color: var(--web-prep); }
+.c-report { color: var(--web-grade-danger); }
+.c-safe { color: var(--web-green); }
+.bg-water { background: var(--web-water); }
+.bg-fire { background: var(--web-terracotta); }
+.bg-prep { background: var(--web-prep); }
+.bg-report { background: var(--web-grade-danger); }
+.bg-safe { background: var(--web-green); }
+.tcard {
+  background: var(--web-bg);
+  border: 1px solid var(--web-border);
+  border-radius: 22px;
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  color: var(--web-white);
+  font-size: 15px;
+  font-weight: 800;
+}
+.tinfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.char {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    'trait face act'
+    '.     name meta';
+  align-items: start;
+  column-gap: 56px; /* 이름과 오른쪽 꼬리표·해시태그 사이를 넉넉히 (28 → 56) */
+  row-gap: 6px;
+}
+.meta {
+  grid-area: meta;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.meta .kws {
+  margin-top: 0;
+}
+/* 가운데 캐릭터 (동그라미 없이 크게, 바닥에 옅은 그림자) */
+.face {
+  grid-area: face;
+  justify-self: center;
+  font-size: 140px;
+  line-height: 1;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.12));
+}
+/* ---- 결과 등장 애니메이션 (A 캐릭터 등장 → C 말풍선 차례로 → B 캐릭터 둥실둥실) ----
+   결과 화면이 그려질 때(v-if) 한 번 실행된다. 다시 진단하면 화면이 새로 그려져 다시 실행 */
+/* A: 아래에서 튀어 올라와 통통 */
+.face {
+  opacity: 0;
+  animation: char-rise 0.8s cubic-bezier(0.2, 1.5, 0.4, 1) 0.1s forwards;
+}
+/* B: 등장이 끝나면 위아래로 둥실둥실 (그림에만 걸어서 A 와 겹치지 않게) */
+.face img,
+.face > span {
+  animation: char-float 3s ease-in-out 1s infinite;
+}
+/* C: 말풍선이 캐릭터 쪽 모서리에서 뿅 하고 커지며 차례로 (성격 → 행동) */
+.b-trait,
+.b-act {
+  opacity: 0;
+  animation: bubble-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+.b-trait {
+  transform-origin: right bottom; /* 캐릭터 쪽(오른쪽 아래)에서 튀어나옴 */
+  animation-delay: 0.75s;
+}
+.b-act {
+  transform-origin: left bottom;
+  animation-delay: 1.05s;
+}
+/* 이름 · 꼬리표 · 해시태그는 캐릭터 뒤에 살짝 떠오르며 */
+.cname,
+.meta {
+  opacity: 0;
+  animation: fade-up 0.5s ease-out 0.55s forwards;
+}
+.meta {
+  animation-delay: 1.3s;
+}
+/* 캐릭터는 버튼 (누르면 반응) */
+button.face {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+button.face:focus-visible {
+  outline: 3px solid var(--web-green);
+  outline-offset: 6px;
+  border-radius: 24px;
+}
+/* 누르는 동안 살짝 눌리고, 떼면 젤리처럼 출렁 (아래쪽 기준으로 찌그러졌다 늘어남) */
+button.face {
+  position: relative;
+}
+button.face:active img,
+button.face:active > span {
+  transform: scale(1.06, 0.9);
+  transition: transform 0.08s;
+}
+.face.jump img,
+.face.jump > span {
+  transform-origin: 50% 90%;
+  animation: char-jump 0.6s ease-out;
+}
+/* 3: 팁이 바뀐 말풍선은 기다리지 않고 바로 뿅 */
+.b-act.again {
+  animation-delay: 0s;
+}
+.tap-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--web-text-sub);
+  animation: hint-blink 1.6s ease-in-out 2s infinite;
+}
+@keyframes char-jump {
+  0% { transform: scale(1.06, 0.9); }
+  30% { transform: scale(0.94, 1.08); }
+  50% { transform: scale(1.04, 0.96); }
+  70% { transform: scale(0.98, 1.02); }
+  100% { transform: scale(1); }
+}
+@keyframes hint-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes char-rise {
+  0% { opacity: 0; transform: translateY(70px) scale(0.6); }
+  60% { opacity: 1; transform: translateY(-12px) scale(1.06); }
+  80% { transform: translateY(4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes char-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes bubble-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+/* 움직임 줄이기 설정을 켠 사람: 애니메이션 없이 바로 보이게 */
+@media (prefers-reduced-motion: reduce) {
+  .face, .face img, .face > span, .b-trait, .b-act, .cname, .meta, .tap-hint {
+    animation: none;
+    opacity: 1;
+  }
+}
+.face img {
+  width: 220px; /* 캐릭터 얼굴 크게 (160 → 220) */
+  height: 220px;
+  display: block;
+}
+.cname {
+  grid-area: name;
+  justify-self: center;
+  text-align: center;
+}
+/* 말풍선 공통: 테두리 없이 그림자로 띄우고, 캐릭터 쪽 모서리만 뾰족하게 (메신저 말풍선 느낌) */
+.bubble {
+  word-break: keep-all; /* 한글을 낱말 중간에서 자르지 않고 띄어쓰기에서만 줄바꿈 */
+  text-wrap: balance; /* 여러 줄이면 줄 길이를 고르게 (지원 안 하는 브라우저는 그냥 무시) */
+  margin: 0;
+  padding: 14px 20px;
+  border-radius: 24px;
+  background: var(--web-bg);
+  box-shadow: 0 6px 20px rgba(28, 29, 27, 0.08), 0 1px 3px rgba(28, 29, 27, 0.06);
+  font-size: 16px;
+  line-height: 1.55;
+  letter-spacing: -0.2px;
+}
+/* 왼쪽 가운데: 성격 — 오른쪽 아래 모서리가 캐릭터를 향함 */
+/* 성격 말풍선: 흰 카드 위에서 묻히지 않게 유형 색을 옅게 깔고 테두리 (행동 말풍선은 진하게 채움 → 둘이 구분됨) */
+.b-trait.tint-fire {
+  background: var(--web-warn-ink-bg);
+  border: 1.5px solid var(--web-terracotta);
+  color: var(--web-warn-ink);
+}
+.b-trait.tint-water {
+  background: var(--web-sky-track);
+  border: 1.5px solid var(--web-water);
+  color: var(--web-water);
+}
+.b-trait {
+  grid-area: trait;
+  font-weight: 600;
+  text-align: center;
+  justify-self: end;
+  align-self: start;
+  margin-top: 16px;
+  max-width: 280px;
+  border-bottom-right-radius: 6px;
+  color: var(--web-text);
+}
+/* 오른쪽 위: 지켜야 할 행동 — 유형 색으로 채우고 흰 글씨, 왼쪽 아래 모서리가 캐릭터를 향함 */
+.b-act {
+  grid-area: act;
+  text-align: center;
+  justify-self: start;
+  align-self: start;
+  max-width: 320px;
+  border-bottom-left-radius: 6px;
+  font-weight: 700;
+  color: var(--web-white);
+  background: var(--web-terracotta);
+  box-shadow: 0 8px 22px rgba(187, 105, 73, 0.28);
+}
+.b-act.fill-water {
+  background: var(--web-water);
+  box-shadow: 0 8px 22px rgba(62, 90, 102, 0.28); /* --web-water 색 그림자 */
+}
+/* 좁은 화면: 캐릭터 → 이름 → 말풍선 차례로 세로 */
+@media (max-width: 760px) {
+  .char {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'face' 'name' 'trait' 'act' 'meta';
+    justify-items: center;
+    row-gap: 12px;
+  }
+  .b-trait, .b-act { justify-self: center; margin-top: 0; }
+  .meta { align-items: center; }
+}
+.tinfo h2 {
+  margin: 8px 0 0;
+  font-size: 40px; /* 동물 얼굴 옆이라 54 → 40 */
+  line-height: 1.1;
+  font-weight: 900;
+  letter-spacing: -2px;
+}
+.who {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--web-text-sub);
+}
+.kws {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kws span {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--web-hash-bg);
+  font-size: 14px;
+}
+.tabwrap {
+  display: flex;
+  flex-direction: column;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px;
+}
+.tabs button {
+  flex: 1;
+  height: 62px;
+  border: 0;
+  border-radius: 18px 18px 0 0;
+  cursor: pointer;
+  font-family: inherit;
+  background: var(--web-track);
+  color: var(--web-text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 500;
+}
+.tabs button.on {
+  background: var(--web-bg);
+  color: var(--web-text);
+  font-weight: 800;
+}
+.tn {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(28, 29, 27, 0.12);
+  color: var(--web-text-sub);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tabs button.on .tn {
+  background: var(--web-terracotta);
+  color: var(--web-white);
+}
+.panel {
+  background: var(--web-bg);
+  border: 1px solid var(--web-border);
+  border-radius: 22px;
+  padding: 34px 40px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 560px;
+}
+.ph {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ph h3 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+.ph span {
+  font-size: 15px;
+  color: var(--web-text-sub);
+}
+.rule {
+  border: 1px solid var(--web-border);
+  border-radius: 20px;
+  background: var(--web-bg-card);
+}
+.rbtn {
+  width: 100%;
+  padding: 20px 24px;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--web-text-sub);
+}
+.emoji {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--web-rule-icon-bg);
+  font-size: 28px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rtitle {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--web-text);
+}
+.rtag {
+  align-self: flex-start;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--web-rule-tag-bg);
+  color: var(--web-text-sub);
+  font-size: 14px;
+  font-weight: 700;
+}
+.rbody {
+  margin: 0;
+  padding: 0 24px 22px 98px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--web-text-mid);
+}
+.call119 {
+  border: 2px solid var(--web-prep);
+  border-radius: 20px;
+  background: var(--web-bg);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.call119 .emoji {
+  background: var(--web-report-bg);
+}
+.call119 span span {
+  display: block;
+  font-size: 16px;
+  color: var(--web-text-sub);
+  margin-top: 4px;
+}
+.call119 b {
+  font-size: 21px;
+  font-weight: 800;
+}
+.cgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.cgroup {
+  border: 1px solid var(--web-border);
+  border-radius: 20px;
+  background: var(--web-bg-card);
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cgroup > b {
+  font-size: 21px;
+  font-weight: 800;
+}
+.cgroup > span {
+  margin-bottom: 4px;
+  font-size: 15px;
+  color: var(--web-text-sub);
+}
+.ck {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--web-border);
+  border-radius: 12px;
+  background: var(--web-bg);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--web-text);
+}
+.box {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid var(--web-line-ghost);
+  background: var(--web-bg);
+  color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ck.on .box {
+  border-color: var(--web-green);
+  background: var(--web-green);
+  color: var(--web-white);
+}
+.ct {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+}
+.ck.on .ct {
+  color: var(--web-arrow);
+  text-decoration: line-through;
+}
+/* 내 유형에 특히 중요한 항목: "꼭" 글자 대신 색으로 (연한 주황 바탕 + 왼쪽 띠 + 굵은 글씨) */
+.ck.must {
+  border-color: var(--web-grade-danger-fg);
+  background: var(--web-grade-danger-bg);
+  box-shadow: inset 4px 0 0 var(--web-grade-danger-fg); /* 왼쪽 강조 띠 */
+}
+.ck.must .ct {
+  font-weight: 700;
+  color: var(--web-grade-danger-fg);
+}
+.ck.must .box {
+  border-color: var(--web-grade-danger-fg);
+}
+/* 체크하면 강조를 거두고 다른 체크한 항목과 같게 (다 챙겼으니) */
+.ck.must.on {
+  border-color: var(--web-border);
+  background: var(--web-bg);
+  box-shadow: none;
+}
+.ck.must.on .ct {
+  font-weight: 400;
+  color: var(--web-arrow);
+}
+.ck.must.on .box {
+  border-color: var(--web-green);
+}
+.must-legend {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--web-text-sub);
+}
+.must-legend i {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--web-grade-danger-bg);
+  border: 1px solid var(--web-grade-danger-fg);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.rech {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.state {
+  margin: 0;
+  font-size: 15px;
+  color: var(--web-text-sub);
+}
+.rec {
+  border: 1px solid var(--web-border);
+  border-radius: 20px;
+  padding: 16px 22px 16px 16px;
+  background: var(--web-bg-card);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: var(--web-text);
+}
+.rphoto {
+  position: relative;
+  flex: 0 0 auto;
+  width: 150px;
+  height: 108px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--web-photo);
+}
+.rphoto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rrank {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--web-green);
+  color: var(--web-white);
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rinfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rname {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rname b {
+  font-size: 21px;
+  letter-spacing: -0.4px;
+}
+.rname span {
+  font-size: 15px;
+  color: var(--web-text-sub);
+}
+.rreason {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--web-green);
+}
+.rchips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  font-weight: 700;
+}
+.rchips span {
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.c1 { background: var(--web-grade-danger-bg); color: var(--web-grade-danger-fg); }
+.c2 { background: var(--web-warn-ink-bg); color: var(--web-warn-ink); }
+.c3 { background: var(--web-best); color: var(--web-green); }
+.rscore {
+  flex: 0 0 auto;
+  width: 92px;
+  height: 92px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, var(--web-rec-from) 0%, var(--web-rec-mid) 52%, var(--web-rec-to) 100%);
+  color: var(--web-white);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.rscore span {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+.rscore b {
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 900;
+}
+.rscore small {
+  font-size: 15px;
+}
+.morebtn {
+  height: 54px;
+  border-radius: 999px;
+  border: 1px solid var(--web-line-input);
+  background: var(--web-bg);
+  color: var(--web-text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+}
+.save {
+  height: 64px;
+  border-radius: 999px;
+  border: 1.5px solid var(--web-terracotta);
+  background: var(--web-bg);
+  color: var(--web-warn-ink);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.go {
+  height: 64px;
+  border-radius: 999px;
+  background: var(--web-green);
+  color: var(--web-white);
+  font-size: 19px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-size: 16px;
+}
+.links button,
+.links a {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--web-text-sub);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 16px;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: var(--web-toast);
+  color: var(--web-toast-fg);
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 30;
+}
+</style>

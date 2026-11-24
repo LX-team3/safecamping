@@ -1,5 +1,255 @@
 # 진행 상황
 
+## 2026-11-24 메타버스 최신 기능을 client 구조로 합침 (브랜치 `myj-metaverse` ← `main`, DB 변경 없음)
+- 배경: main 에서 메타버스가 `client/` 안으로 옮겨졌는데(11-22), 옮겨진 것은 소품·침수 미션이 들어가기 전 옛 버전. `myj-metaverse` 의 최신 기능을 그 구조 위에 합침
+- 방법: 최신 main 을 `myj-metaverse` 로 가져와(merge) 충돌 9개를 풂. 새 파일(`flood.js`·`props.js`·`minigame.js`·`quiz_points.geojson`)은 `client/` 쪽 새 위치로, `missions.js`·`MetaverseView.vue` 는 양쪽 내용을 합침
+- 퀴즈는 DB(`/api/quizzes`)를 쓰지 않고 `client/public/metaverse/data/missions.json` 40문제만 읽음 (메타버스 쪽에서 이미 정한 것)
+- 화면: main 의 "← 캠핑 앱으로" 버튼 유지. 세로 휴대폰 화면에서 정보줄 글자가 세로로 꺾이고 안내·미니게임 창과 겹치던 것을 고침
+- 확대 막기(`user-scalable=no`)는 `client/index.html` 에 넣지 않음 — 팀 앱 전체에 영향을 줘서. 게임 화면 안은 `touch-action: none` 으로 막음
+- 확인: client 개발 서버 `/metaverse` 에서 마시멜로 굽기 → 꼬치 퀴즈 → 주차장 퀴즈 → 침수 대피 시작, 데이터 파일 15개 모두 불러옴, 세로(390×780)·가로(740×360) 화면에서 버튼 겹침 없음, `npm run build` 통과
+- 확인 못 함: 실제 휴대폰, 서버(8080)를 켠 상태, 메타버스가 아닌 다른 화면들
+- 알아 둘 것: `metaverse/gis/camp.qgz` 는 옛 위치(`metaverse/public/data/terrain.asc`)의 지형 파일을 가리킬 수 있음 → QGIS 에서 열 때 경로를 다시 잡아야 할 수 있음 (확인 못 함)
+
+## 2026-11-24 푸시 토큰 등록 버그 수정 (브랜치 `lyh-aibrief`)
+- 증상: 앱에서 로그인한 직후 토큰 등록이 403 으로 실패 → PC 에서 저장하면 "브리핑 푸시 안 보냄: 등록된 폰 없음". 화면을 새로 불러오면(`location.href` 등) 등록됨
+- 원인: 로그인 직후 서버가 CSRF 쿠키를 지우는데, 새 쿠키를 받기 전에 POST 를 보냄
+- 수정: `utils/pushNotify.js` `registerToken` — GET 으로 새 쿠키를 받은 뒤 등록, 403 이면 한 번만 다시. 서버 · SecurityConfig 변경 없음
+- 확인: 쿠키 없이 POST → 같은 403 문구, GET 뒤 POST → CSRF 통과(로그인 안 해서 401), `npm run build` 통과. 확인 못 함: 실제 폰에서 로그인 → 등록 → 알림
+
+## 2026-11-24 PC 웹에서 일정 저장 → 10초 뒤 폰에 브리핑 푸시 — 5번 (브랜치 `lyh-aibrief`)
+- 결정: 저장 10초 뒤 발송(시연용), 10초 안에 일정을 지우거나 고쳐도 알림은 그대로 감. DB · SecurityConfig · 라이브러리 변경 없음
+- `server` `push/BriefPushService`: 10초 뒤 그 회원의 폰 토큰을 찾아 발송(`path=/app/my-camping`, `brief=일정id`). 등록된 폰이 없거나 실패해도 일정 저장은 그대로 성공. 로그에는 일정 id 만
+- `CampPlanRequest` 에 `notifyPhone` 추가, `CampPlanController` 등록(POST)이 성공했을 때만 예약 (고치기 PUT 은 안 보냄)
+- `stores/myCamping.js`: 앱이 아닐 때만 `notifyPhone: true` (앱은 로컬 알림이 이미 떠서)
+- `MobileMyCampingView`: 내 캠핑 화면이 떠 있을 때 알림을 누르면, 목록에 없는 일정이면 다시 받아 브리핑을 펼침. 지난 캠핑을 거르던 조건이 동작하지 않던 것 수정(`p.past` → `checkOut`)
+- 확인: `.\mvnw.cmd test` 208개 통과(새 테스트 8개, 가짜 발송), `npm run build` 통과. 확인 못 함: 실제 Firebase 발송, 실제 폰 수신 · 눌러서 브리핑 열기, 브라우저에서 저장해 보기
+- 남음: 폰에서 확인
+
+## 2026-11-24 폰 주소(푸시 토큰) 등록 — 4번 (브랜치 `lyh-aibrief`)
+- 결정: 토큰은 서버 메모리에 보관(시연용, 재시작하면 비워짐), 회원당 폰 한 대(나중에 로그인한 폰). DB · SecurityConfig · 라이브러리 변경 없음
+- `server` `push/`: `PushTokenStore`(주소록) · `PushTokenController`(`POST`·`DELETE /api/member/push-token`) · `PushTokenRequest`(로그에 토큰이 안 보이게 가림)
+- 앱: `utils/pushNotify.js` `linkPushToken`(토큰과 로그인이 모두 준비되면 등록) · `unlinkPushToken`(로그아웃 직전에 삭제, `stores/auth.js`), `main.js` 연결. 토큰을 콘솔에 찍던 줄 삭제. PC 웹 · 모바일 브라우저에서는 아무 일도 안 함
+- 알림 테스트 화면에 "서버 등록" 상태 한 줄 추가
+- 확인: `.\mvnw.cmd test` 200개 통과(새 테스트 10개), `npm run build` 통과. 실제 키 파일로 "Firebase 연결 준비됨" 로그 확인(서버 전체를 띄우는 테스트에서). 확인 못 함: 실제 폰에서 로그인 · 로그아웃할 때 등록 · 삭제, 로그인 안 한 요청의 401, 실제 발송
+- 남음: 5번 일정 저장 뒤 발송 예약
+
+## 2026-11-24 서버에서 Firebase 푸시를 보낼 준비 (브랜치 `lyh-aibrief`)
+- 라이브러리 추가(승인): `firebase-admin` 9.12.0 (`server/pom.xml`). DB · 로그인 설정 · `application.properties` 변경 없음
+- `server` `push/`: `PushSender`(테스트용 인터페이스) · `FcmPushSender`(Firebase 발송, 채널 `push-alert`). 키가 없거나 잘못돼도 경고만 남기고 서버는 그대로 켜짐
+- 키: 환경변수 `GOOGLE_APPLICATION_CREDENTIALS` 에 서비스 계정 키 파일 경로. 키는 프로젝트 폴더 밖에 두고, 만일을 위해 `.gitignore` 에 `*firebase-adminsdk*.json` 추가
+- 확인: `.\mvnw.cmd test` 190개 통과(새 테스트 5개, 가짜 키 사용). 확인 못 함: 진짜 키로 서버 켜기 · 실제 폰 발송
+- 남음: 토큰 등록 API + 폰 앱이 로그인하면 토큰 보내기, 일정 저장 뒤 발송 예약
+- 정리 문서 `docs/push-notification.md` 저장: 개념 설명 · 흐름 · 설정 · 남은 작업
+
+## 2026-11-23 Firebase 푸시 알림(FCM) 받기 — 콘솔 테스트 발송용 (브랜치 `lyh-aibrief`)
+- 라이브러리 추가: `@capacitor/push-notifications@^8.1.3` (서버 · DB 변경 없음, 기존 로컬 알림 그대로)
+- `utils/pushNotify.js`: 앱 시작 때(`main.js`) 권한 확인 → FCM 등록 → 기기 토큰을 받아 알림 테스트 화면(`/app/test/notify`)에 표시 · 복사 버튼
+  - 앱이 켜져 있을 때 받은 푸시는 로컬 알림으로 한 번 더 띄움 (안드로이드는 앱이 앞에 있으면 알림창에 안 띄우므로)
+  - 알림을 누르면 맞춤 데이터 `path` 로 이동, 나머지 값은 query (예: `path=/app/disaster`, `demo=warning` → 호우경보 예시 재난지도)
+- 안드로이드: `AndroidManifest.xml` 에 기본 알림 채널 `push-alert`(중요도 높음 · 잠금화면 내용 표시), `npx cap sync android` 로 플러그인 반영
+- `client/android/app/google-services.json` 은 `android/.gitignore` 로 커밋 제외 → 팀원끼리 따로 전달
+- 테스트 방법: 앱 › 알림 테스트 화면에서 토큰 복사 → Firebase 콘솔 › Messaging › 새 캠페인 › 알림 › 테스트 메시지 전송 → 토큰 붙여 넣기
+- 정리 문서: `docs/push-notification.md` (구조 · 설정 · 시연 방법 · 서버 발송 계획)
+- 확인: `npm run build` 통과, `cap sync` 플러그인 2개 인식. 확인 못 함: 실제 폰에서 토큰 받기 · 푸시 수신 · 알림 눌러 이동 (안드로이드 스튜디오로 다시 설치 필요)
+
+## 2026-11-23 인제군 호우특보 예시 알림 → 재난지도 (시연용 더미, 브랜치 `lyh-aibrief`)
+- 더미: `data/rainWarningDemo.js` — 호우주의보(3시간 65mm · 준비) · 호우경보(3시간 95mm · 대피). 기상청 기준(60 · 90mm)을 넘는 값, 실제 특보 아님. 알림 제목에 "[예시]"
+- 알림 테스트 화면(`/app/test/notify`)에 버튼 2개 → 5초 뒤 잠금화면 알림(채널 `disaster-alert`, 브리핑과 따로). 잠금화면에는 제목 + 첫 줄, 펼치면 3줄(`largeBody`)
+- 누르면 `/app/disaster?demo=advisory|warning` → 지도가 실황을 반영한 뒤 예시 비 양으로 미리 보기(단계 · 빗줄기), 특보 칸은 "호우경보 발효 (예시)" + 실제 특보 아님 안내. "현상황 보기"로 실황 복귀 (`disasterLive.showDemo`)
+- 알림 누르기 처리 일반화: `extra: { path, query }` + 누른 시각 `t` (브리핑 알림도 같은 방식으로 바꿈, 내 캠핑 화면은 그대로 `?brief=`)
+- 확인: `npm run build` 통과. 확인 못 함: 실제 폰 알림 · 3줄 펼침 · 재난지도 예시 화면
+
+## 2026-11-23 기상특보 더미를 실제 현황으로 교체 (브랜치 `lyh-aibrief`)
+- 실제 수신 확인: 로컬 서버 `GET /api/alerts` → `warningDummy: false`, 기상청 특보현황 11/23 16:00 기준 발효 중 7건 (강풍주의보 인천·강원·충남·전북·경북, 건조주의보 강원·경북)
+- `alert/AlertDummyData.warnings()` 를 그 7건 그대로로 바꿈 (예전 예시: 강원 호우주의보 · 경기 한파주의보 · 제주 강풍 해제). 더미는 키가 없거나 기상청 호출 실패 때만 쓰이고 화면에 "예시"로 표시됨. 체크리스트 · 브리핑은 여전히 더미를 쓰지 않음(못 받으면 "받지 못했어요")
+- `AlertServiceTest` 기대값: 강원 발효 중 더미 1건 → 2건. 확인: 서버 테스트 185개 통과
+
+## 2026-11-23 내 캠핑: 캠핑 전날 브리핑(초인종) + 일정 저장 5초 뒤 앱 알림 (브랜치 `lyh-aibrief`)
+- 캠핑 전날(D-1) 카드에만 삭제 옆 검정 원 초인종 버튼. 누르면 카드 안에 "내일 캠핑 브리핑" 3줄이 스르륵 열리고 다시 누르면 닫힘 (grid 행 0fr ↔ 1fr 전환)
+- 브리핑 3줄 (`utils/campBrief.js`, RAG 붙이기 전이라 정해진 문장 틀): ① 특보·날씨 — 출발 준비 응답의 특보 + 출발일 예보(기상청 값 그대로, 없으면 "받지 못했어요") ② 진단 — 저장된 1분 진단의 가장 약한 분야 + 그 수칙 제목(진단 없으면 진단 권유) ③ 준비물 — 체크리스트 남은 개수 + 먼저 챙길 항목
+- 체크 상태 localStorage 이름을 `checklistStoreKey` 하나로 모아 체크리스트 화면과 브리핑이 같이 씀
+- 앱 알림 (`utils/localNotify.js`): `myCamping.add`(일정 등록 시트 · 예약 정보 확인 새 저장 둘 다) 뒤 5초 뒤 로컬 알림(채널 `camp-brief`, 잠금화면 표시, 알림 id = 일정 id). 알림을 누르면 `/app/my-camping?brief=일정id` → 그 카드가 전날 카드면 브리핑을 펼치고 스크롤. 브라우저에서는 아무 동작 안 함. 5초는 시연용(실제는 전날 저녁 등으로 바꿀 자리)
+- (이어서) 알림을 누르고 들어오면 그 일정의 브리핑이 항상 열린 상태로: 전날이 아닌 일정도 알림으로 들어오면 초인종 · 브리핑을 보여 줌(제목 "캠핑 브리핑 (D-n)"), 같은 알림을 다시 눌러도 열리도록 주소에 누른 시각 `t` 를 붙임. 먼 일정은 특보·날씨 줄에 "○월 ○일부터 확인할 수 있어요"
+- 확인: `npm run build` 통과 (`three` 가 설치 안 돼 있어 `npm install` 후 빌드 → package-lock.json 이 바뀜). 확인 못 함: 실제 안드로이드에서 알림·알림 눌러 이동·브리핑 애니메이션, 브라우저 화면 확인
+
+## 2026-11-23 예약 정보 확인 = 저장한 일정 고치기 (브랜치 `hjs-metaverse-merge`)
+- 내 예약 카드의 "예약 정보 확인 ›"(웹 `WebMyBookingView`, 앱 `MobileMyCampingView`) → `booking-check?camp=&plan=일정id` 로 엶
+- 예약 확인 화면(웹·앱)이 `?plan=` 이면 저장해 둔 날짜 · 인원 · 동행 · 이동 수단을 채우고 제목은 "예약 정보 확인". 저장하면 새로 등록하지 않고 그 일정을 고침
+- 인원 · 동행 · 이동 수단은 지금처럼 memo 글자 (팀 결정: DB 칸은 이 값을 쓰는 기능이 생길 때). 글자 만들기·읽기는 `client/src/utils/bookingMemo.js` 한곳 (최대 48자, memo 100자 안)
+- 서버: `PUT /api/member/camp-plans/{id}` `{ checkIn, checkOut, memo }` 추가 (`CampPlanUpdateRequest`, `CampPlanService.update`, `CampPlanMapper.update`). 체크인을 바꿀 때만 지난 날짜·중복 검사. `server/CLAUDE.md` API 목록에 추가
+- 확인: 서버 `mvnw test` 181개 통과(고치기 테스트 3개 추가), client `vite build` 통과, memo 만들기→읽기 왕복 확인
+- 확인 못 함: 브라우저에서 실제로 고치기 (로그인 계정 없음 · 켜져 있는 서버가 고치기 전 코드라 재시작 필요). 직접 쓴 메모(예: "55")가 있던 일정은 저장하면 메모가 인원·동행·이동 수단 글자로 바뀜
+
+## 2026-11-23 예약 사이트에서 돌아오면 "예약하셨나요?" 팝업 (브랜치 `hjs-metaverse-merge`)
+- "예약 사이트 ↗"를 누르면 캠핑장(내 예약 카드면 일정 id까지)과 시각을 기억 (`stores/reservationReturn.js`, localStorage). 누르는 곳: 웹 캠핑장 상세 패널 `WebCampDetailPanel`, 앱 캠핑장 상세 `MobileCampDetailView`, 웹 내 예약 카드 `WebMyBookingView`
+- 돌아오면(새 탭에서 돌아옴 = visibilitychange, 같은 탭 뒤로 = 화면 다시 열림) 팝업 `components/common/ReservationReturnPopup.vue` (App.vue 에 한 번). 웹은 `WebConfirmModal`, 앱은 tokens.css 색의 작은 팝업
+  - 10초 안에 돌아오면 묻지 않음, 하루 지난 기록은 버림, 예약 확인 · 로그인 화면에서는 안 띄움
+  - 예약했어요 → `booking-check?camp=(&plan=)`. 로그인 안 했으면 `login?next=그 주소` → 로그인 뒤 그 화면으로 (`WebLoginView`·`MobileLoginView` 에 next 추가, 우리 사이트 주소만 받음)
+  - 아직 안 했어요 · 바깥 누르기 → 기록 지움
+- 확인: client `vite build` 통과. 브라우저 웹(1400px)·앱(375px)에서 기록을 넣고 돌아온 것처럼 해 팝업이 뜸, 예약했어요 → 로그인 화면(next 에 `&plan=` 그대로), 3초 만에 돌아오면 안 뜸
+- 팝업 설명 줄("예약했다면 ~ 저장해 둘게요.") 삭제 → 제목과 버튼만
+- 예약 확인 화면(웹·앱) 인원 +/− 버튼이 안 눌리던 것 고침: 템플릿에서 `bump(adults, …)` 로 ref 를 넘기면 숫자로 풀려서 값이 안 바뀌었음 → `bump('adults', 1)` 처럼 칸 이름으로. 브라우저에서 웹·앱 둘 다 늘리기·줄이기·최소값(성인 1, 어린이 0) 확인
+- 어린이(아이) 기준 나이 "※13세 이하" 표시 (팀 결정): 예약 확인 웹·앱 "어린이 ※13세 이하", 웹 누구와·언제 팝업 `WebTripModal` "아이 ※13세 이하", 앱 `MobileTripSheet` "만 13세 미만" → "※13세 이하". 1분 진단의 "어린이 7~12세 · 영유아 0~6세"(`webSurvey.js`)는 다른 질문이라 그대로
+- `WebTripModal` 인원 +/− 도 같은 이유(ref 를 넘김)로 안 되던 것 고침 → `bump('adults', 1, 1)`. 브라우저에서 늘리기·줄이기 확인
+- 웹 캠핑장 상세 "예약 사이트 ↗" 버튼 테두리: 연한 회색(`--web-line-input`) → 메인 초록 1.5px(`--web-green`). 흰 패널 위 흰 버튼이라 안 보였음. "예약 사이트 없음"은 연한 테두리 그대로. 앱(`.reserve`)은 이미 진한 테두리라 그대로
+- DB 저장 확인 (사용자): 예약 확인 화면에서 저장 → `camp_plan` 에 들어감
+- 확인 못 함: 실제 외부 예약 사이트를 열었다 돌아오기, 로그인한 상태에서 저장까지 (테스트할 때 8080 서버가 꺼져 있었음)
+
+## 2026-11-23 재난지도 3D 로딩 빠르게 (브랜치 `hjs-metaverse-merge`)
+- `client/src/utils/disasterMap.js` (웹·모바일 재난지도 같이 씀)
+  - 로딩 화면: 최소 2.5초를 일부러 기다리던 것 없앰. 처음 보이는 타일이 들어오면 바로 걷고, 늦어도 3초 뒤에는 걷음 (예전엔 최대 8초)
+  - `maximumScreenSpaceError` 2(Cesium 기본값) → 3: 받는 타일이 줄어드는 대신 아주 약간 흐려짐
+  - `data.json`·`criteria.json` 을 차례로가 아니라 동시에 받음
+- 작은 물길(OSM 이름 없는 개천)을 인북천과 다르게: 폭 10m → 4m, 비가 와도 넓히지 않음, 물결 없이 옅은 색 띠 (`streamLook`). 폭 10m(비 올 때 최대 약 21m)로 그려서 대피소(서화중앙교회, 개천 가운데선에서 약 14m)가 물 위에 있는 것처럼 보였음. 대피소 좌표는 그대로 (처음부터 바뀐 적 없음)
+- 높낮이 그래프 설명을 짧은 문장으로 (`updateProfile`). 예: "큰 홍수가 나면 이 길 중 570m 정도가 물에 잠겨요. 가장 깊은 곳은 1.6m예요. 도착하는 곳은 물 높이와 거의 같아요."
+- 막대 114mm 눈금 "캠핑장 잠김" → "침수" (웹에서 "90 경보"와 글자가 겹쳤음): `criteria.json`, `disasterMap.js` DEFAULT_CRIT, 주석(`MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse`)
+- 웹(`/web/disaster`)과 앱(`/app/disaster`)은 같은 `disasterMap.js`·`criteria.json` 을 써서 위 수정이 둘 다에 들어감. 옛 단독 앱(`disaster-map/app/`)은 단계·화면이 달라 손대지 않음
+- 시험용 `DevTestNav`(보라색 '🧪 시험' 버튼) 삭제: `App.vue` 3줄, `components/DevTestNav.vue`
+- 확인: `vite build` 통과. 브라우저 모바일 재난지도에서 대피소 '위치 보기' → 기둥 옆 파란 띠 없어짐. 콘솔 오류는 `/api/auth/me` 401(로그인 안 한 상태) 하나뿐
+- 확인 못 함: 비 오는 단계(준비·대피)에서 작은 물길 모습, 브라우저에서 실제로 몇 초 빨라졌는지, 지도 화질 차이. 남은 일: `data.json`(5.5MB) 나눠 받기
+
+## 2026-11-22 메타버스를 client 안으로 합침 (브랜치 `hjs-metaverse-merge`)
+- 아래 "client 주소 아래로 연결"(서버 2개 + proxy, 브랜치 `hjs-metaverse-proxy`) 다음 단계. 개발 서버·빌드를 하나로 하려고 메타버스를 client의 화면 하나로 옮김. 느려지면 다시 생각하기로 함 (되돌릴 때는 `hjs-metaverse-proxy`)
+- 옮긴 곳: 3D 코드 `client/src/metaverse/`, 화면 `client/src/views/metaverse/MetaverseView.vue`, 데이터 `client/public/metaverse/data/`
+- 주소 `/metaverse` (`router/index.js`). 새 layout `full`(`App.vue`) = 웹·모바일 틀 없이 전체 화면. three.js는 이 화면에 들어올 때만 불러옴
+- client에 `three` 추가 (`package.json`). client `vite.config.js`의 `/metaverse` proxy 삭제 (원래대로)
+- 링크: `webLinks.js`의 `METAVERSE_URL` → `METAVERSE_PATH = '/metaverse'`. PC 3곳·모바일 내 정보 링크와 돌아가기 버튼을 RouterLink로 (새로고침 없이 이동)
+- `metaverse/` 폴더: 따로 앱이던 뼈대(Vue 기본 템플릿, index.html, package.json, vite.config.js 등)는 삭제. `gis/`(QGIS 원본), `docs/`, `CLAUDE.md`는 남김. `gis/export_geojson.py`는 `client/public/metaverse/data/`로 내보내게 고침
+- 비교(client `npm run build`): 첫 화면 JS 104.5KB → 104.8KB, 빌드 약 3.5초(같음), 메타버스 화면 덩어리 약 652KB(들어갈 때만 받음), 배포 폴더 26MB → 27MB
+- 확인: `npm run build` 통과. 브라우저 PC·모바일(375px)에서 링크 → `/metaverse` 3D 캠핑장·지형 나옴, 돌아가기로 PC `/web`·모바일 `/app/explore`, 나갔다 다시 들어와도 3D 화면이 하나만 남음(정리 잘 됨), 재난지도(`/web/disaster`) 열림
+- 확인 못 함: 실제 휴대폰·Capacitor 앱에서 열기, 퀴즈 DB(서버에 `/api/quizzes` 없음 → 예비 파일)
+- 참고: `MetaverseView.vue`는 원래 hex 색을 직접 써서 client CSS 규칙(`tokens.css` 변수만)과 다름. 옮기기만 하고 색은 안 바꿈
+
+## 2026-11-22 메타버스를 client 주소 아래로 연결 (브랜치 `hjs-metaverse-proxy`)
+- 목표: client 개발 서버(5173) 하나로 `/` client · `/api` Spring(8080) · `/metaverse/` 메타버스(5174)를 모두 열기. 주소가 하나라서 로그인 쿠키가 공유되고, 나중에 앱(Capacitor)으로 감쌀 때 메타버스가 앱 안에서 그대로 열림
+- 메타버스
+  - `metaverse/vite.config.js`: `base: '/metaverse/'`, 포트 5174 고정(`strictPort`). 메타버스만 따로 띄워도 퀴즈를 Spring에서 받도록 `/api` → 8080 proxy 추가
+  - `public/` 파일 경로 3곳을 `import.meta.env.BASE_URL` 기준으로 (`geo.js` geojson, `missions.js` 예비 파일, `scene.js` 지형). `/api/quizzes`는 그대로
+  - `MetaverseView.vue`: 왼쪽 위 "← 캠핑 앱으로" 링크(`href="/"` → client가 화면 폭을 보고 `/web` 또는 `/app/explore`로 보냄). 좁은 화면에서는 시간·점수 줄과 안 겹치게 정보줄을 한 칸 내림
+  - `metaverse/CLAUDE.md` 실행 주소, `metaverse/docs/작업기록.md` 결정 사항 갱신
+- client
+  - `client/vite.config.js`: proxy에 `/metaverse` → 5174 (`ws: true`, 코드 수정 자동 반영용)
+  - `utils/webLinks.js`: `METAVERSE_URL` 기본값을 `http://localhost:5174/metaverse` → `/metaverse/metaverse`
+  - PC 메타버스 링크 3곳(`WebMenuDrawer.vue`, `WebMyBookingView.vue`, `WebMyInfoView.vue`)에서 `target="_blank"` 삭제 (앱에서는 새 창이 안 열리거나 밖으로 나감). 내 정보 안내 문구 "새 창에서 열려요" → "3D 캠핑장에서 안전 퀴즈"
+  - 모바일 내 정보(`MobileMyInfoView.vue`) 메뉴에 "메타버스 안전 탐험" 추가 (로그인 전·후 모두)
+- 지킬 것: `http://localhost:5174` 같은 주소를 코드에 쓰지 않기 · 파일 경로는 `BASE_URL` 기준 · API는 `/api/...` · 새 창 쓰지 않기
+- 실행(창 3개): server `.\mvnw.cmd spring-boot:run`(8080) · client `npm run dev`(5173) · metaverse `npm run dev`(5174) → http://localhost:5173/metaverse/metaverse
+- 확인: client·metaverse `npm run build` 통과. 브라우저에서 PC·모바일(375px) 링크가 같은 탭에서 열리고 3D 캠핑장·지형이 나옴, 돌아가기 버튼으로 PC는 `/web`, 모바일은 `/app/explore`로 돌아옴
+- 확인 못 함 / 남은 것
+  - 퀴즈를 DB에서 가져오기: 요청은 client → Spring까지 가지만 Spring에 `/api/quizzes`가 없어 404 → 예비 파일 사용. 퀴즈는 Spring AI + RAG(안전 자료를 pgvector에 저장 → 퀴즈 후보 생성 → 사람이 검토·승인 → quiz 표)로 만들 예정이고, 게임은 승인된 문제만 `/api/quizzes`로 읽기로 함. 응답 모양은 `metaverse/public/data/missions.json`과 같게
+  - 배포: 지금은 개발 서버 proxy로만 묶임. 배포할 때는 메타버스 빌드(`dist`, 경로가 `/metaverse/...`)를 client 배포 결과의 `metaverse/` 폴더에 넣거나 같은 주소로 묶는 설정이 따로 필요
+  - Capacitor 앱 안에서 열기 (팀원 담당)
+
+## 2026-11-21 재난지도 3단계 · 산 대피 · 단계별 행동요령 · 119 전화 (브랜치 `hjs-disaster-live`)
+- 화면 단계는 **안전 · 준비 · 대피** 셋. 114mm(서화 50년 큰비)는 단계 이름을 따로 두지 않고 막대 눈금에 "캠핑장 잠김"으로만 표시 (`criteria.json`, `disasterMap.js` DEFAULT_CRIT). 내부 level 3 은 그대로 둬서 물은 캠핑장까지 차고, 할 일 문장만 더 급하게. 서버 `DisasterRules` 는 바꾸지 않음 (level 3 = 화면에선 "대피")
+- 높은 곳 안내를 "남서쪽 산으로 올라가세요"로 (방향은 코드가 계산한 `hDir`). 이유: 도로만 따라 다리 없이 물보다 높은 곳(311m, 100년 범위 밖)까지 가면 1,520m · 약 30분이고 캠핑장(290m)보다 낮은 285m 강가와 범람 범위 안을 약 460m 지나감 → 쓸 수 없음 (계산: 데이터 폴더 `road_route.py`, 그림 `도로경로_비교.png`). 산길은 지형 계산 방향이고 실제 길은 확인 못 함 → 이름표·길안내에 "길 확인 전"
+- 아래 시트 행동요령을 단계별 3줄로 (`LV[lv].todo`, 제목 "○○ 단계 행동요령"). 수치 없는 일반 행동만 씀
+- 긴급 신고 119 를 `tel:119` 링크로 (휴대폰에서 누르면 전화 걸기 화면)
+- 캠핑장 잠김(level 3, 114mm 이상)에서는 대피 경로·목적지 이름표·핀·대피소 칸·경로 고르기·길안내 버튼·높낮이 그래프를 숨김 (`noRoute`). 할 일 문장·행동요령·119 만 남김. 길안내 중에 이 단계가 되면 길안내를 끝냄
+- 화면 위 위치 줄을 "인북천 물빛테마공원 캠핑장"만 남김 (모바일). 웹 `WebDisasterPanel.vue` 는 팀원 파일이라 그대로
+- 안 쓰는 코드 정리: `state.hasBase`, `state.live.water`, 막대 눈금 `.ref`(기준표에 ref 단계 없음) 삭제. "시뮬레이션"·"즉시 대피"·"심각" 등 옛 이름 주석을 지금 이름(미리 보기 · 캠핑장 잠김)으로 (`disasterMap.js`, `MobileDisasterMapView.vue`, `MobileRainSlider.vue`, 서버 `DisasterRules`·`DisasterNowResponse` 주석, `tokens.css` 주석). 동작은 그대로. `stage.ai` 는 팀원 웹 화면이 써서 남김
+- `osmBuildings`(OpenStreetMap 건물 157동) 삭제 (2026-11-22): 지도에서 한 번도 안 그리던 자료라 `client/public/disaster-map/data.json`·옛 단독 앱 `disaster-map/app/data.js` 에서 빼고(각 약 51KB 줄어듦), `disaster-map/qgis/export_data.py` 도 다시 내보낼 때 안 만들게 고침. 건물은 건물통합정보 803동만 (발표 11페이지도 803동). 확인: `npm run build` 통과, 화면 열림·콘솔 오류 없음
+- 막대 눈금 글자가 길면(캠핑장 잠김) 왼쪽 맞춤해 90 경보와 안 겹치게 (`MobileRainSlider.vue`)
+- 확인: `npm run build` 통과, 브라우저(375px)에서 120mm 때 문구 · 행동요령 · tel:119 · 눈금 확인. 팀원 웹 화면(`WebDisasterPanel.vue`)은 행동요령은 자동으로 따라오고 버튼 글자("높은 곳 (참고)")는 팀원 파일이라 그대로
+- 확인 못 함: 실제 휴대폰에서 전화 연결, 서버 켠 실시간 화면
+
+## 2026-11-21 재난지도 화면 단순하게 (브랜치 `hjs-disaster-live`)
+- 비 막대(`RainSlider.vue`)
+  - 글자를 "최근 3시간 비"에서 "3시간 강수량"으로 바꿈 (기상청 특보 기준과 같은 말이고, 실황이든 미리 보기든 맞는 표현)
+  - "실시간"·"실시간 보기"·"시뮬레이션" 표시와 상류 반월촌교 수위 줄(파란 글씨)을 화면에서 뺌
+  - PC 같은 넓은 화면에서도 막대 폭이 최대 440px를 넘지 않게 함
+- 화면에서만 뺀 것: 수위는 서버 단계 판단에 그대로 씀. "실시간 보기" 버튼이 없어서 막대를 만지면 새로고침 전까지 미리 보기 상태로 남음
+- 특보 칸(`DisasterMapView.vue`): 막대로 미리 보는 중이고 실제 특보가 없으면, 그 비에 맞는 특보를 "미리 보기 · 예시"로 보여 줌
+  - 안전: 특보 없음
+  - 준비(60mm~): 호우주의보
+  - 대피(90mm~)와 즉시 대피(114mm~): 호우경보. 특보는 경보가 가장 높음
+  - 큰비를 미리 보는데 초록 "특보 없음"이 함께 떠서 헷갈렸던 것을 고침. 실제 특보가 발효 중이면 미리 보기 중에도 그 특보를 보여 줌
+  - 이를 위해 `disasterMap.js`의 `state.stage`에 `level`을 더함
+- 안내 시트 제목(`disasterMap.js` `LV.head`)을 단계 이름 대신 할 일로 바꿈
+  - 안전: 대피소 가는 길만 알아 두세요
+  - 준비: 짐을 싸고 대피를 준비하세요
+  - 대피: 다리 말고 높은 곳으로 가세요
+  - 즉시 대피: 짐 두고 바로 높은 곳으로 가세요
+- 높은 곳 길 카메라: 남남서에서 보면 산등성이에 가려져서, 동북동에서 서남서를 내려다보게 바꿈 (heading 250°, pitch -45°). 대피소 길 카메라는 그대로
+- 확인: `npm run build` 통과. 휴대폰(390×844)과 PC(1600×900, 폭 제한을 푼 상태) 화면을 0·60·95·120mm에서 찍어 높은 곳 길이 보이는 것을 눈으로 확인함 (서버는 꺼진 상태라 실시간 값은 확인 못 함)
+
+## 2026-11-20 재난지도 실시간 비·기상특보 연결 (브랜치 `hjs-disaster-live`)
+- 서버 새 패키지 `disaster/`: `GET /api/disaster/now`
+  - 비: 기상청 초단기실황(getUltraSrtNcst) RN1 을 캠핑장 격자로 시간마다 받아 최근 3·12·24시간 합. 지난 시간 값은 저장해 두고 다시 안 부름(처음만 최대 24번, 그다음 한 시간에 1번). 정시 관측은 40분 뒤부터 받음
+  - 단계: `DisasterRules` — 준비 3h 60 또는 12h 110 · 대피 3h 90 또는 12h 180 · 즉시 대피 3h 114 또는 24h 310 (criteria.json·rag 문서와 같은 값)
+  - 특보: `alert` 의 `WarningSource`(기상청 특보현황, 10분 캐시)를 그대로 써서 강원 중 "인제"가 들어간 구역 또는 강원 전체 특보만. **alert 패키지 파일은 안 고침**
+  - 못 받으면 값을 비워 둠 (예시 값·더미 없음). 키: 기존 `KMA_SERVICE_KEY` 그대로
+- 화면(`/disaster`): 처음에 실황을 받아 그 단계로 시작, 10분마다 다시 받음. 슬라이더 옆 "실시간"(관측 시각·12/24시간 까닭) ↔ 슬라이더를 만지면 "시뮬레이션", "실시간 보기"로 복귀. 기상특보 칩은 예시 데이터 삭제 → 인제군 실제 특보 / "발효 중인 특보 없음" / "특보 정보 없음"
+- 확인: `mvnw test` 161개 통과(새 `DisasterServiceTest` 7개), `npm run build` 통과
+- 확인 못 함: 실제 키로 기상청 호출(`/api/disaster/now` 응답), 화면에서 실시간 ↔ 시뮬레이션 전환. 강 수위(원통 관측소)는 아직 (한강홍수통제소 키 따로 필요)
+- 높은 곳(2단계 이상) 경로 교체: 캠핑장에서 걸어서 가장 빨리 닿는 높은 곳으로 다시 계산 (10m DEM, 토블러 걷기 속도 최단 시간, 도착 = 지도 범람 범위의 가장 높은 물 높이 311.1m 보다 높고 100년 범람 범위 밖). 약 160m·캠핑장보다 약 20m 높음·계산상 걸어서 3~4분 (예전 188m·+40m 선 대체). 실제 길 아님, 현장 확인 필요. 화면 확인 못 함
+- 범람 물 표현: 3D 물 면이 가장자리 높이로 판판해서 둑·둔치·캠핑장이 안 잠긴 것처럼 보이던 문제 → 즉시 대피 단계에서 50년 범람 범위 전체를 땅에 강물로 덮는 층 추가. 넘친 물 색도 강물과 같은 변수(`--color-river`)로. 빌드 통과, 화면 확인 못 함
+- 강~캠핑장 사이가 안 잠기던 문제: 범람지도가 강 구역(강~둑 사이 낮은 땅, 284~290m)을 범위에서 빼서 생김 → `data.json` 에 `flood50fill` 추가 (강에서 시작해 가까운 범람 가장자리 물 높이보다 낮은 땅을 이어 채운 10m 칸, 가장자리 300m 안, 사각형 527개). 3D 물은 다 차오르면 강물과 같은 땅 덮개 층으로 바뀜(색 통일). 계산 스크립트는 아직 저장소 밖(임시 폴더)
+- 대피(경보, 90mm) 단계부터 강 구역(`flood50fill`)만 물로 덮음 → 즉시 대피(114mm)에서 캠핑장 쪽 범람 범위까지. 경보 때 실제 어디까지 차는지 계산 자료는 없어서 "그림 표현"으로 둠 (수위 자료 붙으면 교체)
+- 상류 수위 연결: 한강홍수통제소 Open API 반월촌교(1011620, 서화면 심적리, 캠핑장 약 4km 상류) — `HrfcoWaterClient`, 키 환경변수 `HRFCO_SERVICE_KEY`. 공식 기준수위 관심 6.7 · 경보 8.4 · 심각 9.4m(주의보 없음)를 관심→준비 · 경보→대피 · 심각→즉시 대피로 연결(팀 결정), 최종 단계 = 비·수위 중 높은 쪽. 1시간 넘게 새 자료 없으면 판단 제외. 화면 슬라이더 아래 "상류 반월촌교 수위 4.77m · 관심(6.7m)까지 1.93m" 줄. 로그에 키가 찍히지 않게 가림(기상청 비 클라이언트도). 테스트 165개 통과, 빌드 통과
+- 확인함(사용자 터미널): 반월촌교 info·10분 자료 응답 (2026-11-20 14:30 수위 4.77m). 확인 못 함: 서버를 통한 /api/disaster/now 의 water 칸, 화면 표시. 유량(fw) 값은 이상해 보여 안 씀
+- 서버에서 수위가 null 이던 원인: JDK 17 기본 신뢰 목록에 api.hrfco.go.kr 의 루트(OISTE WISeKey Global Root GB CA)가 없어 "PKIX path building failed". 공개 루트 인증서를 `server/src/main/resources/certs/` 에 두고 `HrfcoWaterClient` 에서만 추가로 믿게 함 (JDK 폴더·다른 호출은 그대로). Java 로 확인: 기본은 SSLHandshakeException, 루트 추가 시 HTTP 200
+- 대피 출발점 변경: 고캠핑 원본 좌표(128.2061766, 38.2258503) → QGIS 위성 사진에서 찍은 **캠핑장 안쪽**(128.2060817, 38.2252365, 땅 290.1m, 50·80·100년 범람 범위 안). 거기서 캠핑장 안 길 150m(QGIS 에서 그림)로 "세 갈래 길 끝"(128.206146, 38.2239962)까지 간 뒤 기존 경로. `data.json` campsite 점·두 경로(대피소 1,516→1,411m, 언덕 924→819m), `HILL_PTS` 다시 계산(108m·+21m·약 3분, 도착 311.2m), 서버 `CAMP_LAT/LNG`(서버 다시 켜야 반영). 계산 스크립트는 데이터 폴더 `hill_fastest.py`·`flood_fill_riverzone.py`, 정리 기록은 데이터 폴더 `레이어_정리_기록.md`. 포스터 이미지는 아직 예전 출발점 기준
+
+## 2026-11-20 웹 내 예약 · 지난 캠핑 후기 (클라이언트 ↔ 서버, 브랜치 `lyh-record`)
+- DB: `db/schema_06.sql` — `camp_review`(일정 하나에 후기 하나, 별점 없음, 일정 · 회원 지우면 CASCADE) · `camp_review_photo`(파일 이름 · 순서) — **DB 에 직접 실행해야 함**
+- 서버 `mycamping/`: `CampReview*` · `ReviewPhotoStore`(인터페이스) · `LocalReviewPhotoStore`(서버 폴더 `{CAMPIN_UPLOAD_DIR 또는 uploads}/reviews`, `.gitignore` 에 `uploads/`). API 3개(목록 · 작성/수정 multipart POST · 사진 파일) — 표는 `server/CLAUDE.md`
+  - 규칙: 체크아웃 지난 일정만 · 글이나 사진 하나는 꼭 · 글 1000자 · 사진 9장 · 한 장 10MB · 이미지는 파일 앞부분으로 판별 · 파일 이름은 UUID
+  - 일정 삭제 때 후기 사진 파일도 지움(`CampPlanService.delete`). 업로드 크기 초과는 `GlobalExceptionHandler` 에서 400. `application.properties` 에 multipart 크기 두 줄 추가
+- 클라이언트: `components/web/WebReviewModal.vue`(새로 — 이전 브랜치 작업이 커밋 전에 사라져 다시 만듦) · `WebMyBookingView` 지난 캠핑 카드에 후기(사진 줄 → 글 3줄 더보기 → 작성/수정 날짜), 사진 크게 보기, 날짜 줄 "N박" 뺌. 저장 실패 문구는 팝업 안에 보이고 쓰던 내용은 그대로
+- 확인: `mvnw test` 166개 통과 (새 `CampReviewServiceTest` 11개, `CampPlanServiceTest` 에 사진 파일 삭제 1개), `npm run build` 통과
+- 확인 못 함: 실제 DB · 서버를 켜서 업로드 · 사진 보기 (schema_06 미실행), 브라우저 화면. 회원 탈퇴(CASCADE) 때는 사진 파일이 서버 폴더에 남음 (탈퇴 기능이 생기면 함께 지워야 함)
+
+## 2026-11-19 재난 대피 3D 지도 → 최신 main 위로 합침 (브랜치 `hjs-disaster-map-v2`)
+- `hjs-disaster-map` 를 main(b0b8272) 에서 새로 판 브랜치에 merge. 충돌 3곳(tokens.css 색 변수 · router 경로 · 이 파일)은 양쪽을 모두 남김. 차박·가족방 위치·메타버스 작업은 그대로
+- 확인: `npm run build` 통과. 확인 못 함: 합친 뒤 `npm run dev` 로 화면 열어 보기
+
+## 2026-11-19 재난 대피 3D 지도 고도화 + 대피 기준 교체 (브랜치 `hjs-disaster-map`)
+- 대피 기준(`public/disaster-map/criteria.json`): 출처 없던 120·150mm 단계 삭제 → **60 준비(호우주의보) · 90 대피(호우경보) · 114 즉시 대피(서화 50년에 한 번 큰비, WAMIS 3시간)**. 114mm 부터 50년 홍수 범위에 물. 80·100년은 할 일이 같아 단계 없음. 12·24시간 조건은 설명에만 적음 (화면 슬라이더는 3시간)
+- 지도(`utils/disasterMap.js`):
+  - 홍수 물을 땅에 칠하던 방식 → 범위 가장자리 땅 높이로 만든 **파란 3D 물**이 아래에서 차오름
+  - 물이 차면 대피로를 **물 위에** 그림 (가려져도 보이게)
+  - **등고선**: 10m DEM 에서 직접 계산(10m·50m), 강 위·평지는 뺌, 3km 안에서만 보임
+  - **해 낮추기 · 산 그림자 · 앰비언트 오클루전**으로 산의 굴곡이 보이게
+  - 자전거길·보행로·강을 가로지르는 선 숨김 (강 위 하얀 줄), 캐릭터 작게
+  - **나침반 삭제**: 오른쪽 끌기·Ctrl+끌기·두 손가락으로 360도 돌리기, ← → 키
+- 새 부품 `components/disaster/RouteProfile.vue`: **대피 길의 높낮이 그래프**(실제 땅 단면 + 홍수 물 높이 + 다리). 안내 시트 안. `MapCompass.vue` 삭제
+- 색: `tokens.css` 에 재난지도 색 변수 추가(`--color-dm-*`, `--color-stage-0~3`, 물·강·건물·대피로·등고선, 사용자 승인). 재난지도 화면·부품·엔진의 hex 를 모두 변수로 바꿈 (엔진은 `getComputedStyle` 로 읽어 Cesium 에 넘김)
+- 문구: "3시간 강수량" → "최근 3시간 비", 단계 이름 준비·대피·즉시 대피 (RAG 단계 문서의 "판단"과 같게)
+- RAG 문서(`disaster-map/rag`): 02·03 에 12시간 조건 추가, 04 를 50년 단일 기준으로, README 표 갱신
+- 확인: `npm run build` 통과. `npm run dev` 로 `/disaster` 열어 60mm(준비 · 대피소 길 · 높이 그래프) → 120mm(즉시 대피 · 다리 길 막힘 · 파란 물 · 높은 곳 길 291→330m) 확인
+- 확인 못 함: 휴대폰에서 속도(산 그림자·오클루전이 무거움 — 느리면 `disasterMap.js` "해와 그림자"에서 끔), 오른쪽 끌기·두 손가락 돌리기를 실제 기기로
+
+## 2026-11-17 재난 대피 3D 지도 올림 (브랜치 `hjs-disaster-map`)
+- 새 폴더 `disaster-map/`: 인북천 물빛테마공원 캠핑장 재난 대피 3D 지도(CesiumJS) 웹앱을 그대로 올림 + QGIS 스크립트(`flood_depth.py`, `export_data.py`)
+- 기능: 강수량 슬라이더 5단계 침수 표현, 단계별 대피 경로 2종, 4단계 길안내, 캐릭터 경로 따라가기, 오프라인(PWA)
+- `client/`·`server/`·`db/` 는 바꾸지 않음
+- 확인: 로컬 서버(`python -m http.server`)로 열어 동작 확인 (어제까지 확인한 상태 그대로)
+- 다음: `client/` 에 Vue 컴포넌트로 옮기기 (cesium npm 패키지 추가 필요 → 라이브러리 추가라 팀 승인 후)
+
+## 2026-11-17 재난 대피 3D 지도를 client Vue 화면으로 옮김 (브랜치 `hjs-disaster-map`)
+- 새 화면 `/disaster` (`views/disaster/DisasterMapView.vue`). 라우터에 한 줄 추가, 다른 화면에서 들어가는 버튼은 아직 없음
+- 부품 `components/disaster/`: `AlertPill`(기상특보, 예시 데이터) · `RainSlider`(강수량 → 침수 단계) · `MapCompass`(돌리기·북쪽) · `EvacSheet`(대피 안내·길안내)
+- 지도 엔진 `utils/disasterMap.js`: `disaster-map/app/index.html` 의 Cesium 코드를 옮김. 화면은 reactive state 를 읽고, 버튼은 엔진 함수를 부름. 화면을 떠나면 `destroy()` 로 정리
+- 데이터 `public/disaster-map/`: `data.json`(QGIS 내보내기, 5.8MB) · `criteria.json` · 캐릭터 그림
+- **라이브러리 추가 (팀 확인 필요)**: `cesium` 1.123.0 (`/disaster` 화면에 들어갈 때만 불러옴, 빌드 크기 약 3.5MB). Cesium 작업 파일은 `scripts/copy-cesium.mjs` 가 `npm run dev/build` 전에 `public/cesium` 으로 복사 (git 제외)
+- `package.json` `overrides`: `@zip.js/zip.js` 를 2.7.x 로 고정 — 최신(2.25)은 Cesium 1.123 이 쓰는 파일이 없어 빌드가 깨짐
+- 색: 야간용 어두운 색을 `DisasterMapView.vue` 안 CSS 변수(`--dm-*`)로 둠. tokens.css 에 아직 없는 색이라 팀에서 정하면 옮김
+- 서버·DB: 바꾼 것 없음. 기상특보는 예시 데이터 그대로(서버 특보 API 연결은 다음)
+- 확인: `npm run build` 통과, `npm run dev` 로 `/disaster` 열어 지도·강수량 단계(60→130mm 높은 곳 경로 전환)·길안내 1→2단계·화면 떠날 때 정리 확인
+- 확인 못 함: 휴대폰 실기기, 서버(8080)를 켠 상태에서 다른 화면과 함께 동작
+
+## 2026-11-18 가족 모임방 위치 탭 서버+DB(family_location) 연결 (브랜치 `lyh-location`)
+- 더미 배열 `client/src/data/familyLocationDummy.js` 삭제. 위치 탭은 `GET /api/family/locations` 결과만 찍는다
+- 동의 = DB 에 내 줄이 있음. localStorage 동의 저장은 없앰 (다른 기기에서도 같은 상태)
+  - 동의하기·스위치 켜기 → 브라우저 GPS 를 받아 `PUT /api/family/locations/me` (UPSERT) → 목록 다시 불러와 지도에 찍음. GPS 를 못 받으면 저장하지 않고 문구만 보임 (가짜 좌표 안 넣음)
+  - 스위치 끄기 → `DELETE /api/family/locations/me` (내 줄 삭제 → 가족에게 안 보임)
+  - (같은 날 변경) 위쪽 "가족 위치 확인" 문구·위치 공유 스위치 삭제. 안내창은 "위치 공유에 동의하시겠습니까?" + [동의 안 함] [동의합니다]. "언제든 끌 수 있어요" 문구도 뺌 → **화면에서 공유를 끄는 방법이 없음** (방 나가기로만 삭제, API `DELETE /api/family/locations/me` 는 남겨 둠)
+  - 새로고침 → 내 GPS 다시 저장(못 받으면 건너뜀) + 목록 다시 불러오기
+  - (2026-11-19 변경) **브라우저 GPS 저장은 일단 뺌.** 위치 탭은 `family_location` 에 SQL 로 넣은 좌표만 찍는다. [동의합니다]는 서버에 저장하지 않고 이번 화면에서만 지도를 보여 줌 (내 줄이 있으면 묻지 않음). 새로고침 = DB 다시 읽기. 서버 PUT API·store `saveMyLocation` 은 남겨 둠
+  - 방 나가기(`DELETE /api/family/room/me`) 때도 내 위치 삭제 (11-06 합의 "끄거나 나가면 삭제")
+- 백엔드: `LocationRequest` 추가, `LocationMapper.upsert·delete`, `LocationService.saveMine·deleteMine`, `FamilyMapper.deleteLocation`. DB 구조는 그대로 (`schema_05.sql` 주석만 갱신)
+— 화면이 열려 있는 동안 자동 갱신은 아직 없음
 ## 2026-11-23 메타버스: 퀴즈 소품 (브랜치 `myj-metaverse`, DB 변경 없음)
 - 퀴즈 자리에 문제 상황을 보여 주는 3D 소품이 나옴 (모닥불, 버너, 난로, 텐트 화재와 소화기, 벌집 등 28가지). 새 파일 `metaverse/src/metaverse/props.js`
 - `missions.json` 문제에 `prop`(소품 이름) 칸 추가 — 40문제 중 37문제. 주차장·도로·분수 3문제는 소품 없음
@@ -91,6 +341,21 @@
 - 서버 `mycamping/`: 요청 `campId` 선택 · `lat`·`lng` 추가, 자리 중복 검사(`existsSpot`), 응답에 `lat`·`lng`. 테스트 3개 추가 (서버 테스트 통과)
 - 화면: `PlanSheet` 에 lat·lng, 내 캠핑 카드에 "차박지" 표시 + 이름 누르면 `/chabak?lat=&lng=` 로 그 자리 판정 (`ChabakMap` 이 `ready` 를 알림)
 - 확인 못 함: 실제 DB 에 schema_05 실행 · 브라우저 화면 (빌드·서버 테스트만 통과)
+
+## 2026-11-17 시설 상세 지도: 점선 직선 → 카카오 도로 경로
+- `FacilityDetailView`: 캠핑장에서 들어오면(`?camp=`) `GET /api/camps/{campId}/routes`(캠핑장 상세와 같은 API, 서버 24시간 저장)를 불러 이 시설의 `path` 로 도로 선을 그림. 못 받으면 예전처럼 점선 직선 + "실제 경로를 불러오지 못해 직선(점선)으로 보여 드려요"
+- 시간·거리 카드도 경로를 받았으면 카카오 값, 아니면 DB 값 (캠핑장 상세 경로 지도와 같은 규칙). 지도 아래 안내 한 줄 추가
+- 서버·`RouteMap` 은 바꾸지 않음 (`dotted` 를 경로 유무에 따라 켜고 끔)
+- 확인: `npm run build` 통과. 확인 못 함: 브라우저에서 카카오 키로 실제 선이 그려지는지
+
+## 2026-11-17 안전점수 다시 계산: 카카오 소요시간 + ROC 배점, 100점 만점 (브랜치 `lyh-scorefix2`)
+- 직선거리 기준·`score_weights` 를 계산에서 뺌 → `ScoreWeight`·`ScoreNearest`, `ScoreMapper.findWeights`·`findNearest` 삭제. CCTV·가로등도 제외 (팀 결정)
+- 배점: 중요한 순서만 정하고 ROC 공식 `(1/n)·Σ(1/i, i=k..n)` 으로 나눔 (`ScoreRules.TIERS`·`roc`·`points`). 상(응급실·소방서·경찰) / 중(약국·편의점) 2등급 → 상 75점(25씩) · 중 25점(12.5씩). 3등급이면 사진의 20·14·6 이 나오는 것을 테스트로 확인
+- 시간 기준(`ScoreRules.TIME`): 응급실 30분 만점·60분 0점, 소방서 5분·15분, 경찰 5분 만점·**점수 매긴 캠핑장 중 가장 먼 곳 0점**. 그 사이는 시간에 비례 (응급실 40분 → 20 × 20/30 = 13.3)
+- 계산 순서: 모든 캠핑장 카카오 시간을 먼저 모은 뒤(경찰 0점 기준을 알아야 해서) 점수 저장. 카카오를 못 부르면 아무것도 저장하지 않고 멈춤
+- 약국·편의점: 정해진 분 숫자가 없어 캠핑장끼리 비교 (팀 결정) — 가장 빠른 캠핑장 만점, 가장 먼 캠핑장 0점, 그 사이는 카카오 분에 비례
+- 확인: `.\mvnw.cmd test` 101개 통과 (새 `SafetyScoreServiceTest` 7개: ROC 값·배점 합 100·40분 예시·경찰 가장 먼 곳·약국 비교 방식·카카오 실패 시 저장 안 함)
+- 확인 못 함: 실제 DB·카카오로 `--score` 실행. 편의점 중 상비약 파는 곳만 고르는 것(데이터에 그 칸이 없어 camp_facility 의 가장 가까운 편의점 그대로 씀). 시설 고르기(camp_facility)는 아직 직선으로 가장 가까운 1곳이라, 차로는 다른 시설이 더 빠를 수 있음
 
 ## 2026-11-17 차박 서버 코드 정리 (결과 그대로)
 - `ChabakService`: 응급실 분 꺼내기를 `erDriveMinOf()` 하나로 (찍은 지점 점수 · 후보지 같이 씀), `score()` 의 가중치 합 중복 계산 제거 (`scoreOf` 한 곳)
@@ -190,6 +455,20 @@
 - 확인: `npm run build` 통과
 - 확인 못 함: 브라우저에서 실제로 눌러 보기 (카카오 지도 클릭 · 필지 칠하기 · 시트 올리고 내리기)
 - 남은 것: 인제군 경계선 표시(경계 데이터 없음), 차박 지도 위 등록 야영장 마커, 근처 야영장 줄을 캠핑장 상세로 잇기(응답에 id 없음)
+
+## 2026-11-16 가족 모임방 3차 위치 탭 — 1단계: 빈 지도 (브랜치 `lyh-location`)
+- 새 파일 `client/src/components/family/LocationTab.vue`: 위치 탭을 누르면 카카오 지도를 띄운다. 가로는 화면 폭, 세로 55vh(최소 280px). 창 크기가 바뀌면 `keepMapSized` 로 다시 맞춤
+- `FamilyRoomView.vue`: `TABS` 의 위치 탭 `component: null` → `LocationTab` ("준비 중이에요" 대신 지도)
+- 마커 수정: 파란 점(흰 테두리 + 흰 빛) 아래에 파란 이름표(흰 글씨, 테두리 없음). 색 변수 `--color-family-pin` 추가(`tokens.css`, 길 선 파랑 재사용). 더미 인물 짱구·맹구, 좌표는 인제군청 부지 안 대략값(확인 필요). 가까운 두 점이 겹치지 않게 `fitPoints` 최소 확대를 3으로
+- 새로고침 버튼(탭 오른쪽 위): 위치를 다시 불러와 마커를 새로 찍고 가족이 모두 보이게 지도를 다시 맞춤. 지도 아래에 "HH:MM 확인" 표시 (확인한 시각이지 위치가 찍힌 시각이 아님). 지금은 더미라 값은 같고, 서버 연결 때 `refresh()` 안의 한 줄만 API 호출로 바꾸면 됨
+- 위치 공유 동의(시연용): 위치 탭에 들어오면 동의 안내창("내 위치가 이 가족방 구성원에게 보여요 · 언제든 끌 수 있어요", [나중에] [동의하고 보기]). 동의 전에는 지도를 만들지 않음. 나중에 → "동의하면 가족 위치를 볼 수 있어요" + [동의하기]. 동의는 이 브라우저 localStorage(`campin.locationConsent.<회원 id>`)에만 저장 → 다음부터 안 물음. 지도 아래 [공유 끄기]로 철회. 실제 서비스에서는 DB(`location_consent` 안)에 저장해야 함. 회원가입 화면은 바꾸지 않음
+- "나" 마커 구분: 나는 밝은 초록 점·이름표(이름만, "(나)" 표시 없음), 겹치면 위에 표시. 색 변수 `--color-family-me: #16a34a` (사용자 요청으로 새 색 추가).
+- 가족방 구성원 목록: "(나)" 글자를 빼고 내 이름 칩을 같은 밝은 초록(`--color-family-me`) + 흰 굵은 글씨로. 마우스를 올리면 "로그인한 나", 화면 읽기 프로그램에는 "이름, 나"
+- 탭 순서: 위치 · 모일 곳 · 아이 카드 · 일정 (가족방에 들어오면 위치 탭이 먼저)
+- 동의 화면 변경: 화면 전체를 어둡게 덮던 안내창 대신, 지도 칸을 회색(`--color-photo`)으로 두고 가운데에 팝업 카드("내 위치가 이 가족방 구성원에게 보여요. 공유는 언제든 끌 수 있어요." [나중에] [동의하기]). 나중에 → 같은 문구 + [동의하기]만 남고 회색 유지. 동의하면 같은 칸에 지도
+- 3단계 DB: `db/schema_05.sql` — `family_location`(member_id UNIQUE · lon · lat · updated_at). 더미 여부 컬럼은 두지 않음(지금은 전부 시드라 구분할 대상이 없음, 시드 주석에 "시연용 가상 좌표"). 시드 INSERT 는 주석으로 넣어 둠(login_id 를 바꿔 따로 실행). **아직 어떤 DB 에도 실행 안 함**
+- 서버: `family/` 에 LocationController · LocationService · LocationMapper · LocationResponse · FamilyLocation. `GET /api/family/locations` → `[{ id, name, lat, lng, me, updatedAt }]`. 방 확인은 `requireMyRoom`, 방 구성원 중 위치가 있는 사람만(JOIN family_member → 나간 사람은 안 보임)
+- 위치 탭 모양 수정 (2026-11-16): 위쪽에 "위치 공유" on/off 스위치(LayerSheet 스위치와 같은 모양, 켜기 = 동의 · 끄기 = 철회, 아래 "공유 끄기" 글자 버튼은 없앰). 새로고침은 지도 오른쪽 위 동그란 버튼으로 옮김.
 
 ## 2026-11-12 DB 정리 3단계: saved_camp.camp_id 숫자 + 캠핑장 외래키 (브랜치 `db-cleanup-2`)
 - 새 파일 `db/schema_04.sql`: ① camp 에 없는 캠핑장을 가리키는 `saved_camp` 줄 삭제 (더미 `c1`~`c3`, 덤프 기준 4줄) ② `saved_camp.camp_id` varchar → bigint ③ 외래키 `saved_camp.camp_id` · `camp_plan.camp_id` → `camp(id)`
@@ -546,3 +825,205 @@
 - CSRF 방어 켬 (`csrf.spa()`) — curl 로 토큰 없으면 403, 있으면 통과 확인
 - 로그인할 때 세션 id·CSRF 토큰 새로 발급 (`sessionAuthenticationStrategy`), requestCache 끔 → 로그인 안 한 요청에 세션 안 생김 (curl 확인). 토큰 교체는 member 테이블이 없어 확인 못 함
 - 남은 일: 주소 검색 연결(지금은 직접 입력), 오류 문구 색(토큰에 없음 → 정해야 함), ①-1 메인
+
+## 2026-11-20 웹(PC) 화면 (브랜치 `bgh-split-layout`, 주소 `/web/...`)
+- 구조: 웹은 `router/webRoutes.js` + `views/web/` + `components/web/` + `styles/tokens-web.css`(`--web-*`)로 따로 둔다. 모바일 화면·`tokens.css` 는 그대로. 좁은 화면은 `/web/...` → 모바일 주소로 보낸다
+- 설계서(CAMPINE PC 화면설계) 25장 구현: 홈, 로그인·가입, 1분 진단(6유형), 탐색·캠핑장 상세·시설 상세·차박지, 내 주변(카카오 도로 경로), 저장(비교표), 내 예약, 예약 확인, 전체 메뉴
+- 설계서에 없던 화면(모바일 기능을 웹 모양으로): 지역·날짜 선택 팝업(`WebTripModal`, 홈 검색칸·탐색 칩), 관광지 상세, 알림, 출발 준비 체크리스트, 모임방(모일 곳·아이 카드·일정), 내 정보
+- 모임방의 가족 위치(지도) 탭은 웹에 없음. 내 정보의 비상연락처·여행 취향·가족·공지는 "준비 중"
+- 확인: `npm run build` 통과. 확인 못 함: 브라우저에서 새 화면 직접 보기(지도·로그인 화면 포함)
+
+## 2026-11-20 웹·앱 주소 분리: 모바일을 `/app` 으로
+- 모바일 라우트를 `router/mobileRoutes.js` 로 옮기고 주소에 `/app` 접두사를 붙임 (`/explore` → `/app/explore`). 화면 파일 위치·라우트 이름은 그대로
+- 옛 주소(`/explore`, `/camps/12?tab=tour` 등)는 쿼리를 유지한 채 `/app/...` 으로 자동 이동 (`legacyRedirects`) → 이미 공유한 링크·북마크 보호
+- `/` 는 화면 폭으로 `/web` 또는 `/app/explore`. 좁은 화면에서 `/web/...` 로 오면 같은 모바일 화면으로 보냄 (웹에만 있는 이름은 대응표로: alerts→my-info/alerts, family→my-camping/family, my-booking→my-camping, checklist/:id→my-camping/:id/checklist)
+- 모바일 화면·부품 25개 파일의 링크 69곳을 `/app/...` 으로 바꿈. 서버에는 화면 주소를 쓰는 곳이 없어 변경 없음
+- 확인: `npm run build` 통과, 라우터만 따로 돌려 옛 주소 8개가 `/app` 으로 넘어가는 것 확인
+- 확인 못 함: 브라우저에서 모바일 화면을 직접 눌러 보기 (특히 하단 탭, 뒤로가기, 로그인 후 이동)
+
+## 2026-11-20 클라이언트 폴더·이름 규칙 통일 (웹 `Web…` / 모바일 `Mobile…`)
+- 모바일 화면을 `views/mobile/Mobile○○View.vue`, 부품을 `components/mobile/Mobile○○.vue` 로 한 폴더에 모음 (웹의 `views/web/Web○○View.vue`, `components/web/Web○○.vue` 와 같은 규칙). `git mv` 로 옮겨 이력 유지, 파일 48개
+- 컴포넌트 이름과 `import` 경로, 라우터(`mobileRoutes.js`)를 함께 고침. 화면 주소(`/app/...`)와 라우트 이름은 그대로
+- 안 쓰던 Vue 기본 템플릿 파일(HelloWorld · TheWelcome · WelcomeItem · AboutView · HomeView · components/icons)은 삭제
+- 위 옛 기록의 `views/camp/…` 같은 경로는 당시 이름이다 → 지금은 `views/mobile/Mobile…View.vue`
+- 확인: `npm run build` 통과, 모바일 화면 13개 주소를 실제 브라우저로 열어 정상 표시 확인. 확인 못 함: 로그인 후 화면
+
+## 2026-11-20 앱 비상연락처·함께 가는 가족 화면 삭제 / 웹 메뉴 정리
+- 앱에서 `MobileEmergencyContactView`(비상연락처)와 `MobileTravelFamilyView`(함께 가는 가족) 화면, 라우트(`/app/my-info/emergency-contacts`, `/app/my-info/family`), 내 정보 메뉴 항목을 삭제
+- `stores/family.js` 의 아이 카드 함수·`children` 목록 삭제 (이 화면만 쓰던 것). 모임방 기능은 그대로
+- 문구 수정: 인원·날짜 시트의 "내 정보 › 함께 가는 가족에 저장됩니다" → "아이 나이대는 내 정보에 저장됩니다", 여행 취향 화면의 "함께 가는 가족에서 바꿀 수 있어요" 문장 삭제
+- 웹: 전체 메뉴의 "공지사항 · 문의하기", 내 정보의 비상연락처 · 함께 가는 가족 · 공지사항 · 문의 항목 삭제 (최근 본 캠핑장 · 내 안전 설정은 앞서 삭제)
+- 서버 API(`/api/member/emergency-contacts`, `/api/family/children`)와 DB 테이블(`emergency_contact`, `child_card`)은 그대로 둠 (삭제는 따로 정할 일)
+- 확인: `npm run build` 통과, 삭제한 화면 이름이 코드에 남아 있지 않음. 확인 못 함: 브라우저에서 앱 내 정보 화면 직접 열어 보기
+
+## 2026-11-20 웹 재난 대피 3D 지도 / 앱 공지사항·문의 삭제
+- 웹 `/web/disaster` 추가 (`views/web/WebDisasterMapView.vue` + `components/web/WebDisasterPanel.vue`). 지도는 앱과 같은 `utils/disasterMap.js`(CesiumJS)를 그대로 쓰고, 앱에서 지도 위·아래에 흩어져 있던 제목·기상특보·비 슬라이더·대피 안내를 왼쪽 400px 패널 한 칸에 모음. 높낮이 그래프만 앱의 `MobileRouteProfile` 을 그대로 가져다 씀(화면 배치가 없는 그림이라)
+- 웹 메뉴·내 정보·내 예약의 "3D 재난 대피 지도" 링크를 `/web/disaster` 로 연결 (`utils/webLinks.js`). 좁은 화면에서 `/web/disaster` 로 오면 기존 규칙대로 `/app/disaster` 로 감
+- 앱 내 정보의 "공지사항 · 문의" 항목 삭제 (로그인 전·후 모두)
+- 확인: `npm run build` 통과. 실제 Chrome(1400px)에서 지도·패널·비 슬라이더·높낮이 그래프 표시, "대피 길안내 시작" 눌러 단계 안내로 바뀜, 콘솔 오류 없음, 390px 에서 `/app/disaster` 로 이동
+- 확인 못 함: 길안내 단계에서 지도 바탕이 하얗게 보인 것이 테스트용 Chrome(소프트웨어 그래픽)의 타일 로딩 때문인지 (앱에도 같은 코드라 코드 문제는 아닐 것으로 보임), 사람 손으로 지도 돌리기·확대, 비 슬라이더로 물 차오르는 모양
+
+## 2026-11-20 1분 진단 안내 팝업: 웹 위치·바탕 닫기, 앱에 같은 디자인 적용
+- 웹 홈 팝업(`WebHomeView`): 위에서 150px 띄우던 배치를 가로·세로 정중앙으로 바꿈(화면이 낮으면 스크롤, 아래가 잘리지 않음). 어두운 바탕을 누르면 닫힘(카드 안쪽은 안 닫힘)
+- 앱 탐색 화면의 진단 안내 팝업을 웹 디자인으로 교체: 새 `components/mobile/MobileSurveyNudge.vue`(390px 틀에 맞춰 줄임). 문구는 앱 진단이 5문항이라 "5문항 · 약 1분 · 로그인 없이". 버튼은 진단 시작하기 / 오늘 하루 보지 않기 / 닫기, 바탕 누르면 닫힘
+- "닫기"·바탕 누르기는 이 탭에서만 안 뜸(sessionStorage), "오늘 하루 보지 않기"는 오늘 하루 안 뜸(localStorage 날짜). 뜨는 조건(진단 전에만)은 그대로
+- 색은 `tokens.css` 에 `--color-nudge-*` 7개 추가 (웹 `tokens-web.css` 의 진단 팝업 값과 같음, 사용자 요청)
+- 옛 앱 팝업 그림(`assets/illust/camping.svg`)은 이제 쓰는 곳이 없다 (파일은 남겨 둠)
+- 확인: `npm run build` 통과, 실제 Chrome 에서 웹(1400×700)·앱(390×800) 팝업 표시와 바탕 클릭으로 닫힘 확인. 확인 못 함: "오늘 하루 보지 않기" 다음 날 다시 뜨는지, 아주 낮은 화면(400px 이하 높이)에서의 스크롤
+
+## 2026-11-20 앱에 지난 캠핑 후기 · 예약 정보 확인 추가 (웹과 맞춤)
+- 후기: 내 캠핑(`MobileMyCampingView`)의 지난 캠핑 카드에 "후기 쓰기 / 후기 수정하기" 버튼과 작성한 후기(사진 → 글 3줄 + 더보기 → 작성 날짜, 사진 누르면 크게 보기). 쓰기·수정 화면은 새 `components/mobile/MobileReviewSheet.vue` (390px 틀 전체를 덮음). 서버는 웹과 같은 API (`GET /api/member/camp-plans/reviews`, `POST /api/member/camp-plans/{id}/review`) — 서버 변경 없음
+- 후기 규칙은 웹과 같음: 별점 없음, 글이나 사진 중 하나만 있어도 저장, 글 1000자 · 사진 9장 · 한 장 10MB · 이미지만. 쓰던 내용이 있는데 닫으면 확인 창
+- 지난 캠핑 카드를 통째로 흐리게 하던 것(opacity)을 이름·날짜만 연하게로 바꿈 (후기가 흐려지지 않게)
+- 예약 정보 확인: 새 `views/mobile/MobileBookingCheckView.vue`, 주소 `/app/booking-check?camp=캠핑장id`. 예약 여부 · 날짜 · 인원 · 동행 · 가는 수단을 확인해 내 캠핑에 저장 (웹과 같이 인원·동행·수단은 메모로 저장). 들어가는 길: 내 캠핑의 예약 전·중 카드(캠핑장 일정만)에 "예약 정보 확인 ›"
+- 휴대폰 폭에서 `/web/booking-check` 로 들어오면 이제 `/app/booking-check` 로 이동 (전에는 탐색으로 갔음)
+- 확인: `npm run build` 통과. 실제 Chrome(390px)에 테스트 계정으로 로그인해 내 캠핑 지난 카드·후기 쓰기 화면·예약 정보 확인 화면 표시와 오류 없음 확인. 저장은 공유 DB 에 글이 남아 누르지 않음
+- 확인 못 함: 후기 저장·수정(사진 올리기 포함), 작성한 후기가 카드에 보이는 모양, 예약 정보 저장, 실제 휴대폰 사진 고르기
+
+## 2026-11-22 캠핑 기간 날씨 카드에 날씨별 아이콘 · 색
+- 앱 출발 준비(`MobileChecklistView`)의 날씨 카드가 전부 회색이던 것을 하늘·강수 종류별로 아이콘과 카드 바탕색을 다르게: 맑음(노랑) · 구름많음(해+회색 구름) · 흐림(회색) · 비/소나기(파랑) · 눈, 비/눈(청록). 강수가 있으면 하늘보다 강수 우선
+- 웹 출발 준비(`WebChecklistView`)는 줄 목록이라 하늘 글씨 앞에 같은 아이콘만 붙임
+- 새 부품 `components/common/WeatherIcon.vue`(웹·앱 공용), 종류 정하는 `utils/weather.js`. 색은 `tokens.css` 에 `--color-wx-*` 로 추가 (임시 팔레트 — 디자인 확정되면 값만 바꾸면 됨). 서버 변경 없음
+- 확인: `npm run build` 통과. 확인 못 함: 실제 화면에서 아이콘 모양·색 대비 (로그인이 필요한 화면이라 눈으로 못 봄), 눈·비 예보가 있는 날의 표시
+- (같은 날) 앱 날씨 카드: 3일을 가로 한 줄로(4일 이상은 옆으로 넘김, 스크롤바 숨김), 카드 밑 "기상청 단기예보 · 캠핑장 위치 기준 · 아침 최저 / 낮 최고" 글 삭제, 앱 틀(`MobileLayout`)의 세로 스크롤바 숨김 (휠·터치 스크롤은 그대로). 웹 날씨 카드의 같은 안내 글은 그대로 둠
+- (같은 날) 앱 스크롤바 숨김을 틀 하나가 아니라 `styles/base.css` 의 `.frame, .frame *` 전역 규칙으로 바꿈 — 화면마다 자기 스크롤 영역(`.scroll`)이 따로 있어서 틀만으로는 안 숨겨졌음. 마우스 기기의 가로 칩 줄(`.hscroll`) 막대는 그대로 보임. 확인: 헤드리스 Chrome 에서 스크롤이 생기는 앱 화면의 `.scroll` 막대 폭 0
+- (같은 날) 앱 출발 준비 맨 밑 안내 글("체크한 항목은 이 기기(브라우저)에만 저장돼요 · 특보는 기상청 특보 현황 기준 참고용이에요") 삭제. 웹 출발 준비의 같은 글은 그대로 둠
+- (같은 날) 앱 출발 준비(`MobileChecklistView`) 디자인 손봄: 맨 위 "준비 3/9" 진행 막대 추가(체크한 항목 수, 지난 캠핑은 숨김), 항목 묶음을 둥근 카드로(제목 옆 종류 색 점 + 체크한 개수 "2/3", 다 하면 초록), 체크칸 네모→동그라미, 특보 배너 왼쪽 색 띠, 안전 정보·안내 상자 테두리 대신 연한 바탕, 날씨 제목 크게·테두리 상자 없앰. 색은 기존 변수만(새 색 없음). 서버·기능 변경 없음. 확인: `npm run build` 통과 — 로그인이 필요한 화면이라 실제 모양은 눈으로 못 봄
+- (같은 날) 앱 출발 준비의 특보 배너(건조경보·주의보 등)를 접고 펼 수 있게: 제목("○○ 발효 중")은 늘 보이고 긴 지역 목록은 제목을 눌러 펼침, 처음엔 접힘. 확인: `npm run build` 통과 (화면은 로그인이 필요해 눈으로 못 봄)
+- (같은 날) 출발 준비: 특보 배너 왼쪽 색 띠와 묶음 제목 앞 색 점 삭제, 묶음 이름 "특보 대응·날씨 대응" → "특보 대비·날씨 대비" (앱·웹). 계절 기준은 서버 `ChecklistItems.seasonOf` — 체크인 월 기준 봄 3~5 · 여름 6~8 · 가을 9~11 · 겨울 12~2 (기온·지역은 안 봄)
+
+## 2026-11-22 출발 준비: 온도로 정하는 준비물을 계절에서 날씨 묶음으로
+- 침낭 · 핫팩 · 보온 매트 · 일산화탄소 경보기 · 물통 동파 주의는 계절(가을·겨울)로 정하지 않고 예보 최저기온으로: 최저 -12° 이하(기상청 한파주의보 발표 기준 온도)면 핫팩 · 일산화탄소 경보기, 0° 이하(물이 어는 온도)면 동파 주의 · 침낭 쾌적온도 확인 (-12° 이하면 둘 다). 출처 있는 두 기준만 쓰고 새 온도 구간은 만들지 않음
+- 계절 묶음은 월 기준 그대로 두되 온도 항목만 뺌: 겉옷(일교차) · 벌레 퇴치제 · 마스크 · 그늘막 · 아이스박스 · 우비 · 화기 확인은 계절에 남음. 겨울은 남는 항목이 없어 계절 묶음이 안 보임
+- 화면 묶음 이름: "가을 준비물·겨울 준비물" → "계절 대비" (앱·웹). 서버 `ChecklistItems`·`ChecklistServiceTest`(32개 통과, 새 테스트 2개)·`server/CLAUDE.md` 반영. 항목 id 변경: 침낭 `wx-cold-3`·`season-*-bag` 삭제 → `wx-freeze-2` (그 항목에 해 둔 체크는 풀림)
+- 달라지는 점: 예보가 없는 먼 일정(출발 3일 전보다 이전)에는 침낭·핫팩·경보기·동파 항목이 아예 안 나옴 (온도를 모르면 권하지 않음). 한파·강풍 등 특보 항목은 그대로
+- 확인: `ChecklistServiceTest` 통과, `npm run build` 통과. 확인 못 함: 전체 서버 테스트(`ServerApplicationTests` 는 공유 DB 접속이라 안 돌림), 실제 화면
+- (같은 날) 앱 출발 준비: "준비 0/13" 진행 막대 삭제, 안전 정보 줄의 "응급실 차로 ○분" 삭제. 날씨 카드 바탕을 모두 연한 회색으로 돌리고 날씨 색은 작은 동그란 아이콘 배경에만 남김 (특보 배너의 빨강·주황과 비슷해 보이던 것을 구분). 확인: `npm run build` 통과 (화면은 눈으로 못 봄)
+- (같은 날) 출발 준비 문구를 "~요"에서 "~니다"체로 통일: 서버가 만드는 항목 설명(`ChecklistItems` — 쌀쌀합니다 · 쉽습니다 · 비교하십시오 · 얼 수 있습니다)과 앱·웹 체크리스트 안내문(로그인 안내, 지난 캠핑, 특보·날씨를 받지 못했습니다, 특보 없음, ○월 ○일부터 보입니다, 웹 맨 밑 안내 등). `ChecklistServiceTest` 문구 검사도 맞춤(32개 통과), `npm run build` 통과. 이 화면 밖의 다른 화면 문구는 그대로
+- (같은 날) 출발 준비 항목 아래 작은 글을 단답으로: "11.22 예보 최저 -10° · 0° 이하" · 침낭 "쾌적온도 비교 -10° 이하" · 한파 "11.19 예보 최저 -12° · 한파주의보 기준 이하" · "아침저녁 쌀쌀" · "밀폐되기 쉬움" (문장 끝맺음 없음). 서버 `ChecklistItems`·`ChecklistServiceTest`(32개 통과)·`server/CLAUDE.md` 반영, 서버를 다시 켜야 보임
+- (같은 날) 앱 출발 준비: 안전 정보 줄(등급 배지 · 캠핑장 상세 링크)을 키움(글씨 12→15~16px, 배지·여백 확대), 항목 묶음 카드 테두리를 1px 연한 줄에서 1.5px 짙은 줄(`--color-border`)로. 확인: `npm run build` 통과 (화면은 눈으로 못 봄)
+- (같은 날) 앱 차박 화면 목록 머리의 "지도를 누르면 그 자리를 판정해요" 글씨를 회색에서 기본 글씨색으로. 확인: `npm run build` 통과
+- (같은 날) 앱 차박 화면: 목록 머리의 "안전점수순 / 응급실 가까운순" 정렬 선택 삭제 → 항상 안전점수 높은 순(같으면 응급실 가까운 곳 먼저). 응급실 거리는 안전점수에 이미 들어 있고 후보지 값은 직선 어림이라서. 탐색 화면의 정렬은 그대로. 또 가로 칩 줄(`.hscroll`)의 마우스 기기용 얇은 막대를 삭제해 앱 안의 스크롤 막대를 모두 숨김(탐색·차박·캠핑장 상세 칩 줄 포함, 휠·터치로는 그대로 넘어감). 확인: `npm run build` 통과
+- (같은 날) 앱 차박 안전점수 필터: 칩·시트 이름 "주변 안전" → "안전점수"(앱의 다른 곳과 같은 이름), 선택지 "주의 이상" → "위험 제외"(40↑, 주의+안전), "안전만"(70↑)은 그대로. 시트 선택지 앞에 등급 색 점(위험 제외=주황 `--color-caution`, 안전만=초록 `--color-green`, 전체는 점 없음 — 새 색 없음). 판정 카드의 "주변 안전" 줄은 다른 항목이라 그대로. 이 시트는 차박 화면 전용이라 탐색 화면 영향 없음. 확인: `npm run build` 통과
+- (같은 날) 앱 차박 안전점수 시트의 안내 문장("갈 수 있는 곳을 안전점수로 걸러요 · 캠핑장 안전점수와 같은 기준") 삭제 (제목·선택지로 충분). "지도에 구역 표시" 시트의 안내 문장은 그대로. 확인: `npm run build` 통과
+- (같은 날) 앱 차박 목록: 머리의 "지도를 누르면 그 자리를 판정해요" 삭제, 칩이 모두 꺼졌을 때 안내를 "차박 후보지 · 등록 야영장을 눌러 목록을 확인하세요"로. 확인: `npm run build` 통과
+- (같은 날) 앱 차박 목록: 칩이 모두 꺼졌을 때 안내를 "차박 후보지 · 등록 야영장을 눌러 목록 확인"으로(끝맺음 뺌). 차박 후보지 줄의 "응급실 약 ○분" 삭제 — 직선거리 어림값이고 안전점수에 이미 들어 있어서. 등록 야영장 줄의 "응급실 차로 ○분"(카카오 값, 탐색 목록과 같음)은 그대로. 확인: `npm run build` 통과
+- (같은 날) 앱 차박 지도: 등록 야영장 표시를 점에서 탐색 지도와 같은 텐트 아이콘 배지(`facilityIcon.js` 의 `camp`)로. 바탕색은 기존 판정 색(야영 가능 파랑) 그대로, 누르는 범위(44px)와 동작은 점과 같음. 차박 후보지는 지금처럼 점(개수가 많아 겹침·속도 때문에 보류). 확인: `npm run build` 통과 (지도는 눈으로 못 봄)
+- (같은 날) 앱 차박 지도: 차박 후보지를 지도를 확대했을 때(카카오 레벨 5 이하)만 자동차 아이콘 배지(초록, `facilityIcon.js` 에 Lucide car 추가)로 보이고 멀리서는 지금처럼 점(개수가 최대 1000곳이라 겹침·속도 때문). 확대·축소로 그 기준을 넘나들 때만 후보지를 다시 그림. 등록 야영장 텐트 배지와 함께 아이콘 배지 만드는 코드를 하나(`layerIconEl`)로 합침. 아이콘 모양은 정적 HTML 로 렌더링해 확인(지도 위 겹침은 못 봄)
+- (같은 날) 앱 차박 판정 카드 정리: 위 딱지·제목과 겹치던 "차박 규제 ○○" 줄 삭제, "주변 안전" → "안전점수", 시설·근처 후보 안내 글을 짧게(가까운 순 · 시간은 직선거리 어림값 / 공공데이터상 제한 없는 국공유지). 법적 안내 문구(공공데이터 기준 참고용…)는 그대로. 확인: `npm run build` 통과
+- (같은 날) 앱 차박 지도 아이콘 배지 키움: 차박 후보지 자동차 26→36px, 등록 야영장 텐트 30→40px, 배지 안 그림 64→70%. 누르는 범위(44px 버튼)는 그대로. 확인: `npm run build` 통과 (지도 위 겹침은 못 봄)
+- (같은 날) 앱 차박 지도 아이콘 조정: 등록 야영장 텐트는 원래 크기(30px, 그림 64%)로 되돌림. 차박 후보지는 확대해도 점으로만 보이던 문제라서 아이콘이 나오는 확대 단계를 레벨 5 → 7(화면 폭 2km 안팎)로 넓히고 자동차 배지는 36px·그림 72%. 한 화면에 후보지가 너무 많아 겹치면 기준 숫자(`ICON_LEVEL`)만 조정. 확인: `npm run build` 통과 (지도 위 모습은 못 봄)
+- (같은 날) 앱 차박 판정 카드 문구 정리: "제한 없음" 판정 제목 "공공데이터상 제한이 없는 곳이에요" → "공공데이터상 제한 없음", 가까운 시설 목록 위 안내 "가까운 순 · 시간은 직선거리 어림값" 삭제(줄의 "차로 약 ○분"의 "약"은 그대로), 맨 아래 안내를 "공공데이터 기준 참고용 판정이며 법적 경계는 지적측량으로 확정"까지만(뒤의 "지금은 인제군만 판정해요" 삭제). 확인: `npm run build` 통과
+- (같은 날) 앱 차박 판정 제목을 짧게 통일: 불가 "차박 불가" · 주의 "확인 필요" · 제한 없음 "공공데이터상 제한 없음" · 야영 가능 "등록된 야영장". 확인: `npm run build` 통과
+
+## 2026-11-22 웹 1분 진단: 침수 예측지도 묶음 삭제, 이동수단만 남김 (10문항 → 8문항)
+- `utils/webSurvey.js`: "위급할 때는요?"(침수 예측지도) 묶음과 8번(도착하면 먼저 볼 것)·9번(119에 먼저 말할 것) 삭제. 10번 "위급할 때 차로 이동할 수 있나요?"(`car`)만 안전지도 묶음의 5번째 질문으로 옮김. 메타버스 퀴즈는 3문항(난로·화로·계곡물)
+- 점수 분야가 5개 → 3개(일산화탄소 · 화재 · 물·호우): 막대 3개, 유형은 3종 + "든든 대비형", "조심할 것" 카드 3개. "대피 준비"·"신고" 유형·조심할 것 문구와, 그 분야에만 영향을 주던 위험 가중(혼자·어르신·처음 캠핑)은 삭제. 체크리스트의 "소화기·대피로 위치 확인", "사이트 번호 메모", "119 신고 순서"는 그대로(분야가 없어져 "꼭" 표시만 안 붙음). 조심할 것 맨 밑 "위급하면 바로 119" 카드도 그대로
+- 문항 수 표기 "10문항" → 웹 진단 화면은 질문 개수를 따라가게(`ALLQ.length`), 웹 홈 말풍선은 "8문항". 앱 진단은 5문항 그대로(웹·앱 불일치는 보류 중 — 서버 저장은 둘을 맞춘 뒤)
+- 확인: 샘플 답 2가지로 결과 계산 정상(오류 없음), `npm run build` 통과. 확인 못 함: 실제 화면 모양
+- 알아 둘 것: 이동수단(`car`) 답은 지금 결과 화면 어디에도 쓰이지 않음(키워드 앞 3개에만 들어가고 4번째 태그는 안 보임). 추천 캠핑장도 답과 상관없이 안전점수 상위 5곳
+
+## 2026-11-22 앱 1분 진단을 웹과 같은 8문항으로 (클라이언트만, 서버·DB 변경 없음)
+- 앱 진단(`MobileSurveyView`)을 웹과 같은 질문 8개로 교체: ① 어떤 캠핑을 가나요? (누구와 · 어디서 · 언제 · 경험 · 이동수단, 아이를 고르면 나이대) ② 이럴 땐 어떻게 할까요? (난로 · 화로 · 계곡물 퀴즈). 질문·선택지·결과 계산은 웹과 같은 `utils/webSurvey.js` 를 공유해 앞으로 웹·앱이 항상 같음 (새 도우미 `answerTags` · `campTypeOf`)
+- 답 저장(`stores/survey.js`): 서버 대신 이 브라우저 — 로그인했으면 웹 진단과 같은 사용자별 저장소(`web-survey-saved`)라 웹에서 한 진단이 앱에도 보임, 안 했으면 탭(sessionStorage). 서버 `/api/survey`·`survey_answer`·`SurveyQuestions` 는 지우지 않고 앱이 안 부름. 결과 화면은 만들지 않고 내 정보 카드에 요약(예: "아이 동반 · 영유아 · 오토캠핑 텐트 · 여름 · 첫 캠핑 · 차량 대피")만
+- 탐색 추천 연결 유지: "어디서 주무세요?" 답을 캠핑 유형으로 변환해 `/api/camps/recommend?campType=` 에 넘김 (글램핑 → glamping, 오토캠핑·차박 → auto). 노지·백패킹은 진단에 없어져 진단으로는 정해지지 않음. 추천 제목 밑 문구는 옛 답(난방 · 시설 순위)을 읽던 것을 실제 반영하는 것(캠핑 유형 + 안전점수 순)만 말하게 바꿈
+- 문구: 앱 팝업·내 정보 카드의 "5문항"·"3단계" → "8문항"·"2단계"
+- 영향: 앱에서 이미 서버에 저장해 둔 옛 진단 답은 안 읽혀서 그 사용자에게는 "진단 안 한 상태"(팝업 다시 뜸)
+- 확인: `npm run build` 통과, 헤드리스 Chrome(390px)에서 8문항 전체를 눌러 보며 2단계 이동·아이 나이대 입력란·미답 시 안내·마치기 후 탐색 이동·저장값 확인, 화면 캡처 확인(콘솔 오류 없음). 확인 못 함: 로그인 상태의 사용자별 저장·웹↔앱 공유, 탐색 추천 목록이 새 유형으로 거르는 것
+
+## 2026-11-22 웹 홈 "전국 안전 캠핑장 순위"를 실제 데이터로
+- 손으로 적어 둔 8곳(`NATION`, 점수 94·92… 더미)을 지우고 서버 `GET /api/camps?sort=score` 의 안전점수 상위 8곳(이름·점수·`imageUrl`)으로 연결. 카드를 누르면 그 캠핑장 상세(`/web/camps/:id`)로 이동(예전엔 탐색). 사진 주소가 없는 캠핑장은 회색 사진 칸 그대로(사진은 DB `camp.image_url` 에 `https://` 주소가 있는 곳만). 못 받으면 예시 점수를 대신 보여 주지 않고 "순위를 불러오지 못했어요"
+- 같은 화면의 "내 근처" 캠핑장 3곳·공지사항은 아직 더미. 확인: `npm run build` 통과. 확인 못 함: 실제 순위·사진 표시(공유 DB 를 읽는 서버 호출이라 직접 안 돌림 — 새로고침해서 확인)
+
+## 2026-11-23 웹 1분 진단 문구 · 추천 유형 거름 / 앱 내 캠핑 바로가기
+- 웹 진단(`webSurvey.js`, `WebSurveyView.vue`): 퀴즈 묶음의 "메타버스" 칩·문구를 지우고 "선택에 따라 조심해야 할 것이 달라집니다", 첫 묶음 문구는 "주무시는 방식에 맞는 캠핑장을 골라 드려요". 추천 캠핑장을 "어디서 주무세요?" 답으로 거름(`campTypeOf` → `/api/camps?campType=`, 글램핑 2곳·오토 21곳). 다시 진단하면 고른 답은 그대로 두고 추천만 다시 받음. 0곳이면 "찾지 못했어요" 안내
+- 앱 내 캠핑(`MobileMyCampingView.vue`): 웹 내 예약 카드처럼 지나지 않은 일정 카드에 "메타버스 안전 탐험"(`/metaverse`) · "3D 재난 대피 지도"(`/app/disaster`) 바로가기
+- 진단 유형별 안전점수(지도에서 켜고 끄기)는 규칙 합의 전 — 비교안은 워크스페이스 `Claude outputs/진단유형별_안전점수_방식비교.md`
+- 확인: `npm run build` 통과. 확인 못 함: 화면에서 직접 누르기
+- 가족 캠핑 공유: 서버 `GET /api/family/camp-plans` (새 `family/FamilyCampPlan*`, `FamilyService.findMyRoomOrNull`) — 같은 가족방 다른 사람의 `camp_plan` 을 읽기만 (DB 구조 변경 없음, 방에 있으면 자동 공유, 방 없으면 빈 목록). 테스트 `FamilyCampPlanServiceTest` 2개. 앱 내 캠핑에 "가족 캠핑" 묶음(지나지 않은 일정만, "○○님이 등록", 삭제·출발 준비 없음, 메타버스·재난지도 바로가기). 확인: 서버 테스트 183개 통과, `npm run build` 통과. 확인 못 함: 실제 DB 로 두 계정 화면 확인, 웹 내 예약에는 아직 없음
+- 가족 일정 출발 준비: `GET /api/member/camp-plans/{id}/checklist` 를 같은 가족방 사람도 볼 수 있게 (`CampPlanMapper.findVisible` — 내 것 또는 같은 방 사람 것, 그 밖은 404 그대로). 고치기·지우기·후기는 여전히 본인만(`findById`). 앱 가족 캠핑 카드에 "출발 준비" 줄. 체크 표시는 보는 사람 브라우저에 따로. 테스트 1개 추가, 서버 테스트 184개 통과 · `npm run build` 통과. 확인 못 함: 실제 DB 두 계정
+- 웹 내 예약에도 "가족 캠핑" 묶음 (다가오는 캠핑 탭 아래, "○○님의 캠핑", 사진·안전점수·날짜·메모, 안전 점검 체크리스트·주변 안전시설·메타버스·재난지도. 삭제·예약 정보 확인 없음). `npm run build` 통과, 화면 확인 못 함
+- 웹 내 예약 "다가오는 캠핑" 탭 맨 아래에 "가족 모임방" 버튼(/web/family, 앱 내 캠핑 하단 버튼과 같은 역할). 내 일정이 없어도 보임. 색은 tokens-web 변수만. `npm run build` 통과, 화면 확인 못 함
+- 이름 바꿈: 화면 글자 "가족 모임방"·"가족방" → "모임방", "가족 캠핑" → "모임방 캠핑", 웹 모임방의 "가족 일정" → "모임방 일정" (웹·앱 내 캠핑·내 예약·모임방 화면, 위치 동의 문구, 서버 오류 문구 FamilyRoomRequest·FamilyService). 코드·주소(family, /web/family)는 그대로. 서버 테스트 184개 · `npm run build` 통과
+- 앱 모임방 소개 문구에서 "아이 정보" 삭제 (앱에 아이 정보 탭이 없어 문구만 남아 있었음) → "위치, 모일 곳, 일정"
+- 웹 화면 글자 "내 예약" → "내 캠핑" (헤더 메뉴·햄버거 메뉴·내 정보 목록·내 캠핑 화면 제목·체크리스트 뒤로가기·예약 정보 확인 버튼·삭제 확인 문구). 앱 이름과 맞춤. 주소(/web/my-booking)·파일 이름(WebMyBookingView)은 그대로. `npm run build` 통과
+- 웹 헤더 오른쪽(로그인 앞)에 "앱 화면" 버튼 (시연용 웹 → 앱 전환). 같은 화면의 앱 주소로(내 캠핑 → /app/my-camping, 모임방 → /app/my-camping/family, 알림 → /app/my-info/alerts 등), 없으면 /app/explore. 웹→앱 대응표를 `utils/webLinks.js` 의 `webToAppPath` 한곳으로 옮기고 router/index.js 도 이걸 씀. `npm run build` 통과. 앱 → 웹 버튼은 아직 없음
+- 웹 헤더: "앱 화면" 글자 버튼을 없애고, 기능 없던 검색 버튼 자리에 휴대폰 아이콘만 있는 전환 버튼(로그인 · [앱] · 알림 · 메뉴). 검색 버튼 삭제. `npm run build` 통과
+- 앱 로그인 화면(로그아웃 상태) 오른쪽 위에 웹 전환 버튼(모니터 아이콘만, /web/login). PC 처럼 넓은 창(768px 이상)에서만 보임 — 좁으면 /web 이 앱으로 되돌아와서. `npm run build` 통과
+
+## 2026-11-23 진단 유형 점수 (응급실 가산점) — 웹·앱 탐색 지도
+- 규칙(팀 결정): 진단에서 아이·어르신·차박·겨울·걸어서 중 하나라도 고르면, 응급실이 가까운 캠핑장일수록 최대 +5점 (30분 안 +5 → 60분 넘으면 0, 비례·반올림, 겹쳐도 한 번). 저장된 안전점수·등급은 그대로, 화면에 "79 +5" 로 따로. 봄·여름·가을·경험·퀴즈는 가산점 없음. 이동 답은 가산점에만 쓰고 조심할 것·대비할 것에는 안 씀. 비교 문서: 워크스페이스 `Claude outputs/진단유형별_안전점수_방식비교.md`
+- 서버: `ScoreRules.ER_BONUS_MAX`(5) · `erBonus(분)`, `CampResponse.erBonus`, `/api/camps`·`/recommend` 에 `sort=bonus`(안전점수+가산점). DB 변경 없음(`camp.er_drive_min` 사용). 테스트 `ScoreRulesBonusTest` 3 · `CampServiceBonusTest` 2
+- 클라이언트: `webSurvey.js` 의 `erBonusReasons`·`needsErBonus`, `stores/survey` 의 `bonusOn`(진단을 마치면 켜짐), 웹 진단을 마치면 답을 `stores/survey` 에도 저장(지도가 읽게). 앱 탐색: "내 유형 점수" 칩 · 안전점수순일 때 bonus 정렬 · 목록/마커에 "+N" · 이유 한 줄. 웹 탐색: "내 유형 점수 켜짐/꺼짐" 버튼 · 추천 TOP 5·목록 bonus 정렬 · 목록/마커/정보 카드에 "+N"
+- 캠핑장 상세(웹 패널·앱): `/api/camps/{id}` 에도 `erBonus`, 점수 옆 줄에 "내 유형 점수 +5 · 아이 동반 …" (켜짐 · 해당 답일 때만). 다른 화면(홈 순위·저장 비교·내 캠핑·체크리스트)과 차박 후보지는 기본 점수 그대로
+- 확인: 서버 테스트 189개 통과, `npm run build` 통과. 확인 못 함: 실제 화면(서버를 다시 켜야 `erBonus` 가 나옴)
+- 캠핑장 상세(웹·앱)의 "내 유형 점수" 줄에 끄기/켜기 버튼 (탐색과 같은 상태). 문구 "…이라" → "…에 해당해" (예: 걸어서 대피이라 → 걸어서 대피에 해당해). `npm run build` 통과
+- 캠핑장 상세(웹·앱) 점수 원을 누르면 내 유형 점수 켜기/끄기 (켜면 원에 "76 / 71 +5", 끄면 "71 / 안심", 색은 저장된 등급 그대로, 원 바깥 테두리 + 아래 "내 유형 ON/OFF" 꼬리표). 줄의 끄기/켜기 버튼은 없애고 설명만. 가산점이 없는 사람·캠핑장은 원이 버튼이 아님. `npm run build` 통과
+- 웹은 "+5" 를 따로 붙이지 않고 내 유형 점수를 켜면 점수 숫자 자체가 바뀜 (탐색 목록·핀·정보 카드·상세 원: 71 → 76). 등급 색·글자는 저장된 점수 그대로, 상세 설명 줄에 "안전점수 71" 을 남김. 앱은 그대로 "+5" 표시
+- 앱도 웹과 같이 "+5" 대신 점수 숫자 자체가 바뀜 (탐색 목록·마커·상세 원 71 → 76, 상세 설명 줄에 "안전점수 71"). MobileCampRow·MobileCampMap 의 +N 표시 제거. `npm run build` 통과
+- 앱 탐색 "내 유형 맞춤" · "내 유형 점수" 두 칩을 "내 유형" 하나로 합침: 켜면 추천 TOP 5(유형 거름·위험 뺌) + 내 유형 점수(가산점 더한 숫자·정렬), 끄면 전체 목록 + 기본 점수. 상태는 stores/survey 의 bonusOn 하나(상세 점수 원과 같이 움직임). `npm run build` 통과
+- 웹 캠핑장 상세의 "리뷰" 탭 삭제 (기능 없음, "준비 중"만 보였음). 앱 상세엔 원래 없음. 웹 1분 진단 결과의 분야별 막대(일산화탄소·화재·물호우 점수) 삭제 → 유형 카드는 유형 이름·한 줄·해시태그만. 웹 "내 유형 점수" 버튼 구조는 그대로 둠(사용자 결정). `npm run build` 통과
+
+## 2026-11-23 재난지도: 특보 카드 가림 · 거리 요약 줄 · 높낮이 그래프 정리 (앱·웹, 클라이언트만)
+- 앱: 특보 알림(`MobileAlertPill`)을 누르면 펼쳐지는 설명 카드가 강수량 막대(z-index 6) 밑에 깔려 가려지던 것 → 펼친 동안만 알림을 막대 위(8)로. `MobileDisasterMapView` 의 `topbar` 에서 z-index 를 빼고 제목(`.place`)과 알림(`.alert`)에 따로 줌(막대 위로 제목·그림자가 덮이지 않게). 웹은 특보가 패널 안에 펼쳐져 있어 해당 없음
+- 앱·웹: 단계 제목 밑 작은 글 "서화중앙교회까지 1.41km · 도보 약 21분"(`state.dest.sum`) 삭제 — 아래 대피소 칸에 거리·시간이 이미 있어 겹침
+- 앱·웹: 대피 길 높낮이 그래프 삭제. `MobileRouteProfile.vue` 파일과 `disasterMap.js` 의 그래프 계산(`updateProfile`·`profileBase`·`waterAt`·`state.profile`) 함께 지움
+- 웹 패널(`WebDisasterPanel.vue`)은 팀원이 만든 파일이지만 사용자 요청으로 위 두 줄만 손댐
+- 확인: `npm run build` 통과, 브라우저(앱 375px·웹)에서 85mm로 특보 카드가 막대 위에 보임·요약 줄·그래프 없음 확인. 확인 못 함: 실제 휴대폰(iOS Safari 15.4 미만은 `:has` 미지원이라 카드가 예전처럼 가려질 수 있음)
+
+## 2026-11-23 웹 재난지도를 앱과 똑같이 맞춤 (클라이언트만)
+- 웹 화면은 실시간을 받지 않아 특보 칸이 "확인 중"에 멈춰 있었음 → 앱 화면에 있던 실시간·특보 코드(`/api/disaster/now` 10분마다, 특보 칸, 미리 보기 예시 특보)를 `utils/disasterLive.js`(`useDisasterLive`)로 빼서 앱(`MobileDisasterMapView`)·웹(`WebDisasterMapView`)이 같이 씀. 앱 동작은 그대로
+- 웹 패널(`WebDisasterPanel.vue`)을 앱 시트·막대와 같게: 장소 줄 "· 인제군 서화면" 삭제, "높은 곳 (참고)" → "산 위 높은 곳", "{단계} 단계 행동요령", 119 `tel:` 링크(눌러서 전화), 길안내 "…가 잠겼어요 · 산으로", 침수(114mm 이상)에는 경로·목적지·길안내 숨김, 막대 글 "3시간 강수량"·관측 시각 줄·긴 눈금 겹침 방지, "AI 판단/기준표" 표시 삭제(앱에 없음), 특보 칸 색(특보 없음 = 안전 색, 못 받음 = 회색)
+- 확인: `npm run build` 통과, 브라우저에서 웹(실황 11.23 10:00 관측 0mm 안전 · 95mm 대피 · 120mm 경로 숨김)·앱(375px 실황 표시) 확인. 콘솔 401 은 로그인 안 한 `/api/auth/me` 라 무관
+
+## 2026-11-23 재난지도: 현상황 보기 · 카카오맵 길찾기 · 비 효과 (앱·웹, 클라이언트만)
+- 현상황 보기: 막대로 미리 보는 중이고 받아 둔 실황이 있으면 막대 칸의 관측 시각 줄 자리에 "미리 보기 중 [↺ 현상황 보기]". 누르면 마지막으로 받은 `/api/disaster/now` 실황으로 돌아감(`useDisasterLive().backToLive`). 실황을 못 받았으면 버튼 없음. 앱 `MobileRainSlider`·웹 `WebDisasterPanel` 같은 모양(`emit('live')`)
+- 카카오맵 길찾기: 대피소 칸 "위치 보기" 옆 버튼. 대피소 경로(안전·준비)일 때만, 산 대피·침수에는 없음(정해진 길이 없어서). `state.dest.navUrl` = `map.kakao.com/link/by/walk/캠핑장,위도,경도/서화중앙교회,위도,경도` (걷기, 새 창). 열어서 도보 18분·1.2km 경로 나오는 것 확인 — 카카오가 고른 길이라 우리 지도의 1.41km 경로와 다를 수 있음
+- 비 효과: 지도 위 투명 캔버스에 옅은 빗줄기(`rainFx`, disasterMap.js). 3시간 강수량에 따라 줄기 수만 바뀜(5mm 미만 없음 → 최대 160mm 에서 90개, 투명도 0.22). 움직임 줄이기 설정이면 그리지 않음. 색은 `--color-dm-text`
+- 확인: `npm run build` 통과, 브라우저(앱 375px·웹)에서 95·150mm 빗줄기, 현상황 보기로 0mm 실황 복귀, 카카오 링크(40mm 있음·150mm 없음) 확인. 확인 못 함: 실제 휴대폰에서 카카오맵 앱으로 열리는지, 빗줄기가 폰에서 느려지지 않는지
+
+## 2026-11-23 재난지도: 버튼 정리 · 비 효과 진하게 (앱·웹)
+- "▶ 대피 경로 따라가기"(캐릭터가 경로를 걷는 미리 보기) 버튼 삭제 → 그 자리에 "카카오맵 길찾기" 버튼(대피소 경로일 때만, 대피 단계에는 없음). 대피소 칸 "위치 보기" 옆의 작은 카카오 버튼은 뺌. 지도 쪽 `toggleTour` 동작은 코드에 남아 있지만 부르는 버튼은 없음
+- 큰 버튼 글자 "대피 길안내 시작"·"대피 경로 미리 보기" → 전 단계 "대피경로 보기" (`LV[].cta`)
+- 비 효과를 더 잘 보이게: 최대 줄기 90 → 170개, 투명도 0.22 → 0.38, 굵기 1 → 1.3, 길이 조금 길게
+- 확인: `npm run build` 통과, 브라우저 웹·앱(375px)에서 70mm(대피경로 보기 + 카카오맵 길찾기)·95mm(대피경로 보기만), 빗줄기 확인
+- (이어서) 경로 따라가기 기능을 코드에서도 삭제: `disasterMap.js` 의 `startTour`·`stopTour`·`toggleTour`·`tour` 프레임 처리·`tourSec`, 화면 상태 `tourOn`·`meU`(옛 높낮이 그래프 점), 앱·웹 막대의 `v-show="!state.tourOn"`. 길안내(대피경로 보기 → 단계별 이동·캐릭터 걷기)는 그대로. 확인: 빌드 통과, 앱(375px)·웹에서 대피경로 보기 → 다음 → 길안내 종료 동작, 콘솔 오류 없음
+
+## 2026-11-23 재난지도: 기상청 호우특보로도 단계를 올림 (서버)
+- 문제: 단계가 이미 내린 비(실황, 1시간 단위·약 40분 늦게 나옴)와 상류 수위로만 정해져서, 호우경보가 발효돼도 비가 아직 덜 왔으면 화면이 "안전"으로 나올 수 있었음 (특보는 화면에 보여 주기만 함)
+- 수정: `DisasterRules.judgeWarnings` 추가 — 인제에 걸린 호우주의보 → 1 준비, 호우경보 → 2 대피. 최종 단계 = 비 · 수위 · 호우특보 중 가장 높은 쪽 (`DisasterService`). 특보는 기상청이 "3시간 60·90mm 이상 예상" 때 내리는 예보 기반 경고라 새 숫자 기준은 없음
+- 호우특보가 없을 때는 판단 재료에서 뺌(특보가 없다고 "안전"이라 하지 않음). 한파·건조 등 다른 특보는 단계와 상관없음. 까닭 줄에 "기상청 호우경보 발효"가 나와 앱·웹 막대 아래 관측 줄에 함께 보임 (화면 코드 변경 없음, `disasterLive.js` 주석만)
+- 확인: 서버 테스트 185개 통과(재난지도 15개, 새 테스트 4개: 특보만으로 단계 올림 · 비가 더 크면 비를 따름 · 호우 아닌 특보는 무관 · 특보가 없다고 안전이라 하지 않음). 확인 못 함: 실제 호우특보 발효 중 화면(지금은 특보 없음)
+
+## 2026-11-24 차박 서버 주석 정리 (동작 변경 없음)
+- "캠핑장 안전점수와 같은 계산" 주석을 바로잡음: 차박 /score·후보지 점수는 직선거리 + raw.score_weights(예전 방식), 지금 camp.safety_score 는 카카오 차 시간 + ScoreRules → 기준이 다름 (ChabakController·Service·Mapper·ScoreResponse·LayerItem, server/CLAUDE.md). layer 응답 칸 목록 갱신, 없는 06_shared_db_after_restore.sql 언급을 README 절차로. 컴파일 확인
+- 웹 내 주변·저장 지도의 기상특보 띠(WebWeatherBar, "강원 · 기상특보 · 확인 못 함") 삭제 (특보 조회 코드도 같이 뺌, 부품 파일은 남김). 차박지 찾기 전환 버튼을 공통 부품 `components/web/WebChabakToggle.vue` 로 빼서 검색·내 주변·저장 지도 오른쪽 위에 같이 붙임. `npm run build` 통과
+- 웹 저장(로그인 후): 오른쪽 전체를 덮던 비교표를 없애고 지도(관심 캠핑장 핀 · 시설 칩 · 차박 버튼)를 보여 줌. 비교표는 지도 위, 관심 캠핑장 목록 바로 옆 패널(520px)로. ✕ 로 닫으면 "비교 보기 (n곳)" 버튼, 체크를 바꾸면 다시 열림. 패널이 열려 있으면 시설 칩을 패널 오른쪽으로. `npm run build` 통과, 화면 확인 못 함
+- 앱 차박 지도: 등록 야영장에 저장(하트) — 목록 줄(MobileSpotRow) 오른쪽 하트, 판정 카드 "관심 캠핑장에 저장/저장됨" 버튼. 저장 탭 관심 캠핑장에 담김 (stores/favorite.js, 서버 변경 없음). 차박 후보지는 camp 표에 없어(saved_camp 외래키) 저장 불가 — 하트 안 보임. 웹 차박지 찾기 목록은 후보지만 있어 해당 없음. `npm run build` 통과
+- 웹 차박지 찾기(/web/chabak): ① 핀·목록을 누르면 왼쪽에 차박지 상세(새 `components/web/WebChabakDetailPanel.vue`, 웹 캠핑장 상세와 같은 틀) — 스카이뷰/야영장 사진 · 판정+안전점수 상자 · 판정 사유 · 규제구역 · 땅 정보 · 가까운 시설 · 근처 후보(누르면 그 자리로) · 근처 야영장 · 카카오맵 길찾기 · (야영장이면) 캠핑장 상세. 고른 필지를 지도에 판정 색으로 칠함. ② 앱과 같은 레이어 필터(WebCarPanel): 차박 후보지 · 등록 야영장(새로 목록에 들어감) · 불가 구역 · 주의 구역(지도에 반투명 면) · 안전점수(전체/위험 제외/안전만). WebCampMap 에 zones · parcel 다각형 추가. 하트 저장은 넣지 않음(후보지는 저장 표에 못 담음, 사용자 결정). `npm run build` 통과, API 응답 확인(후보지 46 · 야영장 23 · 구역 · 판정). 화면 확인 못 함
+- 웹 차박지 찾기 지도: 후보지 핀 아래 이름표("475-3 잡종지") 숨김 (WebCampMap hideNames). 고른 핀 · 등록 야영장은 이름 보임, 숨긴 핀은 마우스를 올리면 이름(title). 목록 · 상세에는 그대로
+- 웹 차박지 찾기: "차박할 땐 이것만 챙겨요" 고정 문구 상자 삭제. 지도 아무 곳이나 누르면 그 자리를 판정해 왼쪽 상세에 보여 줌 (WebCampMap mapclick 이벤트, 종류 "지도에서 찍은 자리", 인제군 밖이면 서버 문구 그대로). 검색 탭에서는 지도 클릭 무시. `npm run build` 통과
+- 웹 차박지 찾기: 지도에서 찍은 자리 · 근처 후보 핀에도 안전점수 표시 (상세 패널이 점수를 받으면 score 이벤트로 핀에 반영, 핀 색도 등급대로)
+- 웹 차박지 상세에 "내 캠핑에 일정 등록" (웹 캠핑장 상세와 같은 시트: 로그인 안내 → 날짜·메모 → 완료). 야영장은 campId, 후보지·찍은 자리는 lat·lng 로 저장(이름: 후보지 "475-3 잡종지", 찍은 자리 "지번 지목"). 아래 버튼: 카카오맵 길찾기 · (야영장) 캠핑장 상세 · 내 캠핑에 일정 등록. `npm run build` 통과, 실제 등록은 안 눌러 봄(공유 DB)
+- 1분 진단 아이 나이: "청소년 13세 이상" 선택지 추가 (고를 수 있지만 결과는 성인 일행과 같음 — 물·호우 +1 · 아이 체크리스트 · 지도 응급실 가산점 모두 12세 이하만, webSurvey.js hasYoungChild). 대비할 것을 나이별로: 영유아 = 상비약·해열제·체온계 / 화로·난로 거리 두기 / 물가 손 닿는 거리 / 구명조끼, 어린이 = 상비약·해열제 / 화로·버너 약속 / 구명조끼 / 연락처 카드·호루라기(근거 자료 없음). 해시태그에 "· 청소년". 웹·앱 같이 적용. `npm run build` 통과
+- 진단 해시태그: "#아이 동반 · 영유아" → "#영유아" / "#어린이" / "#청소년" (whoTag)
+- 웹 진단 결과 "캠핑장 고르기": 내 유형 점수(응급실 가산점) 해당 답이 있고 켜져 있으면 가산점 순(sort=bonus)으로 고르고 점수도 더한 값으로 표시 (지도 · 상세와 같은 숫자). `npm run build` 통과
+- 웹 진단 결과 "대비할 것": "꼭" 배지 대신 색으로 강조 (연한 노랑 바탕 + 왼쪽 띠 + 굵은 갈색 글씨, 토큰 --web-grade-danger-*), 강조 항목을 위로 정렬, 위에 "색이 칠해진 항목은 내 유형에 특히 중요해요" 안내. 체크하면 강조를 거둠. 화면 읽기 프로그램용 숨김 글 "(내 유형에 특히 중요)". `npm run build` 통과
+- 진단 첫 묶음 문구: "주무시는 방식에 맞는 캠핑장을 골라 드려요" → "선택에 따라 추천 캠핑장 점수가 달라집니다" (응급실 가산점이 추천 점수에 반영돼서)
+- 진단 첫 묶음의 "안전지도" 칩 삭제 (feature 비움 → 웹은 칩을 그리지 않음)
+- 진단 "누구와 가세요?" 옆 안내 "여러 개 골라도 돼요" 삭제 (복수 선택은 그대로)
+- 진단 유형을 캐릭터 6개로 (webSurvey.js CHARACTERS · AXIS_TYPES · typeOf): 조심할 것 1위 분야 → 답으로 캐릭터. 일산화탄소 = 차박 🐢 등껍질 거북이 / 겨울 🐻 이불 속 곰 / 기본 거북이, 화재 = 오토 🦝 불멍 너구리 / 봄가을 🐿️ 낙엽 다람쥐 / 기본 너구리, 물·호우 = 아이(12세 이하) 🦆 꼬마 오리 가족 / 여름 🦦 계곡 수달 / 기본 수달. 문구 = 성격(trait) + 행동 하나(act). 든든 대비형 등 예전 4유형 삭제, 퀴즈 다 맞히면 👑 배지(allRight). 결과 첫 줄 "{분야}를 가장 조심해야 하는 ‘{캐릭터}’ 유형이에요", 캠핑장 고르기 제목은 실제 기준대로("안전점수(내 유형 점수 포함)가 높은 순으로 골랐어요" — 예전 "하천에서 떨어진 높은 사이트 · 대피로가 가까운 순" 같은 사실이 아닌 문구 제거). 12개 조합을 node 로 돌려 규칙대로 나오는 것 확인, `npm run build` 통과
+- 유형 문구: 마침표 삭제, 행동 줄을 "~세요" 로 (열어 두세요 · 끄세요 · 확인하세요 · 다시 한번 보세요 · 계속 보세요 · 가세요)
+- 유형: 🦦 계곡 수달 → 🐸 장마 개구리 ("비 오는 날도 캠핑은 못 참는 타입 / 비가 많이 오면 물가 자리는 피하고, 물이 불어나면 바로 높은 곳으로 가세요") — 진단에 계곡 가는지 묻는 질문이 없고 여름 가중치 근거가 장마·집중호우라서. 물·호우 기본 캐릭터도 개구리. 다람쥐 성격 "가을 숲" → "마른 숲" (봄에도 나와서)
+- 진단 결과 유형 카드의 "일행과 함께하는 · 불을 다루는 캠퍼" 줄 삭제 (해시태그와 겹침)
+- 진단 결과: "👑 상황 퀴즈 모두 정답" 배지 삭제 (퀴즈 정답 여부를 결과에 알리지 않음, allRight 제거)
+- 진단 결과 유형 카드: 동물 얼굴(이모지 120px) 크게 + 오른쪽에 이름, 그 아래 말풍선 두 개(성격 / 지켜야 할 행동 — 굵게, 유형 색 테두리, 왼쪽 꼬리). `npm run build` 통과, 화면 확인 못 함
+- 진단 결과 유형 카드를 스케치대로: 가운데 동그라미(200px) 안에 캐릭터, 아래 이름, 왼쪽 가운데 말풍선 = 성격(꼬리 → 캐릭터), 오른쪽 위 말풍선 = 행동(굵게 · 유형 색 테두리, 꼬리 ↙ 캐릭터). 좁은 화면(760px 이하)은 세로로 쌓고 꼬리 숨김. `npm run build` 통과, 화면 확인 못 함
+- 진단 결과 말풍선 다시: 테두리·삼각 꼬리 없이 그림자로 띄운 둥근 말풍선(캐릭터 쪽 모서리만 뾰족, 메신저 느낌). 성격 = 흰 말풍선, 행동 = 유형 색으로 채운 말풍선 + 흰 글씨. 캐릭터 동그라미 삭제, 이모지 140px + 옅은 그림자. `npm run build` 통과
+- 진단 결과 유형 카드 배치를 사용자 시안대로: 위쪽 양옆 말풍선(왼쪽 성격 · 오른쪽 행동), 가운데 캐릭터, 아래 이름, 오른쪽 아래 ⚠ 꼬리표 + 해시태그 (grid-template-areas). 좁은 화면은 캐릭터 → 이름 → 말풍선 → 꼬리표·태그 세로. 캐릭터 그림 비교 예시: 워크스페이스 `Claude outputs/캐릭터_그림_비교.html` (이모지 · Fluent 2D Color · Flat · 3D, MIT 라이선스 확인). `npm run build` 통과
+- 진단 캐릭터 그림을 Fluent 3D 이미지로 통일: client/public/survey/characters/{turtle,bear,raccoon,chipmunk,duck,frog}.png (Microsoft Fluent Emoji 3D, 256px, MIT — 같은 폴더 LICENSE-fluentui-emoji.txt). CHARACTERS 에 img, 못 불러오면 이모지로 대신. 성격 말풍선은 유형 색을 옅게 깔고 테두리 · 글씨 색(불: 연한 주황 / 물: 연한 청회색)으로 흰 카드에서 구분되게. `npm run build` 통과, 개발 서버에서 이미지 200
+- 진단 결과 카드: 이름 ↔ 꼬리표·해시태그 간격 28 → 56px, 캐릭터 그림 160 → 220px
+- 진단 결과 애니메이션(CSS만): A 캐릭터 아래에서 튀어 올라 통통(0.1s~), C 말풍선 캐릭터 쪽 모서리에서 차례로 뿅(성격 0.75s → 행동 1.05s), 이름 · 꼬리표/해시태그 떠오르기, B 등장 뒤 캐릭터 둥실둥실(계속). 움직임 줄이기 설정이면 끔. `npm run build` 통과, 화면 확인 못 함
+- 진단 결과 캐릭터 누르기: 통 튀어 한 바퀴(char-jump) + 오른쪽 말풍선이 다음 안전 팁으로 바뀌며 바로 뿅. 팁 = 캐릭터 행동 + 분야별 3개(webSurvey.js AXIS_TIPS, 조심할 것·대비할 것 문장에서 가져옴), 마지막 다음은 처음. 이름 아래 "캐릭터를 눌러 보세요"(한 번 누르면 사라짐). 캐릭터는 버튼(키보드 포커스 표시), 말풍선 aria-live. `npm run build` 통과, 화면 확인 못 함
+- 진단 결과: 캐릭터 누르기 반응을 "점프·빙글" → 젤리처럼 눌렸다 출렁 + 반짝이 6개 팡 으로 교체 (팁 바뀌기는 그대로). 줄맞춤: 결과 화면 전체 word-break: keep-all(한글 낱말 중간 줄바꿈 방지), 말풍선은 text-wrap: balance + 가운데 정렬
+- 진단 결과 캐릭터 누르기: 반짝이 삭제 (젤리 출렁 + 팁 바뀌기만)

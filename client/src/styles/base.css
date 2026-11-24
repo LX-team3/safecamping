@@ -25,29 +25,27 @@ button {
   color: inherit;
 }
 
+/* ---- 앱 틀(.frame, layouts/MobileLayout.vue) 안의 스크롤바는 전부 숨긴다 (앱처럼 보이게) ----
+   화면마다 자기 스크롤 영역(.scroll 등)이 따로 있어서 틀 하나만 숨겨서는 안 된다 → 틀 안 전체에 한 번에.
+   휠·터치·키보드 스크롤은 그대로 된다. 가로 칩 줄(.hscroll)도 막대를 보이지 않는다 */
+.frame,
+.frame * {
+  scrollbar-width: none;
+}
+.frame::-webkit-scrollbar,
+.frame *::-webkit-scrollbar {
+  display: none;
+}
+
 /* ---- 가로로 넘기는 칩 줄 (탐색 필터 · 캠핑장 상세 시설 칩) ----
-   휴대폰(손가락)에서는 막대를 숨기고, 마우스를 쓰는 기기에서만 얇은 막대를 보여 줘 "옆으로 더 있다"를 알린다
-   휠로 넘기는 것은 utils/hscroll.js (v-hscroll) */
+   막대는 어느 기기에서도 보이지 않는다 (예전에는 마우스 기기에서만 얇은 막대를 보여 줬는데 지움).
+   손가락으로 밀거나, 마우스는 휠로 넘긴다 (utils/hscroll.js, v-hscroll) */
 .hscroll {
   overflow-x: auto;
   scrollbar-width: none;
 }
 .hscroll::-webkit-scrollbar {
   display: none;
-}
-@media (hover: hover) and (pointer: fine) {
-  .hscroll {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
-  }
-  .hscroll::-webkit-scrollbar {
-    display: block;
-    height: 6px;
-  }
-  .hscroll::-webkit-scrollbar-thumb {
-    border-radius: 3px;
-    background: var(--color-border);
-  }
 }
 
 /* ---- 지도 위 버튼 (탐색 · 차박 지도 오른쪽 위에 세로로 모음: 지도 설정 · 내 위치) ----

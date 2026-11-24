@@ -1,31 +1,19 @@
 <script setup>
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
+import MobileLayout from './layouts/MobileLayout.vue'
+import ReservationReturnPopup from './components/common/ReservationReturnPopup.vue'
+
+// 주소가 /web 으로 시작하면 웹(PC) — 틀(WebLayout)은 라우트가 직접 가져오므로 그대로 둔다
+// 'full'(메타버스 등)은 틀 없이 화면 전체에 그린다
+// 그 밖의 주소(/app/explore 등)는 모바일 390px 틀을 씌운다
+const route = useRoute()
 </script>
 
 <template>
-  <!-- 모바일 390px 폭 틀 -->
-  <div class="frame">
+  <RouterView v-if="route.meta.layout === 'web' || route.meta.layout === 'full'" />
+  <MobileLayout v-else>
     <RouterView />
-  </div>
+  </MobileLayout>
+  <!-- 예약 사이트에서 돌아오면 "예약하셨나요?" (어느 화면에 있든 뜨게 여기 한 번만) -->
+  <ReservationReturnPopup />
 </template>
-
-<style scoped>
-.frame {
-  max-width: var(--frame-width);
-  height: 100vh;
-  height: 100dvh; /* 모바일 주소창을 뺀 실제 보이는 높이 */
-  margin: 0 auto;
-  overflow-y: auto; /* 화면이 틀보다 길면 틀 안에서 스크롤 */
-  background: var(--color-bg);
-}
-
-/* PC 처럼 화면이 틀보다 넓을 때: 설계의 폰 크기(390×844)로 줄이고 가운데에 둔다 */
-@media (min-width: 391px) {
-  .frame {
-    height: min(var(--frame-height), calc(100dvh - 48px));
-    margin: 24px auto;
-    border-radius: 20px;
-    box-shadow: 0 0 0 1px var(--color-border), 0 4px 24px rgba(0, 0, 0, 0.08);
-  }
-}
-</style>
