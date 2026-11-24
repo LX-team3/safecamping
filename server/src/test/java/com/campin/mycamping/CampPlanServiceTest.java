@@ -82,13 +82,13 @@ class CampPlanServiceTest {
     // 오늘에서 며칠 뒤 체크인, nights 박
     private static CampPlanRequest plan(long campId, int daysLater, int nights) {
         LocalDate in = TODAY.plusDays(daysLater);
-        return new CampPlanRequest(campId, " 설하캠핑장 ", "강원 인제군 북면", null, null, in, in.plusDays(nights), "  ");
+        return new CampPlanRequest(campId, " 설하캠핑장 ", "강원 인제군 북면", null, null, in, in.plusDays(nights), "  ", null);
     }
 
     // 캠핑장이 아닌 자리 (차박 후보지 · 찍은 자리): campId 없이 좌표
     private static CampPlanRequest spot(Double lat, Double lng, int daysLater) {
         LocalDate in = TODAY.plusDays(daysLater);
-        return new CampPlanRequest(null, "475-3 잡종지", "강원 인제군", lat, lng, in, in.plusDays(1), null);
+        return new CampPlanRequest(null, "475-3 잡종지", "강원 인제군", lat, lng, in, in.plusDays(1), null, null);
     }
 
     @Test
