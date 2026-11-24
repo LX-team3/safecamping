@@ -35,7 +35,7 @@ class AlertServiceTest {
         for (int i = 1; i < res.items().size(); i++) {
             assertFalse(res.items().get(i).issuedAt().isAfter(res.items().get(i - 1).issuedAt()));
         }
-        assertEquals(1, res.activeWarnings().size());  // 더미 호우주의보
+        assertEquals(2, res.activeWarnings().size());  // 더미 강원 강풍주의보 · 건조주의보 (2026-11-23 실제 현황을 옮긴 것)
     }
 
     @Test
@@ -52,7 +52,7 @@ class AlertServiceTest {
         assertTrue(res.disasterDummy());
         assertEquals(1, res.activeWarnings().size());
         assertEquals("건조주의보", res.activeWarnings().get(0).category());
-        // 더미 기상특보(호우주의보)가 섞이지 않는다
+        // 더미 기상특보(id 가 w 로 시작)가 섞이지 않는다
         assertTrue(res.items().stream().filter(a -> a.kind().equals("warning"))
                 .allMatch(a -> a.id().startsWith("kma-")));
     }

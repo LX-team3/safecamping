@@ -29,6 +29,8 @@ public record CampPlanRequest(
         LocalDate checkOut,
 
         @Size(max = 100, message = "메모는 100자까지 입력할 수 있습니다.")
-        String memo
+        String memo,
+
+        Boolean notifyPhone    // true 면 저장 뒤 내 폰으로 브리핑 푸시 (웹에서만 true). 앱은 스스로 로컬 알림을 띄우므로 false — 두 번 울리지 않게
 ) {
 }

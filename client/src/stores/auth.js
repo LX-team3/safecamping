@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/utils/api'
+import { unlinkPushToken } from '@/utils/pushNotify'
 
 // 로그인 상태. 진짜 로그인 정보는 서버 세션에 있고, 여기에는 화면 표시용 회원 정보만 둔다
 export const useAuthStore = defineStore('auth', () => {
@@ -21,6 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    await unlinkPushToken() // 앱: 이 폰의 알림 등록을 먼저 지운다 (다음에 이 폰을 쓰는 사람에게 알림이 가지 않게)
     await api('/api/auth/logout', { method: 'post' })
     member.value = null
   }
