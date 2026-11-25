@@ -77,10 +77,10 @@ public final class DisasterRules {
             return new Judgement(null, List.of());
         }
         if (categories.stream().anyMatch(c -> c != null && c.contains("호우경보"))) {
-            return new Judgement(2, List.of("기상청 호우경보 발효"));
+            return new Judgement(2, List.of("인제 호우경보 발효"));
         }
         if (categories.stream().anyMatch(c -> c != null && c.contains("호우주의보"))) {
-            return new Judgement(1, List.of("기상청 호우주의보 발효"));
+            return new Judgement(1, List.of("인제 호우주의보 발효"));
         }
         return new Judgement(null, List.of());
     }

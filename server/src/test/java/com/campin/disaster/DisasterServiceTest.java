@@ -122,10 +122,10 @@ class DisasterServiceTest {
         WarningSource alarm = () -> Optional.of(List.of(warning("호우경보", "강원 인제평지에 호우경보가 발효 중입니다.")));
         DisasterNowResponse r1 = new DisasterService(every(0), watch, NO_WATER).now();
         assertEquals(1, r1.level());
-        assertEquals(List.of("기상청 호우주의보 발효"), r1.reasons());
+        assertEquals(List.of("인제 호우주의보 발효"), r1.reasons());
         DisasterNowResponse r2 = new DisasterService(every(0), alarm, NO_WATER).now();
         assertEquals(2, r2.level());
-        assertEquals(List.of("기상청 호우경보 발효"), r2.reasons());
+        assertEquals(List.of("인제 호우경보 발효"), r2.reasons());
     }
 
     @Test

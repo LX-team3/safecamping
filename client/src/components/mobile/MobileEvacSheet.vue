@@ -35,7 +35,7 @@ defineProps({
       <div class="seg" role="group" aria-label="경로 선택">
         <button type="button" :aria-pressed="state.routeKey === 'base'" :disabled="state.baseDisabled"
           @click="map?.selectRoute('base')">{{ state.baseLabel }}</button>
-        <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">산 위 높은 곳</button>
+        <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">가까운 높은 곳</button>
       </div>
 
       <div class="actions">
@@ -71,7 +71,7 @@ defineProps({
         <button type="button" class="btn primary" @click="map?.next()">{{ state.nav.nextLabel }}</button>
       </div>
       <button v-if="state.detourBtn" type="button" class="btn ghost detour" @click="map?.detour()">
-        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 산으로
+        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 높은 곳으로
       </button>
       <button type="button" class="btn ghost" @click="map?.endNav()">길안내 종료</button>
     </div>
