@@ -2,11 +2,16 @@
 // 가족 모임방 (내 캠핑 → 가족 모임방 버튼으로 들어옴. 설계 파일 없음 — 저장 화면 모양에 맞춤)
 // 방이 없으면 만들기·초대코드 입력, 있으면 방 정보 + 탭. 탭 내용은 components/mobile/ 에 하나씩 (MobileXxxTab)
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { askConfirm } from '@/utils/confirm'
+import { goUp } from '@/utils/backStack'
 import { useAuthStore } from '@/stores/auth'
 import { useFamilyStore } from '@/stores/family'
 import MobileMeetingPlaceTab from '@/components/mobile/MobileMeetingPlaceTab.vue'
 import MobileScheduleTab from '@/components/mobile/MobileScheduleTab.vue'
 import MobileLocationTab from '@/components/mobile/MobileLocationTab.vue'
+
+const router = useRouter()
 
 const auth = useAuthStore()
 const family = useFamilyStore()
@@ -61,10 +66,8 @@ async function join() {
 async function leave() {
   // 마지막 사람이 나가면 방과 그 안의 정보가 모두 지워지므로 한 번 더 묻는다
   const last = family.room.members.length === 1
-  const msg = last
-    ? '마지막 구성원이라 나가면 모임방과 모일 곳·일정이 모두 지워집니다. 나갈까요?'
-    : '모임방에서 나갈까요?'
-  if (!window.confirm(msg)) return
+  const message = last ? '마지막 구성원이라 나가면 모임방과 모일 곳·일정이 모두 지워집니다.' : ''
+  if (!(await askConfirm({ title: '모임방에서 나갈까요?', message, confirmLabel: '나가기' }))) return
   if (await run(() => family.leave(), error)) tab.value = 0
 }
 
@@ -94,7 +97,7 @@ async function run(fn, errorRef) {
 <template>
   <div class="family-room">
     <div class="head">
-      <RouterLink to="/app/my-camping" class="back" aria-label="내 캠핑으로">‹</RouterLink>
+      <RouterLink to="/app/my-camping" class="back" aria-label="내 캠핑으로" @click.capture.prevent="goUp(router, '/app/my-camping')">‹</RouterLink>
       <h1>모임방</h1>
     </div>
 

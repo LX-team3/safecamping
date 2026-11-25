@@ -10,6 +10,7 @@ const EMPTY = {
   sido: null, // { id, name } — null 이면 전국
   sigungu: null, // { id, name, safetyReady } — null 이면 시·도 전체 (또는 전국)
   adults: 1,
+  senior: false, // 어르신과 함께 가는지 (인원은 adults 에 포함, 서버로는 안 보낸다)
   kids: 0,
   childAges: [], // 아이 수만큼: infant | preschool | elementary
   checkIn: null, // "2026-11-14"
@@ -48,8 +49,9 @@ export const useTripStore = defineStore('trip', () => {
   }
 
   // 누구와 언제 시트에서 서버 검사(POST /api/trips/check)를 통과한 값만 넣는다
-  function setWhoWhen({ adults, kids, childAges, checkIn, checkOut }) {
-    state.value = { ...state.value, adults, kids, childAges, checkIn, checkOut }
+  // senior 는 서버 응답에 없어 따로 넘긴다. 안 넘기면(웹) 그대로 둔다
+  function setWhoWhen({ adults, kids, childAges, checkIn, checkOut, senior = state.value.senior }) {
+    state.value = { ...state.value, adults, kids, childAges, checkIn, checkOut, senior }
   }
 
   return { state, nights, setRegion, setWhoWhen }

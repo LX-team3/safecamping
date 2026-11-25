@@ -3,6 +3,7 @@
 // 끝나면 ?camp= 로 받은 캠핑장의 관광지 탭으로, 캠핑장 없이 들어왔으면 내 정보로 돌아간다. 1분 진단(survey)과는 별개 화면
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { goUp } from '@/utils/backStack'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
 
 const props = defineProps({ campId: { type: Number, default: null } })
@@ -56,7 +57,7 @@ async function save() {
   saving.value = true
   try {
     await preference.save({ activity: picked.activity, nature: picked.nature })
-    router.push(backTo.value)
+    goUp(router, backTo.value)
   } catch (e) {
     error.value = e.message
   } finally {
@@ -69,7 +70,7 @@ async function save() {
   <div class="preference">
     <header class="top">
       <span>여행 취향 · 약 30초</span>
-      <RouterLink class="later" :to="backTo">나중에 할게요</RouterLink>
+      <RouterLink class="later" :to="backTo" @click.capture.prevent="goUp(router, backTo)">나중에 할게요</RouterLink>
     </header>
 
     <main class="body">

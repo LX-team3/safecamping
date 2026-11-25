@@ -3,8 +3,9 @@
 // 단계는 웹의 묶음과 같다: ① 어떤 캠핑을 가나요? (5문항) ② 이럴 땐 어떻게 할까요? (3문항, 안전 상식 퀴즈)
 // 답은 이 브라우저에 저장한다 (stores/survey.js). 끝나면 내 정보(또는 탐색)로 간다 — 앱에는 결과 화면 없이 내 정보 카드에 요약만 보인다
 // 다시 진단할 때는 이전 답을 채워서 연다
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { goUp, pushBack } from '@/utils/backStack'
 import { useAuthStore } from '@/stores/auth'
 import { useSurveyStore } from '@/stores/survey'
 import { ALLQ, KID_OPTS, PARTS, emptyAnswers, isReady, pickAnswer } from '@/utils/webSurvey'
@@ -48,6 +49,9 @@ function stepAnswered() {
   return ok && (!current.value.qs.some(showKid) || !!A.value.kid)
 }
 
+const releases = [] // 단계마다 쌓은 뒤로가기 칸 (utils/backStack.js)
+onBeforeUnmount(() => releases[0]?.())
+
 async function next() {
   if (!stepAnswered()) {
     error.value = '모든 질문에 답해 주세요.'
@@ -56,13 +60,18 @@ async function next() {
   error.value = ''
   if (step.value < STEPS.length - 1) {
     step.value++
+    releases.push(pushBack(() => { // 휴대폰 뒤로가기: 진단을 나가지 않고 이전 단계로
+      releases.pop()
+      error.value = ''
+      step.value--
+    }))
     return
   }
   if (!isReady(A.value)) return
   loading.value = true
   try {
     await survey.save(A.value, auth.isLoggedIn)
-    router.push(backTo.value)
+    goUp(router, backTo.value)
   } catch (e) {
     error.value = e.message
   } finally {
@@ -72,8 +81,12 @@ async function next() {
 
 function prev() {
   error.value = ''
-  if (step.value === 0) router.push(backTo.value)
-  else step.value--
+  if (step.value === 0) {
+    goUp(router, backTo.value)
+    return
+  }
+  releases.pop()?.()
+  step.value--
 }
 </script>
 
@@ -82,7 +95,7 @@ function prev() {
     <div class="top">
       <div class="top-row">
         <span class="step-text">1분 진단 · {{ step + 1 }} / {{ STEPS.length }}</span>
-        <RouterLink :to="backTo" class="later">나중에 할게요</RouterLink>
+        <RouterLink :to="backTo" class="later" @click.capture.prevent="goUp(router, backTo)">나중에 할게요</RouterLink>
       </div>
       <div class="bars" :style="{ gridTemplateColumns: `repeat(${STEPS.length}, minmax(0, 1fr))` }">
         <span v-for="(s, i) in STEPS" :key="i" :class="{ on: i <= step }" />

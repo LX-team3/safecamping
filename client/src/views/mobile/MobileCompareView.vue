@@ -2,12 +2,14 @@
 // 관심 캠핑장 비교 (설계: Compare.dc.html). 값은 서버가 DB(camp · camp_facility · camps)에서 읽은 실제 데이터
 // 캠핑장은 탐색 목록·캠핑장 상세의 하트로 담는다 (stores/favorite.js)
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { goUp } from '@/utils/backStack'
 import { api } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
 import { useSavedStore } from '@/stores/saved'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const saved = useSavedStore()
 
@@ -63,7 +65,7 @@ function remove(campId) {
 <template>
   <div class="compare">
     <div class="head">
-      <RouterLink to="/app/saved" class="back" aria-label="저장으로 돌아가기">
+      <RouterLink to="/app/saved" class="back" aria-label="저장으로 돌아가기" @click.capture.prevent="goUp(router, '/app/saved')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />
@@ -99,8 +101,11 @@ function remove(campId) {
         <!-- 비교 중인 캠핑장 (빼기) -->
         <div class="camps">
           <div v-for="c in data.camps" :key="c.id" class="camp">
-            <span class="photo" />
-            <b>{{ c.name }}</b>
+            <!-- 사진·이름을 누르면 캠핑장 상세 -->
+            <RouterLink :to="`/app/camps/${c.id}`" class="camp-link">
+              <span class="photo" />
+              <b>{{ c.name }} ›</b>
+            </RouterLink>
             <button type="button" class="remove" :disabled="busy" @click="remove(c.id)">빼기</button>
           </div>
         </div>
@@ -198,6 +203,13 @@ h1 {
   aspect-ratio: 4 / 3;
   border-radius: 10px;
   background: var(--color-photo);
+}
+.camp-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
 }
 .camp b {
   font-size: 14px;

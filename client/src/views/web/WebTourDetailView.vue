@@ -2,12 +2,14 @@
 // 웹 관광지 상세: 캠핑장 상세의 관광지 탭에서 들어온다 (/web/tours/:id?camp=캠핑장id)
 // 데이터: GET /api/tours/{id}?campId=   (모바일 TourDetailView 와 같은 API)
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import WebSubPage from '@/components/web/WebSubPage.vue'
+import { goUp } from '@/utils/backStack'
 import { api } from '@/utils/api'
 import { directionsUrl, shortSido } from '@/utils/place'
 
 const route = useRoute()
+const router = useRouter()
 const id = computed(() => Number(route.params.id))
 const campId = computed(() => (route.query.camp ? Number(route.query.camp) : null))
 
@@ -39,13 +41,13 @@ const directions = computed(() => {
   return directionsUrl(t, f ? { name: f.campName, lat: f.lat, lng: f.lng } : null)
 })
 // 돌아갈 곳: 캠핑장이 있으면 그 캠핑장 상세, 없으면 탐색
-const backTo = computed(() => (tour.value?.from ? `/web/camps/${tour.value.from.campId}` : '/web/explore'))
+const backTo = computed(() => (tour.value?.from ? `/web/camps/${tour.value.from.campId}?tab=tour` : '/web/explore'))
 </script>
 
 <template>
   <WebSubPage eyebrow="관광지" :title="tour?.name || '관광지 상세'" :desc="place">
     <template #actions>
-      <RouterLink :to="backTo" class="back">‹ 캠핑장으로 돌아가기</RouterLink>
+      <RouterLink :to="backTo" class="back" @click.capture.prevent="goUp(router, backTo)">‹ 캠핑장으로 돌아가기</RouterLink>
     </template>
 
     <p v-if="error" class="state">{{ error }} <button type="button" class="retry" @click="load">다시 시도</button></p>
@@ -87,7 +89,7 @@ const backTo = computed(() => (tour.value?.from ? `/web/camps/${tour.value.from.
         <a class="go" :href="directions" target="_blank" rel="noopener noreferrer">
           {{ tour.from ? '캠핑장에서 길찾기' : '길찾기' }}
         </a>
-        <RouterLink :to="backTo" class="other">다른 관광지 보기</RouterLink>
+        <RouterLink :to="backTo" class="other" @click.capture.prevent="goUp(router, backTo)">다른 관광지 보기</RouterLink>
       </aside>
     </div>
   </WebSubPage>

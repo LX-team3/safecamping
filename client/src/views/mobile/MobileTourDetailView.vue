@@ -7,6 +7,7 @@ import MobileDetailTopBar from '@/components/mobile/MobileDetailTopBar.vue'
 import MobilePhotoBox from '@/components/mobile/MobilePhotoBox.vue'
 import MobileInfoRows from '@/components/mobile/MobileInfoRows.vue'
 import MobileNoteList from '@/components/mobile/MobileNoteList.vue'
+import { goUp } from '@/utils/backStack'
 import { api } from '@/utils/api'
 import { directionsUrl, shortSido } from '@/utils/place'
 import { useFavoriteStore } from '@/stores/favorite'
@@ -49,7 +50,7 @@ const directions = computed(() => {
 })
 
 function otherTours() {
-  if (tour.value?.from) router.push(`/app/camps/${tour.value.from.campId}?tab=tour`)
+  if (tour.value?.from) goUp(router, `/app/camps/${tour.value.from.campId}?tab=tour`)
   else router.push('/app/explore')
 }
 </script>

@@ -3,6 +3,7 @@
 // 좌표는 "지금 내 위치 넣기"로만 넣는다 (지도에서 고르기는 카카오맵 SDK 연결 때)
 import { ref, onMounted } from 'vue'
 import { useFamilyStore } from '@/stores/family'
+import { askConfirm } from '@/utils/confirm'
 import MobileAddButton from './MobileAddButton.vue'
 
 const family = useFamilyStore()
@@ -61,7 +62,7 @@ async function add() {
 }
 
 async function remove(place) {
-  if (!window.confirm(`'${place.name}'을(를) 모일 곳에서 지울까요?`)) return
+  if (!(await askConfirm({ title: '모일 곳을 지울까요?', message: place.name, confirmLabel: '지우기' }))) return
   try {
     await family.deletePlace(place.id)
   } catch (e) {

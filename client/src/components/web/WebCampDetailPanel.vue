@@ -3,7 +3,7 @@
 // 탭: 캠핑장 정보 · 주변 안전시설(누르면 지도에 길을 그린다) · 관광지 (리뷰 탭은 기능이 없어 뺐다 — 후기는 내 캠핑의 지난 캠핑에서 쓴다)
 // 데이터: GET /api/camps/{id}, /api/camps/{id}/tours, /api/camps/{id}/routes (카카오 도로 경로)
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/utils/api'
 import { FACILITY_LABEL, directionsUrl, shortSido } from '@/utils/place'
 import { nightsBetween, todayIso } from '@/utils/date'
@@ -36,6 +36,7 @@ const GRADE_CLASS = { safe: 'safe', caution: 'mid', danger: 'warn' }
 const CHIP_COLOR = { er: 'hospital', fire: 'fire', police: 'police', store: 'store', pharmacy: 'pharmacy', shelter: 'shelter' }
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const favorite = useFavoriteStore()
 const myCamping = useMyCampingStore()
@@ -54,13 +55,18 @@ const tours = ref([])
 const routes = ref([])
 const error = ref('')
 const tab = ref('info')
+// 고른 탭을 주소에도 적어 둔다 (뒤로가기 기록은 안 쌓임) → 관광지·시설에 갔다 오면 보던 탭이 열린다
+function selectTab(key) {
+  tab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
 const tourSort = ref('pref') // pref(내 취향순) · near(가까운 순)
 
 async function load() {
   error.value = ''
   camp.value = null
   routes.value = []
-  tab.value = 'info'
+  tab.value = TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'info'
   emit('routes', [])
   try {
     await preference.load() // 회원이면 저장한 여행 취향으로 관광지 순서를 정한다
@@ -187,7 +193,7 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
     <div class="bar">
       <button type="button" class="list-btn" @click="emit('back')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>목록
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>뒤로
       </button>
       <b class="bar-title">{{ camp?.name }}</b>
       <span class="rel">
@@ -232,7 +238,7 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
 
       <!-- 탭 -->
       <div class="tabs" role="tablist">
-        <button v-for="t in TABS" :key="t.key" type="button" role="tab" :aria-selected="tab === t.key" :class="{ on: tab === t.key }" @click="tab = t.key">{{ t.label }}</button>
+        <button v-for="t in TABS" :key="t.key" type="button" role="tab" :aria-selected="tab === t.key" :class="{ on: tab === t.key }" @click="selectTab(t.key)">{{ t.label }}</button>
       </div>
 
       <div class="panel">

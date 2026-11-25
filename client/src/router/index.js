@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { mobileRoutes, legacyRedirects, APP_PREFIX } from './mobileRoutes'
 import { webRoutes } from './webRoutes'
+import { initBackStack } from '@/utils/backStack'
 import { webToAppPath } from '@/utils/webLinks'
 
 // 주소 규칙: 웹(PC)은 /web/..., 모바일(앱)은 /app/... (화면 틀은 App.vue 가 route.meta.layout 으로 고른다)
@@ -41,6 +42,17 @@ router.beforeEach((to) => {
     if (target && router.resolve(target).matched.length) return { path: target, query: to.query, hash: to.hash }
     return `${APP_PREFIX}/explore`
   }
+})
+
+initBackStack(router) // 시트가 열렸을 때 뒤로가기로 시트만 닫기 (utils/backStack.js)
+
+// 로그인·회원가입으로 갈 때 보던 화면 주소를 next 로 붙인다 → 로그인하면 그 화면으로 돌아온다 (LoginView 가 next 를 읽음)
+// 로그인 ↔ 회원가입 사이를 오갈 때는 처음 받은 next 를 이어 준다. 앱 ↔ 웹이 바뀌면 붙이지 않는다
+const isAuthPage = (path) => /^\/(app|web)\/(login|signup)\/?$/.test(path)
+router.beforeEach((to, from) => {
+  if (!isAuthPage(to.path) || to.query.next || !from.matched.length) return
+  const next = isAuthPage(from.path) ? from.query.next : from.fullPath
+  if (typeof next === 'string' && next.startsWith(to.path.slice(0, 4))) return { path: to.path, query: { ...to.query, next }, hash: to.hash }
 })
 
 export default router

@@ -15,6 +15,7 @@ import WebChabakDetailPanel from '@/components/web/WebChabakDetailPanel.vue'
 import WebCampDetailPanel from '@/components/web/WebCampDetailPanel.vue'
 import WebFacilityPanel from '@/components/web/WebFacilityPanel.vue'
 import WebTripModal from '@/components/web/WebTripModal.vue'
+import { goUp } from '@/utils/backStack'
 import { api } from '@/utils/api'
 import { facilityOn, initFacilityOn, onTypes, toggleFacilityOn } from '@/utils/facilityLayers'
 import { directionsUrl } from '@/utils/place'
@@ -270,7 +271,10 @@ watch(() => [props.campId, props.facId], async ([id, fid]) => {
     }
   }
 }, { immediate: true })
-const backFromFacility = () => router.push(`/web/camps/${props.campId}`)
+// 시설 상세 → 그 캠핑장. 캠핑장에서 왔으면 뒤로 가서 보던 탭 그대로
+const backFromFacility = () => goUp(router, `/web/camps/${props.campId}`)
+// 캠핑장 상세의 뒤로: 들어온 화면(홈·진단 결과·내 캠핑 …)으로. 주소로 바로 들어왔으면 탐색으로
+const backFromDetail = () => (window.history.state?.back ? router.back() : router.push('/web/explore'))
 const toBrowse = () => router.push('/web/explore')
 
 // ---- 지도 위 시설 칩 ----
@@ -378,7 +382,6 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
       <div v-if="bonusReasons.length" class="bonusbar">
         <button type="button" class="chip bonus-chip" :class="{ on: survey.bonusOn }" :aria-pressed="survey.bonusOn"
           @click="survey.bonusOn = !survey.bonusOn">내 유형 점수 {{ survey.bonusOn ? '켜짐' : '꺼짐' }}</button>
-        <span v-if="survey.bonusOn" class="bonus-note">{{ bonusReasons.join(' · ') }}에 해당해 응급실이 가까운 곳의 점수를 올려 보여 드려요 (등급은 그대로)</span>
       </div>
 
       <!-- 결과 헤더 -->
@@ -420,7 +423,7 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
       <WebCarPanel v-else-if="view === 'car'" :camps="carCamps" :selected-id="selectedId" :layer-on="layerOn" :safety="safety"
         :zone-loading="zoneLoading" @back="toBrowse" @pick="pick" @toggle-layer="toggleLayer" @safety="(k) => (safety = k)" />
       <WebFacilityPanel v-else-if="view === 'facility'" :fac-id="facId" :camp-id="campId" @back="backFromFacility" @close="toBrowse" @routes="(r) => (mapRoutes = r)" />
-      <WebCampDetailPanel v-else :camp-id="campId" :focus-key="focusKey" @back="toBrowse" @camp="onCamp" @routes="(r) => (mapRoutes = r)" @focus="(k) => (focusKey = k)" />
+      <WebCampDetailPanel v-else :camp-id="campId" :focus-key="focusKey" @back="backFromDetail" @camp="onCamp" @routes="(r) => (mapRoutes = r)" @focus="(k) => (focusKey = k)" />
     </template>
 
     <!-- 지도 -->
@@ -623,10 +626,6 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
   border-color: var(--web-green);
   background: var(--web-green);
   color: var(--web-white);
-}
-.bonus-note {
-  font-size: 12px;
-  color: var(--web-text-sub);
 }
 .sort {
   font-size: 13px;

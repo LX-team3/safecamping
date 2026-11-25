@@ -43,7 +43,7 @@ async function logout() {
   await auth.logout()
   survey.reset() // 다음 사람에게 이전 사람의 진단 결과가 보이지 않게
   myCamping.reset() // 내 캠핑 목록도 같은 이유로 비운다
-  router.push('/app/login')
+  router.push({ path: '/app/login', query: { next: '/app/explore' } }) // 로그아웃 뒤 다시 로그인하면 메인으로
 }
 </script>
 

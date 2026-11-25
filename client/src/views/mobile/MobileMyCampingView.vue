@@ -11,6 +11,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useMyCampingStore } from '@/stores/myCamping'
+import { askConfirm } from '@/utils/confirm'
 import { api } from '@/utils/api'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
 import { buildBriefLines, readCheckedIds } from '@/utils/campBrief'
@@ -218,7 +219,7 @@ const cards = computed(() => {
 })
 
 async function remove(p) {
-  if (!window.confirm(`'${p.campName}' 일정을 지울까요?`)) return
+  if (!(await askConfirm({ title: '캠핑 일정을 지울까요?', message: p.campName, confirmLabel: '지우기' }))) return
   try {
     await myCamping.remove(p.id)
   } catch (e) {

@@ -2,6 +2,7 @@
 // 가족방 · 일정 탭. 가족이 함께 보는 일정 (예: 06:00 출발, 15:00 체크인). 시간 순, 날짜별로 묶어 보여 준다
 import { ref, computed, onMounted } from 'vue'
 import { useFamilyStore } from '@/stores/family'
+import { askConfirm } from '@/utils/confirm'
 import MobileAddButton from './MobileAddButton.vue'
 
 const family = useFamilyStore()
@@ -44,7 +45,7 @@ async function add() {
 }
 
 async function remove(s) {
-  if (!window.confirm(`'${s.title}' 일정을 지울까요?`)) return
+  if (!(await askConfirm({ title: '일정을 지울까요?', message: s.title, confirmLabel: '지우기' }))) return
   try {
     await family.deleteSchedule(s.id)
   } catch (e) {

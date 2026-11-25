@@ -101,15 +101,11 @@ watch(r, () => {
   tapped.value = false
 })
 // 추천 기준 한 줄 (실제로 고른 방식 그대로): 내 유형 점수(응급실 가산점)를 썼으면 그걸 포함한 순
-const recWhy = computed(() =>
-  needsErBonus(A.value) && survey.bonusOn ? '안전점수(내 유형 점수 포함)가 높은 순으로 골랐어요' : '안전점수가 높은 순으로 골랐어요',
-)
+const recWhy = '안전점수 높은 순으로 추천' // 내 유형 점수(응급실 가산점)를 켰으면 그 점수를 포함한 순
 const shownCamps = computed(() => camps.value.slice(0, more.value ? 5 : 3))
 
 // ---- 체크리스트 ----
 const toggleCheck = (id) => (checked.value = { ...checked.value, [id]: !checked.value[id] })
-const checkTotal = computed(() => (r.value ? r.value.checks.length + r.value.know.length : 0))
-const checkDone = computed(() => (r.value ? [...r.value.checks, ...r.value.know].filter((c) => checked.value[c.id]).length : 0))
 
 // ---- 결과 저장 · 알림 ----
 function say(m) {
@@ -219,7 +215,7 @@ const mustFirst = (list) => [...list.filter((c) => c.must), ...list.filter((c) =
 
             <!-- 조심할 것 -->
             <section v-if="tab === 'rules'" class="panel">
-              <div class="ph"><h3>이것부터 조심해요</h3><span>내 답변에서 위험이 큰 순서예요</span></div>
+              <div class="ph"><h3>이것부터 조심하세요</h3></div>
               <div v-for="ru in r.rules" :key="ru.ax" class="rule">
                 <button type="button" class="rbtn" :aria-expanded="openRule === ru.ax" @click="openRule = openRule === ru.ax ? null : ru.ax">
                   <span class="emoji" aria-hidden="true">{{ ru.emoji }}</span>
@@ -237,19 +233,17 @@ const mustFirst = (list) => [...list.filter((c) => c.must), ...list.filter((c) =
 
             <!-- 대비할 것 -->
             <section v-else-if="tab === 'check'" class="panel">
-              <div class="ph"><h3>이렇게 대비해요</h3><span>눌러서 체크해요 · {{ checkDone }}/{{ checkTotal }} 완료</span></div>
-              <!-- "꼭" 글자 대신 색으로 강조: 내 유형이 가장 조심할 분야(조심할 것 상위 2개)에 해당하는 항목 -->
-              <p class="must-legend"><i aria-hidden="true"></i>색이 칠해진 항목은 내 유형에 특히 중요해요</p>
+              <div class="ph"><h3>이렇게 대비하세요</h3></div>
               <div class="cgrid">
                 <div class="cgroup">
-                  <b>출발 전에 챙겨요</b><span>내 유형에 필요한 용품이에요</span>
+                  <b>출발 전에 챙겨요</b>
                   <button v-for="c in mustFirst(r.checks)" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id], must: c.must }" @click="toggleCheck(c.id)">
                     <span class="box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg></span>
                     <span class="ct">{{ c.text }}<span v-if="c.must" class="sr-only"> (내 유형에 특히 중요)</span></span>
                   </button>
                 </div>
                 <div class="cgroup">
-                  <b>미리 알아둬요</b><span>떠나기 전에 한 번 읽어 두세요</span>
+                  <b>미리 알아둬요</b>
                   <button v-for="c in mustFirst(r.know)" :key="c.id" type="button" role="checkbox" :aria-checked="!!checked[c.id]" class="ck" :class="{ on: checked[c.id], must: c.must }" @click="toggleCheck(c.id)">
                     <span class="box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg></span>
                     <span class="ct">{{ c.text }}<span v-if="c.must" class="sr-only"> (내 유형에 특히 중요)</span></span>
@@ -1064,21 +1058,6 @@ button.face:active > span {
 }
 .ck.must.on .box {
   border-color: var(--web-green);
-}
-.must-legend {
-  margin: 0 0 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--web-text-sub);
-}
-.must-legend i {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--web-grade-danger-bg);
-  border: 1px solid var(--web-grade-danger-fg);
 }
 .sr-only {
   position: absolute;

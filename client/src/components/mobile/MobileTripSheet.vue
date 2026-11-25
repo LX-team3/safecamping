@@ -22,11 +22,12 @@ const AGES = [
 
 // 시트 안에서 고치는 값 (적용 전까지 store 는 그대로)
 const adults = ref(trip.state.adults)
+// 어르신은 어른 인원에 포함 — 어른이 나 혼자면 함께 가는 어르신이 없는 것
+const senior = ref(trip.state.senior && trip.state.adults >= 2)
 const kids = ref(trip.state.kids)
 const childAges = ref([...trip.state.childAges])
 const checkIn = ref(trip.state.checkIn)
 const checkOut = ref(trip.state.checkOut)
-const loadedSaved = ref(false) // 회원 정보에서 나이대를 불러왔는지
 const error = ref('')
 const saving = ref(false)
 
@@ -50,7 +51,6 @@ onMounted(async () => {
     // 이번에 아직 고르지 않은 칸만 지난번 정보로 채운다
     if (kids.value === 0) kids.value = saved.length
     childAges.value = childAges.value.map((v, i) => v || saved[i] || null)
-    loadedSaved.value = true
   } catch {
     /* 못 불러오면 빈 상태로 */
   }
@@ -58,15 +58,28 @@ onMounted(async () => {
 
 // ---- 함께 가는 사람 칩: 인원 수에서 계산하고, 누르면 인원 수를 바꾼다 ----
 const alone = computed(() => adults.value === 1 && kids.value === 0)
-const withAdults = computed(() => adults.value >= 2)
+// 나(+ 어르신) 말고 어른이 더 있으면 성인 동행
+const baseAdults = computed(() => (senior.value ? 2 : 1))
+const withAdults = computed(() => adults.value > baseAdults.value)
 const withKids = computed(() => kids.value >= 1)
 
+// 어른을 1명까지 줄이면 어르신 선택도 풀린다
+watch(adults, (n) => {
+  if (n < 2) senior.value = false
+})
+
 function toggleAlone() {
+  senior.value = false
   adults.value = 1
   kids.value = 0
 }
 function toggleAdults() {
-  adults.value = withAdults.value ? 1 : Math.max(2, adults.value)
+  adults.value = withAdults.value ? baseAdults.value : baseAdults.value + 1
+}
+function toggleSenior() {
+  // 켜면 어른 한 명을 더하고, 끄면 한 명을 뺀다
+  senior.value = !senior.value
+  adults.value = Math.min(MAX, Math.max(1, adults.value + (senior.value ? 1 : -1)))
 }
 function toggleKids() {
   kids.value = withKids.value ? 0 : Math.max(1, kids.value)
@@ -113,7 +126,7 @@ function dayClass(iso, col) {
 const summary = computed(() => {
   if (!checkIn.value) return '체크인 날짜를 눌러 주세요'
   if (!checkOut.value) return `${labelWithDay(checkIn.value)} 체크인 · 체크아웃 날짜를 눌러 주세요`
-  const people = `어른 ${adults.value}${kids.value ? ` · 아이 ${kids.value}` : ''}`
+  const people = `어른 ${adults.value}${senior.value ? '(어르신 포함)' : ''}${kids.value ? ` · 아이 ${kids.value}` : ''}`
   return `${labelWithDay(checkIn.value)} – ${labelWithDay(checkOut.value)} · ${nightsBetween(checkIn.value, checkOut.value)}박 · ${people}`
 })
 const canApply = computed(() => checkIn.value && checkOut.value && childAges.value.every(Boolean) && !saving.value)
@@ -128,7 +141,7 @@ async function apply() {
     if (auth.isLoggedIn && kids.value > 0) {
       await api('/api/member/children', { method: 'put', body: { ageGroups: childAges.value } })
     }
-    trip.setWhoWhen(checked)
+    trip.setWhoWhen({ ...checked, senior: senior.value })
     emit('apply')
   } catch (e) {
     error.value = e.message
@@ -143,7 +156,6 @@ async function apply() {
     <section>
       <div class="sec-head">
         <h3>함께 가는 사람</h3>
-        <span class="hint">복수 선택 · 동행에 맞는 안전 정보를 챙겨요</span>
       </div>
       <div class="chips">
         <button type="button" class="chip" :class="{ on: alone }" :aria-pressed="alone" @click="toggleAlone">혼자</button>
@@ -151,6 +163,7 @@ async function apply() {
           성인 동행</button>
         <button type="button" class="chip" :class="{ on: withKids }" :aria-pressed="withKids" @click="toggleKids">
           아이 동반</button>
+        <button type="button" class="chip" :class="{ on: senior }" :aria-pressed="senior" @click="toggleSenior">어르신</button>
       </div>
 
       <div class="counter">
@@ -173,7 +186,6 @@ async function apply() {
       <!-- 아이가 있으면 나이대 -->
       <div v-if="kids > 0" class="ages">
         <h4>아이 나이대</h4>
-        <p class="hint">나이에 맞는 안전 안내를 드려요<template v-if="loadedSaved"> · 지난번 정보를 불러옵니다</template></p>
         <div v-for="(age, i) in childAges" :key="i" class="age-row">
           <span class="who">아이 {{ i + 1 }}</span>
           <button v-for="a in AGES" :key="a.code" type="button" class="age" :class="{ on: age === a.code }"
@@ -245,11 +257,12 @@ h3 {
 }
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .chip {
   height: 44px;
-  padding: 0 18px;
+  padding: 0 14px;
   border: 1px solid var(--color-border);
   border-radius: 22px;
   background: var(--color-card);

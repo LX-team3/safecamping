@@ -5,7 +5,7 @@
 //  - 안전점수 탭의 시설을 누르면 시설 상세, 관광지 탭의 관광지를 누르면 관광지 상세
 // 데이터: GET /api/camps/{id}, GET /api/camps/{id}/tours?prefer=, GET /api/camps/{id}/routes
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import MobileRouteMap from '@/components/mobile/MobileRouteMap.vue'
 import MobileDetailTopBar from '@/components/mobile/MobileDetailTopBar.vue'
 import MobilePhotoBox from '@/components/mobile/MobilePhotoBox.vue'
@@ -32,6 +32,7 @@ const GRADE_LABEL = { safe: '안전', caution: '주의', danger: '위험', unkno
 const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
 
 const route = useRoute()
+const router = useRouter()
 const favorite = useFavoriteStore()
 const preference = useTourPreferenceStore()
 
@@ -48,6 +49,11 @@ const error = ref('')
 const sheetOpen = ref(true)
 // "다른 관광지"로 돌아올 때 ?tab=tour 로 관광지 탭을 연다
 const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'safety')
+// 고른 탭을 주소에도 적어 둔다 (뒤로가기 기록은 안 쌓임) → 관광지·시설에 갔다 뒤로 오면 보던 탭이 열린다
+function selectTab(key) {
+  tab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+}
 const selectedId = ref(null) // 경로 지도에서 고른 시설
 const chipsEl = ref(null) // 시설 칩 줄 (가로로 넘김)
 
@@ -220,7 +226,7 @@ function openPlan() {
 
           <div class="tabs" role="tablist">
             <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="tab" :class="{ on: tab === t.key }"
-              :aria-selected="tab === t.key" @click="tab = t.key">
+              :aria-selected="tab === t.key" @click="selectTab(t.key)">
               {{ t.label }}
             </button>
           </div>

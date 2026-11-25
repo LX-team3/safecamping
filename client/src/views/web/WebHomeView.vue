@@ -1,7 +1,7 @@
 <script setup>
 // 웹 메인 (설계 1-1 · 1-1' · 1-2 · 1-5): 히어로 검색 · 기상특보 띠 · 전국 안전 캠핑장 순위 · 메인 기능 · 공지사항
 // "전국 안전 캠핑장 순위"는 실제 데이터(서버 /api/camps). "내 근처" 캠핑장·공지사항은 아직 설계의 예시 데이터다 (더미) → 서버 데이터를 연결할 때 바꾼다
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import WebGuideModal from '@/components/web/WebGuideModal.vue'
@@ -10,7 +10,9 @@ import { useTripStore } from '@/stores/trip'
 import { api } from '@/utils/api'
 import { shortLabel } from '@/utils/date'
 import { shortSido } from '@/utils/place'
-import { loadSavedResult } from '@/utils/webSurvey'
+import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
+import { useSurveyStore } from '@/stores/survey'
+import { campTypeOf, computeResult, isReady, needsErBonus } from '@/utils/webSurvey'
 
 const auth = useAuthStore()
 // 검색칸(지역 · 날짜 · 인원): 누르면 지역·날짜 팝업이 열리고, 고른 값은 trip store 에 저장돼 탐색 화면에서도 그대로 쓴다
@@ -24,20 +26,50 @@ function openTrip(tab) {
 const regionText = computed(() => (trip.state.sigungu ? `${shortSido(trip.state.sido?.name)} ${trip.state.sigungu.name}` : trip.state.sido ? shortSido(trip.state.sido.name) : '전국'))
 const dateText = computed(() => (trip.state.checkIn && trip.state.checkOut ? `${shortLabel(trip.state.checkIn)} – ${shortLabel(trip.state.checkOut)}` : '날짜 선택'))
 const peopleText = computed(() => `성인 ${trip.state.adults}${trip.state.kids ? ` · 아이 ${trip.state.kids}` : ''}`)
-// 진단 결과를 저장한 사람만 "내 유형" 영역을 보여 준다 (결과는 이 브라우저에 저장, utils/webSurvey.js)
-const savedType = computed(() => (auth.isLoggedIn && auth.member ? loadSavedResult(auth.member.id) : null))
+// "내 유형" · "내 유형 맞춤 TOP 5": 로그인했고 1분 진단(지금 질문 전부)을 마친 사람에게만 보인다
+// 답은 앱·웹이 같이 쓰는 stores/survey (이 브라우저에 사용자별 저장). 예전 질문으로 한 답은 안 한 것으로 본다
+const survey = useSurveyStore()
+const savedType = computed(() => {
+  const A = survey.answers
+  return auth.isLoggedIn && A && isReady(A) ? computeResult(A) : null
+})
+// 저장된 답을 읽는다. 로그인 전에 진단했다면 그 답이 내 것으로 저장된다. 로그아웃하면 savedType 이 null 이 돼 사라진다
+watch(() => auth.member?.id, () => survey.load(auth.isLoggedIn), { immediate: true })
+
+// 맞춤 5곳: 앱 탐색의 "내 유형 추천"과 같은 서버 API · 같은 규칙 (잠자리 유형으로 거르고, 해당하면 응급실 가산점 순)
+const myCamps = ref([])
+const myState = ref('loading') // loading | ok | error
+const bonusOn = computed(() => needsErBonus(survey.answers) && survey.bonusOn)
+let myReq = 0 // 늦게 온 이전 응답을 버리는 번호
+async function loadMine() {
+  if (!savedType.value) return
+  const no = ++myReq
+  const useBonus = bonusOn.value
+  myState.value = 'loading'
+  try {
+    const res = await api('/api/camps/recommend', {
+      params: { campType: campTypeOf(survey.answers) || undefined, sort: useBonus ? 'bonus' : 'score', limit: 5 },
+    })
+    if (no !== myReq) return
+    myCamps.value = res.camps.map((c) =>
+      useBonus && c.erBonus && c.safetyScore != null ? { ...c, safetyScore: Math.min(100, c.safetyScore + c.erBonus) } : c)
+    myState.value = 'ok'
+  } catch {
+    if (no !== myReq) return
+    myCamps.value = []
+    myState.value = 'error' // 예시 점수를 대신 보여 주지 않는다
+  }
+}
+watch([savedType, bonusOn], loadMine, { immediate: true })
+const TYPE_LABEL = { auto: '오토캠핑', glamping: '글램핑', backpacking: '노지·백패킹' }
+const campMeta = (c) => [TYPE_LABEL[c.campType], c.eupmyeon || c.sigungu].filter(Boolean).join(' · ')
 
 // ---- 예시 데이터 (더미) ----
-const MY_CAMPS = [
-  { name: '설하캠핑장', score: 90, meta: '오토캠핑 · 인제읍' },
-  { name: '북면 솔숲캠핑장', score: 88, meta: '글램핑 · 북면' },
-  { name: '내린천 오토캠핑장', score: 85, meta: '오토캠핑 · 인제읍' },
-  { name: '기린 계곡캠핑장', score: 82, meta: '카라반 · 기린면' },
-]
+// img: 실제 화면을 찍은 그림 (public/web). 없으면 회색 사진 자리. credit: 그림에 들어간 지도 · 위성사진 출처. pos: 좁을 때 남길 쪽 (안전지도는 점수 핀)
 const FEATURES = [
-  { label: '01 고르고 · 안전점수 지도', title: '안전점수로 내 유형에 맞는 캠핑장 고르기', desc: '안전점수 지도에서 우리 가족 유형에 맞는 캠핑장을 골라요.', cta: '안전지도 보기', to: '/web/explore' },
-  { label: '02 배우고 · 메타버스 안전 탐험', title: '메타버스로 캠핑장 위험 배우기', desc: '실제 캠핑장을 3D로 걸으며 위험한 곳을 퀴즈로 익혀요.', cta: '안전 탐험 하기', to: null },
-  { label: '03 대비하세요 · 3D 재난 대피 지도', title: '3D 재난 대피 지도로 사고와 재난 대비하기', desc: '3D 재난 대피 지도로 위험을 먼저 알리고 대피소 길을 안내해요.', cta: '대피 지도 보기', to: null },
+  { label: '01 안전점수 지도', title: '안전한 캠핑장 찾기', desc: '안전점수 지도에서 우리 가족 유형에 맞는 캠핑장을 고릅니다.', cta: '안전지도 보기', to: '/web/explore', img: '/web/feature-map.jpg', pos: '40% top', credit: '지도 kakao · 국토지리정보원' },
+  { label: '02 메타버스 안전 탐험', title: '위험 미리 체험하기', desc: '실제 캠핑장을 3D로 걸으며 위험한 곳을 퀴즈로 익힙니다.', cta: '안전 탐험 하기', to: METAVERSE_PATH, img: '/web/feature-metaverse.jpg' },
+  { label: '03 3D 재난 대피 지도', title: '대피 경로 확인하기', desc: '3D 재난 대피 지도로 위험을 먼저 알리고 대피소 길을 안내합니다.', cta: '대피 지도 보기', to: DISASTER_PATH, img: '/web/feature-disaster.jpg', credit: '위성사진 VWorld' },
 ]
 const NOTICES = [
   { title: '[안전안내] 주말 집중호우·강풍 예보에 따른 캠핑장 이용객 안전 안내', date: '2026.10.24', views: 412 },
@@ -83,6 +115,31 @@ async function loadNation() {
   }
 }
 onMounted(loadNation)
+
+// ---- 기상특보 띠: 전국에 지금 발효 중인 특보 (서버 GET /api/alerts, 기상청). 10분마다 다시 확인 ----
+// 특보가 없거나, 기상청에서 못 받아 서버가 예시(warningDummy)를 보냈거나, 호출에 실패하면 띠를 숨긴다 (가짜 특보를 보여 주지 않음)
+const warnings = ref([])
+async function loadWarnings() {
+  try {
+    const d = await api('/api/alerts')
+    warnings.value = d.warningDummy ? [] : d.activeWarnings
+  } catch {
+    warnings.value = []
+  }
+}
+const warningText = computed(() => {
+  const [w, ...rest] = warnings.value
+  if (!w) return ''
+  const at = new Date(w.issuedAt)
+  const time = isNaN(at) ? '' : ` · ${at.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })} 기준`
+  return `${w.area} ${w.category} 발효 중${rest.length ? ` 외 ${rest.length}건` : ''}${time}`
+})
+let warningTimer = null
+onMounted(() => {
+  loadWarnings()
+  warningTimer = setInterval(loadWarnings, 10 * 60 * 1000) // 서버도 10분마다 기상청을 확인한다
+})
+onUnmounted(() => clearInterval(warningTimer))
 
 // ---- 전국 순위 가로 넘김 ----
 const nationRow = ref(null)
@@ -160,13 +217,13 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
     </section>
 
     <!-- ③ 지금 안전 상황 -->
-    <a href="#" class="alert" @click.prevent>
+    <RouterLink v-if="warningText" to="/web/alerts" class="alert">
       <span class="tag">기상특보</span>
-      <span class="msg">[지역] [특보 이름] 발효 중 · [기준 시각]</span>
-      <span class="more">더미 데이터 · 알림 전체 보기 ›</span>
-    </a>
+      <span class="msg">{{ warningText }}</span>
+      <span class="more">알림 전체 보기 ›</span>
+    </RouterLink>
 
-    <!-- ④⑤ 로그인 후: 내 유형 + 내 유형 맞춤 TOP 5 (진단 결과가 서버에서 오면 실제 값으로 바꾼다) -->
+    <!-- ④⑤ 로그인 후: 내 유형 + 내 유형 맞춤 TOP 5 (진단한 사람만, 실제 데이터) -->
     <template v-if="savedType">
       <section class="mytype">
         <div class="mytype-row">
@@ -184,16 +241,25 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
           <h2>내 유형 맞춤 TOP 5</h2>
           <RouterLink to="/web/explore" class="link">안전지도 상세보기</RouterLink>
         </div>
-        <div class="grid4">
-          <RouterLink v-for="(c, i) in MY_CAMPS" :key="c.name" to="/web/explore" class="card nc">
-            <span class="photo"></span>
+        <p v-if="myState === 'loading' && !myCamps.length" class="nation-msg">불러오는 중...</p>
+        <p v-else-if="myState === 'error'" class="nation-msg">추천을 불러오지 못했어요</p>
+        <p v-else-if="!myCamps.length" class="nation-msg">내 유형에 맞는 캠핑장이 아직 없어요</p>
+        <div v-else class="grid5">
+          <RouterLink v-for="(c, i) in myCamps" :key="c.id" :to="`/web/camps/${c.id}`" class="card nc">
+            <span class="photo">
+              <img v-if="c.imageUrl" :src="c.imageUrl" :alt="`${c.name} 전경`" loading="lazy" />
+              <!-- 사진 주소가 없는 캠핑장: 텐트 그림 -->
+              <svg v-else class="tent" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.4"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20L12 4l9 16z" /><path d="M12 20v-6" /></svg>
+            </span>
             <span class="rank">{{ i + 1 }}위</span>
             <span class="info">
-              <span class="name">{{ c.name }}</span>
+              <span class="name ellipsis">{{ c.name }}</span>
               <span class="score-row">
-                <span class="muted">안전점수</span><span class="score">{{ c.score }}</span>
-                <span class="muted">/ 100 · {{ c.meta }}</span>
+                <span class="muted">안전점수</span><span class="score">{{ c.safetyScore ?? '-' }}</span>
+                <span class="muted">/ 100</span>
               </span>
+              <span v-if="campMeta(c)" class="muted ellipsis">{{ campMeta(c) }}</span>
             </span>
           </RouterLink>
         </div>
@@ -241,11 +307,14 @@ const showNudge = computed(() => nudgeOpen.value && !guideOpen.value)
 
     <!-- ⑥ 메인기능 1 · 2 · 3 -->
     <section class="features">
-      <h2>고르고, 배우고, 대비하세요</h2>
+      <h2>캠핑 안전, 세 단계로 준비합니다</h2>
       <div class="grid3">
         <component :is="f.to ? RouterLink : 'a'" v-for="f in FEATURES" :key="f.label" :to="f.to || undefined"
           :href="f.to ? undefined : '#'" class="mf" @click="f.to ? null : $event.preventDefault()">
-          <span class="mf-photo"></span>
+          <span class="mf-photo">
+            <img v-if="f.img" :src="f.img" alt="" loading="lazy" :style="f.pos ? { objectPosition: f.pos } : null" />
+            <small v-if="f.credit">{{ f.credit }}</small>
+          </span>
           <span class="mf-body">
             <span class="mf-title">{{ f.title }}</span>
             <span class="mf-label">{{ f.label }}</span>
@@ -554,9 +623,9 @@ h2 {
   gap: 32px;
   background: var(--web-bg-beige);
 }
-.grid4 {
+.grid5 {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 24px;
 }
 
@@ -592,6 +661,13 @@ h2 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.photo .tent {
+  display: block;
+  width: 56px;
+  height: 100%;
+  margin: 0 auto;
+  color: var(--web-text-sub);
 }
 .nation-msg {
   margin: 0;
@@ -727,9 +803,27 @@ h2 {
   color: var(--web-green);
 }
 .mf-photo {
+  position: relative;
   display: block;
   height: 220px;
   background: var(--web-photo);
+}
+.mf-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top; /* 재난 지도의 "내 위치" 이름표가 잘리지 않게 위쪽 기준 */
+}
+.mf-photo small {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--web-bg);
+  color: var(--web-text-sub);
+  font-size: 10px;
 }
 .mf-body {
   flex: 1;
@@ -739,10 +833,9 @@ h2 {
   flex-direction: column;
 }
 .mf-title {
-  font-family: var(--web-font-serif);
-  font-size: 34px;
-  line-height: 1.28;
-  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.35;
+  font-weight: 700;
   letter-spacing: -1px;
 }
 .mf-label {

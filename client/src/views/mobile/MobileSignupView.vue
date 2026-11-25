@@ -68,7 +68,7 @@ async function submit() {
   loading.value = true
   try {
     await api('/api/auth/signup', { method: 'post', body: form })
-    router.push({ path: '/app/login', query: { joined: 1 } })
+    router.replace({ path: '/app/login', query: { joined: 1 } })
   } catch (e) {
     error.value = e.message
   } finally {
@@ -80,7 +80,7 @@ async function submit() {
 <template>
   <div class="signup">
     <div class="head">
-      <RouterLink to="/app/login" aria-label="로그인으로 돌아가기" class="back">
+      <RouterLink replace to="/app/login" aria-label="로그인으로 돌아가기" class="back">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />

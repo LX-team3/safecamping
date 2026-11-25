@@ -69,7 +69,7 @@ async function submit() {
   loading.value = true
   try {
     await api('/api/auth/signup', { method: 'post', body: form })
-    router.push({ path: '/web/login', query: { joined: 1 } })
+    router.replace({ path: '/web/login', query: { joined: 1 } })
   } catch (e) {
     error.value = e.message
   } finally {
@@ -82,7 +82,7 @@ async function submit() {
   <div class="page">
     <main class="card">
       <div class="head">
-        <RouterLink to="/web/login" class="back" aria-label="로그인으로 돌아가기">
+        <RouterLink replace to="/web/login" class="back" aria-label="로그인으로 돌아가기">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
         </RouterLink>
@@ -138,7 +138,7 @@ async function submit() {
         <button type="submit" class="submit" :disabled="loading">가입하기</button>
       </form>
 
-      <p class="foot">이미 회원이세요? <RouterLink to="/web/login" class="login">로그인</RouterLink></p>
+      <p class="foot">이미 회원이세요? <RouterLink replace to="/web/login" class="login">로그인</RouterLink></p>
     </main>
   </div>
 </template>
