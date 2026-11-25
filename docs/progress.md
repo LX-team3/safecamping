@@ -1,5 +1,25 @@
 # 진행 상황
 
+## 2026-11-25 배포 문서를 처음 보는 팀원도 따라 하게 보완 (문서만. 코드 · 설정 · 서버 · DB 변경 없음)
+- `docs/deploy.md` 1 ~ 14단계: 시작 전 준비물, 내 값으로 바꿀 것, 콘솔에서 누르는 순서(1 ~ 3), 작업 PC 준비(11-0), 올릴 파일 만들기(11-8), 환경변수 모양(12-1), 확인 명령(12-4 · 13-2 · 14-4), 카카오 새 주소 등록(14-5), 마지막 확인(14-6) 추가
+- 웹 배포는 14단계까지면 끝. 15(앱) · 16(벡터 DB)은 내용을 그대로 둠
+- 확인: 콘솔 메뉴는 네이버 클라우드 공식 가이드와 대조, 작업 PC에서 git 제외 확인 · `.jar` 목록 · 지문 명령 실행
+- 확인 못 함: 새 서버에서 1 ~ 14를 처음부터 따라 해 보기, 서버에서 치는 확인 명령, certbot 질문 화면
+
+## 2026-11-25 RAG용 벡터 DB를 배포 서버에 올리는 순서 정리 (서버 · 코드 변경 없음)
+- `docs/deploy.md` 16단계에 적음: 안전 자료 조각 CSV → 서버의 새 DB `campine_vector`(pgvector)
+- 확인: 작업 PC의 `safety_doc_chunk.csv` 120줄, 벡터 120개(1536), `text-embedding-3-small`
+- 확인 못 함: 서버에서 명령 실행, 작업한 팀원의 `01_table.sql`과 테이블이 같은지
+- 남은 일: RAG 백엔드 코드. 지금은 벡터 DB를 쓰는 코드가 없어 화면은 그대로
+
+## 2026-11-24 도메인 · HTTPS 적용, 배포 주소로 앱(APK) 빌드 (DB · 서버 코드 변경 없음)
+- 주소: `https://campine.duckdns.org` (DuckDNS + Let's Encrypt). 자세한 순서는 `docs/deploy.md` 14 · 15단계
+- 앱 이름: `내 캠핑메이트` → `campine` (`capacitor.config.json`, 안드로이드 `strings.xml`. `appId`는 Firebase와 연결되어 그대로 둠)
+- `client/capacitor.config.json`: `url`을 배포 주소로 바꾸고 `cleartext` 제거 → `cap sync` → debug APK 빌드
+- 화면 이름도 `campine`으로: 브라우저 탭 제목, 모바일 로그인(같은 말이 두 번 나오게 되어 부제는 삭제), 재난지도 `CAMPIN` 2곳. 로고 · `CAMPINE` 표기는 그대로. `npm run build` 통과, 서버에 올림(사이트 첫 화면이 새 빌드와 같음 확인), 실제 폰에 APK 설치(작업자 확인)
+- 확인: 인증서 검증, http→https 이동, 화면 · API 200, 다른 주소 조회 요청 403, APK 빌드 성공과 APK 안의 주소
+- 확인 못 함: 로그인 · 저장, 카카오 지도(새 주소 등록 필요), 현재 위치, 인증서 자동 갱신 시험, 실제 폰에서의 기능 동작
+
 ## 2026-11-24 메타버스 최신 기능을 client 구조로 합침 (브랜치 `myj-metaverse` ← `main`, DB 변경 없음)
 - 배경: main 에서 메타버스가 `client/` 안으로 옮겨졌는데(11-22), 옮겨진 것은 소품·침수 미션이 들어가기 전 옛 버전. `myj-metaverse` 의 최신 기능을 그 구조 위에 합침
 - 방법: 최신 main 을 `myj-metaverse` 로 가져와(merge) 충돌 9개를 풂. 새 파일(`flood.js`·`props.js`·`minigame.js`·`quiz_points.geojson`)은 `client/` 쪽 새 위치로, `missions.js`·`MetaverseView.vue` 는 양쪽 내용을 합침

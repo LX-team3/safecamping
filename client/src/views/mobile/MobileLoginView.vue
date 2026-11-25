@@ -52,8 +52,7 @@ async function submit() {
           <path d="M12 20v-6" />
         </svg>
       </span>
-      <b class="name">캠핑메이트</b>
-      <span class="sub">내 캠핑메이트</span>
+      <b class="name">campine</b>
     </div>
 
     <p v-if="route.query.joined" class="notice">가입되었습니다. 로그인해 주세요.</p>
@@ -121,10 +120,6 @@ async function submit() {
 .name {
   font-size: 26px;
   letter-spacing: -0.02em;
-}
-.sub {
-  font-size: 14px;
-  color: var(--color-text-sub);
 }
 .notice {
   margin: 0;

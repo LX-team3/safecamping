@@ -25,7 +25,7 @@ const ticks = computed(() => props.state.stages.slice(1))
 <template>
   <aside class="panel" aria-label="재난 대피 안내">
     <header class="head">
-      <RouterLink to="/web" class="back">‹ CAMPIN 홈</RouterLink>
+      <RouterLink to="/web" class="back">‹ campine 홈</RouterLink>
       <h1>호우 및 침수 시 대피경로</h1>
       <span class="loc">인북천 물빛테마공원 캠핑장</span>
     </header>
