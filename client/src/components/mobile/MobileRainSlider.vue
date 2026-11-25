@@ -41,6 +41,8 @@ const ticks = computed(() => props.state.stages.slice(1))
       </span>
       <span style="left: 100%">mm</span>
     </div>
+    <!-- 지금 보이는 물이 공식 범위인지 참고 그림인지 -->
+    <p v-if="state.waterText" class="note water">{{ state.waterText }}</p>
   </section>
 </template>
 
@@ -60,6 +62,7 @@ const ticks = computed(() => props.state.stages.slice(1))
 .note.preview { display: flex; align-items: center; gap: 8px; overflow: visible; }
 .golive { font: inherit; font-size: 11px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 2px 9px; cursor: pointer; }
 .golive:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
+.note.water { margin-top: 5px; }
 .note { margin: 2px 0 0; font-size: 10.5px; color: var(--dm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 input { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; background: transparent; margin: 0; touch-action: pan-x; cursor: pointer; }
 input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--track); }

@@ -59,6 +59,7 @@ const ticks = computed(() => props.state.stages.slice(1))
         </span>
         <span style="left: 100%">mm</span>
       </div>
+      <p v-if="state.waterText" class="note water">{{ state.waterText }}</p>
     </section>
 
     <!-- 기본 화면 -->
@@ -86,7 +87,7 @@ const ticks = computed(() => props.state.stages.slice(1))
         <div class="seg" role="group" aria-label="경로 선택">
           <button type="button" :aria-pressed="state.routeKey === 'base'" :disabled="state.baseDisabled"
             @click="map?.selectRoute('base')">{{ state.baseLabel }}</button>
-          <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">산 위 높은 곳</button>
+          <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">가까운 높은 곳</button>
         </div>
 
         <div class="actions">
@@ -123,7 +124,7 @@ const ticks = computed(() => props.state.stages.slice(1))
         <button type="button" class="btn primary" @click="map?.next()">{{ state.nav.nextLabel }}</button>
       </div>
       <button v-if="state.detourBtn" type="button" class="btn ghost detour" @click="map?.detour()">
-        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 산으로
+        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 높은 곳으로
       </button>
       <button type="button" class="btn ghost" @click="map?.endNav()">길안내 종료</button>
     </section>
@@ -165,6 +166,7 @@ const ticks = computed(() => props.state.stages.slice(1))
 .v b { font-family: var(--dm-font-num); font-size: 18px; color: var(--dm-text); margin-right: 1px; }
 .stage { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--dm-sheet); }
 .stage i { width: 8px; height: 8px; border-radius: 50%; }
+.note.water { margin-top: 6px; }
 .note { margin: 2px 0 0; font-size: 11px; color: var(--dm-muted); }
 .note.preview { display: flex; align-items: center; gap: 8px; }
 .golive { font: inherit; font-size: 11px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 2px 9px; cursor: pointer; }

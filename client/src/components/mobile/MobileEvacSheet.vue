@@ -35,7 +35,7 @@ defineProps({
       <div class="seg" role="group" aria-label="경로 선택">
         <button type="button" :aria-pressed="state.routeKey === 'base'" :disabled="state.baseDisabled"
           @click="map?.selectRoute('base')">{{ state.baseLabel }}</button>
-        <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">산 위 높은 곳</button>
+        <button type="button" :aria-pressed="state.routeKey === 'detour'" @click="map?.selectRoute('detour')">가까운 높은 곳</button>
       </div>
 
       <div class="actions">
@@ -71,7 +71,7 @@ defineProps({
         <button type="button" class="btn primary" @click="map?.next()">{{ state.nav.nextLabel }}</button>
       </div>
       <button v-if="state.detourBtn" type="button" class="btn ghost detour" @click="map?.detour()">
-        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 산으로
+        {{ state.baseLabel.replace(/^대피소 \((.*)\)$/, '$1') }}가 잠겼어요 · 높은 곳으로
       </button>
       <button type="button" class="btn ghost" @click="map?.endNav()">길안내 종료</button>
     </div>
@@ -96,7 +96,7 @@ defineProps({
 
 .state-row { display: flex; gap: 12px; align-items: center; }
 .badge { flex: none; font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 8px; background: var(--lv); color: var(--color-dm-on-light); }
-.state-row h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 700; text-wrap: balance; }
+.state-row h2 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 700; text-wrap: balance; word-break: keep-all; }
 
 .shelter { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; background: var(--dm-card); border-radius: 14px; padding: 14px; }
 .shelter .name { font-size: 17px; font-weight: 700; }
