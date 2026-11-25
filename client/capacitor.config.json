@@ -1,9 +1,8 @@
 {
   "appId": "com.campin.app",
-  "appName": "내 캠핑메이트",
+  "appName": "campine",
   "webDir": "dist",
   "server": {
-    "url": "http://localhost:5173",
-    "cleartext": true
+    "url": "https://campine.duckdns.org"
   }
 }

@@ -64,7 +64,7 @@ onBeforeUnmount(() => {
 
     <header class="topbar">
       <div class="place">
-        <span class="app">CAMPIN</span>
+        <span class="app">campine</span>
         <h1>호우 및 침수 시 대피경로</h1>
         <span class="loc">인북천 물빛테마공원 캠핑장</span>
       </div>
