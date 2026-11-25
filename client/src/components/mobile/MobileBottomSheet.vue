@@ -4,6 +4,7 @@
 // 열 때 아래에서 미끄러져 올라오고, 닫을 때(X · 바깥 · Esc · 손잡이를 아래로 끌기) 내려간 뒤 close 를 보낸다
 // 움직임은 지도 위 시트(styles/base.css .drag-sheet)와 같은 곡선
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { pushBack } from '@/utils/backStack'
 
 defineProps({
   title: { type: String, required: true },
@@ -18,13 +19,16 @@ const dragging = ref(false)
 // 끊기지 않게: 화면에 붙자마자 움직이면 첫 장면들이 새 요소를 그리느라 밀려 툭 튀어나온다
 // → 아래에 숨긴 채 한 장면을 먼저 그리고(requestAnimationFrame 두 번), 그다음에 올라오게 한다
 let raf = 0
+let release = () => {}
 onMounted(() => {
+  release = pushBack(requestClose) // 휴대폰 뒤로가기: 화면을 나가지 않고 시트만 닫는다
   window.addEventListener('keydown', onKey)
   raf = requestAnimationFrame(() => {
     raf = requestAnimationFrame(() => (shown.value = true))
   })
 })
 onBeforeUnmount(() => {
+  release()
   window.removeEventListener('keydown', onKey)
   cancelAnimationFrame(raf)
   clearTimeout(closeTimer)

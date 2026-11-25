@@ -3,7 +3,11 @@
 // 지역: 지금 내 위치(브라우저) → 서버가 가장 가까운 시·도로 정한다. 위치를 못 쓰면 시·도를 직접 고른다
 // 기상특보는 기상청, 재난문자는 행정안전부 긴급재난문자 실제 데이터 (서버가 못 받으면 각각 예시). 로그인 없이도 볼 수 있다
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { goUp } from '@/utils/backStack'
 import { api } from '@/utils/api'
+
+const router = useRouter()
 
 // AlertResponse: { warningDummy, disasterDummy, sido, regions, activeWarnings, todayDisasterCount, items }
 const data = ref(null)
@@ -94,7 +98,7 @@ function timeText(iso) {
 <template>
   <div class="alert-page">
     <div class="head">
-      <RouterLink to="/app/my-info" aria-label="내 정보로 돌아가기" class="back">
+      <RouterLink to="/app/my-info" aria-label="내 정보로 돌아가기" class="back" @click.capture.prevent="goUp(router, '/app/my-info')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />

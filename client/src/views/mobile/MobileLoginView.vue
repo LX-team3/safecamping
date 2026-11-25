@@ -2,6 +2,7 @@
 // ①-3 로그인 (설계: docs/design/Login.dc.html)
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { goUp } from '@/utils/backStack'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -29,7 +30,7 @@ async function submit() {
     await auth.login(loginId.value, password.value, keep.value)
     // next: 로그인이 필요해서 보낸 화면이 있으면 그리로 (예약하셨나요? → 예약 정보 확인). 우리 사이트 주소만 받는다
     const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//') ? route.query.next : ''
-    router.push(next || '/app/explore') // 로그인 후에는 메인으로
+    goUp(router, next || '/app/explore') // 로그인 후에는 메인으로
   } catch (e) {
     error.value = e.message
   } finally {
@@ -71,7 +72,7 @@ async function submit() {
       <p v-if="error" class="error" role="alert">{{ error }}</p>
 
       <button class="primary" type="submit" :disabled="loading">로그인</button>
-      <div class="join">처음이세요?<RouterLink to="/app/signup">회원가입</RouterLink></div>
+      <div class="join">처음이세요?<RouterLink replace to="/app/signup">회원가입</RouterLink></div>
     </form>
 
     <RouterLink to="/app/explore" class="guest">로그인 없이 둘러보기</RouterLink>

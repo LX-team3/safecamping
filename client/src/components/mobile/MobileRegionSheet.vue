@@ -80,7 +80,7 @@ const footText = computed(() => {
       : `${where} · 안심 데이터를 준비하고 있어요`
   }
   if (currentSido.value) return `${currentSido.value.name} 전체 캠핑장을 보여 드려요`
-  return '전국 캠핑장을 보여 드려요'
+  return '' // 전국은 안내 문구 없음
 })
 
 function apply() {
@@ -92,9 +92,6 @@ function apply() {
 
 <template>
   <MobileBottomSheet title="어디로 캠핑을 떠나시나요?" @close="emit('close')">
-    <!-- TODO: 안심 데이터가 있는 지역이 늘면 서버(is_safety_ready)에서 문구를 만든다 -->
-    <p class="notice">지금은 <b>강원 인제군 시범 서비스</b>예요. 다른 지역은 안전점수 데이터를 준비하고 있어요.</p>
-
     <label class="search">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
         stroke-linecap="round" aria-hidden="true">
@@ -153,28 +150,15 @@ function apply() {
     </template>
 
     <template #footer>
-      <p class="foot-text">{{ footText }}</p>
+      <p v-if="footText" class="foot-text">{{ footText }}</p>
       <button type="button" class="apply" @click="apply">이 지역 캠핑장 보기</button>
     </template>
   </MobileBottomSheet>
 </template>
 
 <style scoped>
-.notice {
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--color-bg-soft);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--color-text-sub);
-}
-.notice b {
-  color: var(--color-text);
-}
 .search {
   height: 48px;
-  margin-top: 14px;
   padding: 0 16px;
   border-radius: 24px;
   background: var(--color-bg-soft);

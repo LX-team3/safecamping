@@ -5,7 +5,7 @@
 // 실시간(/api/disaster/now, 10분마다)·기상특보는 utils/disasterLive.js — 웹(WebDisasterMapView)과 같이 쓴다
 // ?demo=advisory·warning: 호우특보 예시 알림(utils/localNotify.js)을 누르고 들어옴 → 예시 비 양 · 예시 특보로 보여 준다 ("현상황 보기"로 실황 복귀)
 import { onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { RAIN_DEMOS } from '@/data/rainWarningDemo'
 import { createDisasterMap, initialState } from '@/utils/disasterMap'
 import { useDisasterLive } from '@/utils/disasterLive'
@@ -21,6 +21,13 @@ const map = shallowRef(null)
 const live = useDisasterLive(state, map)
 const pillAlert = live.alert
 const route = useRoute()
+const router = useRouter()
+// 뒤로: 들어온 화면으로. 알림으로 바로 들어왔거나 알림을 거듭 눌러 이 화면이 쌓였으면 내 캠핑으로
+function goBack() {
+  const back = window.history.state?.back
+  if (back && !back.startsWith('/app/disaster')) router.back()
+  else router.replace('/app/my-camping')
+}
 let alive = true
 
 // 예시 알림으로 들어왔으면 그 비 양으로 미리 보기 + 특보 칸에 예시 (지도가 준비된 뒤에만 가능)
@@ -63,6 +70,12 @@ onBeforeUnmount(() => {
     <div ref="credits" class="credits"></div>
 
     <header class="topbar">
+      <button type="button" class="back" aria-label="뒤로" @click="goBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 5l-7 7 7 7" />
+        </svg>
+      </button>
       <div class="place">
         <span class="app">campine</span>
         <h1>호우 및 침수 시 대피경로</h1>
@@ -118,12 +131,19 @@ onBeforeUnmount(() => {
 }
 /* 특보 알림을 펼치면 알림만 강수량 막대(z-index 6) 위로 올린다 (제목·그림자는 막대 아래 그대로)
    그래서 topbar 자체에는 z-index 를 두지 않고, 제목과 알림에 따로 준다 */
+/* 뒤로 버튼은 지도를 불러오는 중(.loading z-index 30)에도 누를 수 있게 그 위에 */
+.back {
+  position: relative; z-index: 31; flex: none; width: 40px; height: 40px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--dm-line); border-radius: 50%; background: var(--dm-card); color: var(--dm-text);
+  cursor: pointer; pointer-events: auto;
+}
 .place { position: relative; z-index: 5; }
 .topbar :deep(.alert) { position: relative; z-index: 5; }
 .topbar :deep(.alert:has(.pill[aria-expanded="true"])) { z-index: 8; }
-.place { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.place { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
 .place .app { font-size: 12px; font-weight: 700; color: var(--dm-water); letter-spacing: 0.04em; }
-.place h1 { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.3; }
+.place h1 { margin: 0; font-size: 15px; word-break: keep-all; font-weight: 700; line-height: 1.3; }
 .place .loc { font-size: 12px; color: var(--dm-muted); }
 
 /* 지도 위 이름표 (utils/disasterMap.js 가 만들어 붙임) */

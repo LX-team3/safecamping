@@ -5,7 +5,9 @@
 // 사진은 두 종류가 섞인다: 서버에 이미 있는 사진 { id, url } / 이번에 고른 사진 { file, url(미리보기) }
 // save 로 { content, keepPhotoIds, files } 를 넘긴다 → 서버 POST /api/member/camp-plans/{id}/review 의 칸과 같다
 // 서버 규칙(CampReviewService)과 같은 검사: 글 1000자 · 사진 9장 · 한 장 10MB · 이미지 파일만
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import MobileConfirm from '@/components/mobile/MobileConfirm.vue'
+import { pushBack } from '@/utils/backStack'
 
 const MAX_PHOTOS = 9
 const MAX_LEN = 1000
@@ -24,6 +26,7 @@ const emit = defineEmits(['save', 'cancel'])
 const content = ref('')
 const photos = ref([]) // 화면 순서대로 [{ id, url }] 또는 [{ file, url }]
 const notice = ref('')
+const asking = ref(false) // "그만둘까요?" 팝업이 떠 있는지
 const fileInput = ref(null)
 
 const isEdit = computed(() => !!props.review)
@@ -40,6 +43,7 @@ watch(
   (v) => {
     release(photos.value)
     photos.value = []
+    asking.value = false
     if (!v) return
     content.value = props.review?.content || ''
     photos.value = (props.review?.photos || []).map((p) => ({ id: p.id, url: p.url }))
@@ -71,10 +75,27 @@ const dirty = computed(() => {
   const before = (r.photos || []).map((p) => p.id)
   return content.value.trim() !== (r.content || '') || photos.value.length !== before.length || photos.value.some((p, i) => p.id !== before[i])
 })
+// 휴대폰 뒤로가기: 화면을 나가지 않고 시트만 닫는다
+let releaseBack = () => {}
+async function onBack() {
+  if (asking.value) asking.value = false // 팝업이 떠 있으면 팝업만 닫는다
+  else close()
+  await nextTick()
+  if (props.open) releaseBack = pushBack(onBack) // "그만둘까요?"를 띄웠거나 저장 중이면 계속 열려 있다
+}
+watch(
+  () => props.open,
+  (open) => {
+    releaseBack()
+    releaseBack = open ? pushBack(onBack) : () => {}
+  },
+)
+onBeforeUnmount(() => releaseBack())
+
 function close() {
   if (props.busy) return
-  if (dirty.value && !window.confirm(isEdit.value ? '바꾼 내용은 저장되지 않아요. 그만둘까요?' : '작성 중인 후기가 사라져요. 그만둘까요?')) return
-  emit('cancel')
+  if (dirty.value) asking.value = true
+  else emit('cancel')
 }
 function save() {
   if (!canSave.value) return
@@ -128,6 +149,9 @@ onBeforeUnmount(() => release(photos.value))
     <footer class="foot">
       <button type="button" class="ok" :disabled="!canSave" @click="save">{{ busy ? '저장 중...' : isEdit ? '수정하기' : '작성하기' }}</button>
     </footer>
+
+    <MobileConfirm :open="asking" title="그만둘까요?" :message="isEdit ? '바꾼 내용은 저장되지 않아요.' : '작성 중인 후기가 사라져요.'"
+      confirm-label="그만두기" cancel-label="계속 쓰기" @confirm="emit('cancel')" @cancel="asking = false" />
   </div>
 </template>
 

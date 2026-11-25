@@ -3,8 +3,8 @@
     <!-- 3D 화면 -->
     <div ref="container" class="metaverse"></div>
 
-    <!-- 캠핑 앱 화면으로 돌아가기. '/' 로 가면 화면 폭을 보고 PC(/web) · 모바일(/app/explore) 으로 보내 준다 -->
-    <RouterLink to="/" class="back">← 캠핑 앱으로</RouterLink>
+    <!-- 들어온 화면으로 돌아가기. 주소로 바로 들어왔으면 '/' (화면 폭을 보고 PC · 모바일 첫 화면으로) -->
+    <button type="button" class="back" @click="goBack">← 돌아가기</button>
 
     <!-- 위쪽 정보줄: 지금 낮·밤, 푼 문제 수, 나가기 (점수는 없앴어요) -->
     <div v-if="phase === 'play'" class="hud">
@@ -162,6 +162,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { createScene } from '@/metaverse/scene.js'
 
 const container = ref(null)
@@ -318,6 +319,12 @@ function floodRetry() {
 }
 
 // 나가기: 제한 시간이 없어서, 그만하고 싶을 때 직접 눌러서 끝내요
+const router = useRouter()
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else router.replace('/')
+}
+
 function finish() {
   quiz.value = null
   flood.value = ''
@@ -368,7 +375,7 @@ function choiceClass(i) {
 .back {
   position: absolute; top: 14px; left: 14px; z-index: 10;
   padding: 8px 14px; background: rgba(20, 40, 30, 0.8); color: #fff;
-  border-radius: 999px; font-size: 14px; font-weight: 700; text-decoration: none;
+  border-radius: 999px; font-size: 14px; font-weight: 700; border: none; cursor: pointer;
 }
 /* 휴대폰처럼 좁은 화면에서는 돌아가기 버튼과 겹치지 않게 정보줄을 한 줄 아래로 */
 @media (max-width: 560px) {

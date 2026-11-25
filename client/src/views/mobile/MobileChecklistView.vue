@@ -6,7 +6,8 @@
 // 안전 판단 수치(몇 도 이하 등)는 화면에도 없다: 특보는 기상청이 발표한 이름 그대로, 침낭은 "내 침낭의 쾌적온도 확인"으로 안내
 // 날씨 카드의 기온·강수확률·풍속은 기상청 예보를 그대로 보여 줄 뿐, 우리가 기준을 정해 항목을 바꾸지 않는다 (침낭 항목에만 예보 최저기온을 덧붙임)
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { goUp } from '@/utils/backStack'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import WeatherIcon from '@/components/common/WeatherIcon.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -16,6 +17,7 @@ import { weatherKind } from '@/utils/weather'
 import { checklistStoreKey } from '@/utils/campBrief'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const myCamping = useMyCampingStore()
 
@@ -112,7 +114,7 @@ const wxClass = (d) => {
 <template>
   <div class="page">
     <div class="scroll">
-      <RouterLink to="/app/my-camping" class="back">‹ 내 캠핑</RouterLink>
+      <RouterLink to="/app/my-camping" class="back" @click.capture.prevent="goUp(router, '/app/my-camping')">‹ 내 캠핑</RouterLink>
 
       <div v-if="!auth.isLoggedIn" class="empty">
         <p>출발 준비는 로그인하면 쓸 수 있습니다.</p>

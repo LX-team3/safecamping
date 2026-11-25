@@ -4,17 +4,23 @@
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useMyCampingStore } from '@/stores/myCamping'
+import { useSurveyStore } from '@/stores/survey'
 import { DISASTER_PATH, METAVERSE_PATH } from '@/utils/webLinks'
 
 defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
 
 const auth = useAuthStore()
+const survey = useSurveyStore()
+const myCamping = useMyCampingStore()
 const router = useRouter()
 const memberName = computed(() => auth.member?.name ?? '')
 
 async function logout() {
   await auth.logout()
+  survey.reset() // 다음 사람에게 이전 사람의 진단 결과 · 내 캠핑이 보이지 않게 (WebMyInfoView 와 같게)
+  myCamping.reset()
   emit('close')
   router.push('/web')
 }

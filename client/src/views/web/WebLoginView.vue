@@ -2,6 +2,7 @@
 // 웹 로그인 (설계 1-3): 헤더·하단 없이 가운데 카드. 동작은 모바일 로그인과 같다 (서버 로그인 API)
 import { ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { goUp } from '@/utils/backStack'
 import { useAuthStore } from '@/stores/auth'
 import '@/styles/tokens-web.css'
 
@@ -26,7 +27,7 @@ async function submit() {
     await auth.login(loginId.value, password.value, keep.value)
     // next: 로그인이 필요해서 보낸 화면이 있으면 그리로 (예약하셨나요? → 예약 정보 확인). 우리 사이트 주소만 받는다
     const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//') ? route.query.next : ''
-    router.push(next || '/web') // 로그인 후에는 웹 메인으로
+    goUp(router, next || '/web') // 로그인 후에는 웹 메인으로
   } catch (e) {
     error.value = e.message
   } finally {
@@ -62,7 +63,7 @@ async function submit() {
       </form>
 
       <div class="below">
-        <p>처음이세요? <RouterLink to="/web/signup" class="join">회원가입</RouterLink></p>
+        <p>처음이세요? <RouterLink replace to="/web/signup" class="join">회원가입</RouterLink></p>
         <div class="rule"></div>
         <RouterLink to="/web" class="guest">로그인 없이 둘러보기</RouterLink>
       </div>

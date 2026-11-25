@@ -7,8 +7,8 @@
 //  - 지도 레이어 버튼 → 내 주변과 같은 MobileLayerSheet(안전 시설 켜고 끄기). 처음엔 전부 꺼짐, 켠 종류는 지도 화면 안의 시설을 보여 준다
 // 데이터: GET /api/camps (지도 마커·전체 목록), /api/camps/recommend (추천),
 //         /api/nearby/layers (레이어 줄 목록), /api/facilities?types=&swLat=… (지도 화면 안의 켠 시설)
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import MobileCampMap from '@/components/mobile/MobileCampMap.vue'
 import MobileCampRow from '@/components/mobile/MobileCampRow.vue'
 import MobileRegionSheet from '@/components/mobile/MobileRegionSheet.vue'
@@ -36,18 +36,22 @@ const survey = useSurveyStore()
 const favorite = useFavoriteStore()
 const trip = useTripStore()
 
+// 상세에서 뒤로 왔을 때 되살릴 상태 (아래 onBeforeRouteLeave 가 브라우저 기록에 적어 둔 것)
+// 하단 탭으로 새로 들어오면 없다 → 처음처럼 지도부터
+const kept = window.history.state?.explore ?? {}
+
 // ---- 화면 상태 ----
 // 지도 위 시트: 목록(화면 전체) ↔ 지도(검색·필터만). 손잡이를 끌거나 눌러 오간다 (utils/dragSheet.js, 차박 지도와 같은 움직임)
 const stageEl = ref(null)
 const stageH = useElementHeight(stageEl, 700)
 const sheetSnaps = computed(() => ({ map: COLLAPSED, list: stageH.value }))
-const { snap: sheetSnap, dragging: sheetDragging, style: sheetStyle, events: sheetDrag } = useDragSheet(sheetSnaps, 'map') // 처음엔 지도 화면 (진단 안내 팝업도 지도 위에 뜬다)
+const { snap: sheetSnap, dragging: sheetDragging, style: sheetStyle, events: sheetDrag } = useDragSheet(sheetSnaps, kept.snap ?? 'map') // 처음엔 지도 화면 (진단 안내 팝업도 지도 위에 뜬다)
 // true: 목록 / false: 지도 (다른 곳에서 sheetOpen = true 처럼 바꾸면 그 단계로 움직인다)
 const sheetOpen = computed({
   get: () => sheetSnap.value === 'list',
   set: (open) => (sheetSnap.value = open ? 'list' : 'map'),
 })
-const query = ref('') // 검색어 (이름·지역)
+const query = ref(kept.query ?? '') // 검색어 (이름·지역)
 // "내 유형" 칩 하나로 추천 TOP 5(유형 거름) + 내 유형 점수(응급실 가산점)를 같이 켜고 끈다 (예전 "내 유형 맞춤" · "내 유형 점수" 두 칩을 합침)
 // 상태는 stores/survey 의 bonusOn 하나 → 캠핑장 상세의 점수 원을 눌러 끄면 여기도 꺼진다. 진단을 마치면 켜짐
 const matchMine = computed({
@@ -55,9 +59,19 @@ const matchMine = computed({
   set: (on) => (survey.bonusOn = on),
 })
 const openSheet = ref(null) // null | 'region' | 'trip' | 'layers' — 열려 있는 아래 시트
-const sort = ref('score') // score | er
-const showExcluded = ref(false) // "따로 보기": 추천에서 뺀 위험 등급 보기
-const selectedId = ref(null)
+const sort = ref(kept.sort ?? 'score') // score | er
+const showExcluded = ref(kept.showExcluded ?? false) // "따로 보기": 추천에서 뺀 위험 등급 보기
+const selectedId = ref(kept.selectedId ?? null)
+const listEl = ref(null) // 목록 칸 (스크롤 위치를 기억)
+
+onBeforeRouteLeave((to) => {
+  if (!['camp-detail', 'facility-detail'].includes(to.name)) return
+  const explore = {
+    snap: sheetSnap.value, query: query.value, sort: sort.value, showExcluded: showExcluded.value,
+    selectedId: selectedId.value, scroll: listEl.value?.scrollTop ?? 0,
+  }
+  window.history.replaceState({ ...window.history.state, explore }, '')
+})
 
 // ---- 서버 데이터 ----
 const allCamps = ref([])
@@ -147,7 +161,12 @@ onMounted(async () => {
   surveyChecked.value = true
 })
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  if (!kept.scroll) return
+  await nextTick() // 목록이 그려진 뒤 보던 위치로
+  if (listEl.value) listEl.value.scrollTop = kept.scroll
+})
 onMounted(loadLayers) // 켜짐 기본값을 미리 받아 둔다 (시트를 열기 전에도 지도에 맞게 보이도록)
 watch([() => trip.state.sido, () => trip.state.sigungu, sort, bonusActive], load)
 watch(matchMine, () => (showExcluded.value = false))
@@ -225,18 +244,9 @@ const title = computed(() => {
   return '캠핑장 목록'
 })
 
-// 제목 아래 문구: 진단 답에서 실제로 반영한 것 (캠핑 유형으로 거르고, 안전점수 높은 순) — 진단의 다른 답은 추천에 쓰지 않으므로 말하지 않는다
-const CAMP_TYPE_LABEL = { auto: '오토캠핑·차박', glamping: '글램핑·카라반' }
-const reason = computed(() => {
-  if (showExcluded.value) return '안전점수가 낮아 추천하지 않는 곳이에요'
-  if (!matchMine.value) return '' // 내 유형 맞춤을 끄면 안내 문구 없이 목록만
-  const label = CAMP_TYPE_LABEL[campType.value]
-  return label ? `${label} 중 안전점수가 높은 곳부터 보여 드려요` : '안전점수가 높은 곳부터 보여 드려요'
-})
-// 가산점을 켰을 때 왜 점수가 붙었는지 한 줄 (예: 아이 동반 · 겨울에 해당해 응급실이 가까울수록 최대 +5점)
-const bonusNote = computed(() =>
-  bonusActive.value ? `${bonusReasons.value.join(' · ')}에 해당해 응급실이 가까운 곳의 점수를 올려 보여 드려요 (등급은 그대로)` : '',
-)
+// 제목 아래 문구: 뺀 캠핑장을 볼 때, 그리고 내 유형 점수(가산점)를 켰을 때만
+const reason = computed(() => (showExcluded.value ? '안전점수가 낮아 추천하지 않는 곳이에요' : ''))
+const bonusNote = computed(() => (bonusActive.value ? '유형에 따라 점수가 달라집니다' : ''))
 
 const hasDummy = computed(() => allCamps.value.some((c) => c.dummy))
 
@@ -314,7 +324,7 @@ function onMarker(id) {
         </div>
 
         <!-- 목록 (시트를 펼쳤을 때만 보임) -->
-        <div v-show="sheetOpen || sheetDragging" class="list-area">
+        <div v-show="sheetOpen || sheetDragging" ref="listEl" class="list-area">
           <div class="list-head">
             <div>
               <h1>{{ title }}</h1>
