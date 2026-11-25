@@ -59,6 +59,7 @@ const ticks = computed(() => props.state.stages.slice(1))
         </span>
         <span style="left: 100%">mm</span>
       </div>
+      <p v-if="state.waterText" class="note water">{{ state.waterText }}</p>
     </section>
 
     <!-- 기본 화면 -->
@@ -165,6 +166,7 @@ const ticks = computed(() => props.state.stages.slice(1))
 .v b { font-family: var(--dm-font-num); font-size: 18px; color: var(--dm-text); margin-right: 1px; }
 .stage { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--dm-sheet); }
 .stage i { width: 8px; height: 8px; border-radius: 50%; }
+.note.water { margin-top: 6px; }
 .note { margin: 2px 0 0; font-size: 11px; color: var(--dm-muted); }
 .note.preview { display: flex; align-items: center; gap: 8px; }
 .golive { font: inherit; font-size: 11px; font-weight: 700; color: var(--dm-water); background: none; border: 1px solid var(--dm-water); border-radius: 999px; padding: 2px 9px; cursor: pointer; }

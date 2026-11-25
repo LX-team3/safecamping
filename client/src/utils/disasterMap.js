@@ -34,13 +34,13 @@ const DEFAULT_CRIT = {
 // {dir} 은 캠핑장에서 높은 곳 쪽 방향(남서 등)으로 바꿔 넣는다
 // todo: 단계별 행동요령 3줄 (아래 시트 "○○ 단계 행동요령")
 const LV = {
-  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길만 알아 두세요', cta: '대피경로 보기',
+  0: { badge: '안전', color: cssVar('--color-stage-0'), head: '대피소 가는 길을 미리 봐 두세요', cta: '대피경로 보기',
     todo: ['대피소 가는 길과 산으로 오르는 방향을 미리 봐 둡니다.', '강가·계곡 가까이에 텐트를 치지 않습니다.', '기상특보와 재난문자를 확인합니다.'] },
-  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 대피를 준비하세요', cta: '대피경로 보기',
+  1: { badge: '준비', color: cssVar('--color-stage-1'), head: '짐을 싸고 떠날 준비를 하세요', cta: '대피경로 보기',
     todo: ['짐을 싸고 바로 나갈 수 있게 둡니다.', '손전등·비옷을 챙기고 휴대폰을 충전합니다.', '강물이 불어나는지 자주 살핍니다.'] },
-  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리 말고 {dir}쪽 산으로 올라가세요', cta: '대피경로 보기',
+  2: { badge: '대피', color: cssVar('--color-stage-2'), head: '다리를 건너지 말고 높은 곳으로 대피하세요', cta: '대피경로 보기',
     todo: ['짐은 가볍게, 걸어서 산 쪽으로 갑니다.', '물이 넘친 길과 다리는 건너지 않습니다.', '혼자 가지 말고 함께 움직입니다.'] },
-  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '캠핑장이 잠겨요. 짐 두고 바로 {dir}쪽 산으로', cta: '대피경로 보기',
+  3: { badge: '대피', color: cssVar('--color-stage-2'), head: '짐 두고 지금 바로 높은 곳으로!', cta: '대피경로 보기',
     todo: ['짐 두고 지금 바로 산으로 올라갑니다.', '흐르는 물은 얕아 보여도 건너지 않습니다.', '도착하면 119에 위치를 알립니다.'] },
 }
 
@@ -52,6 +52,7 @@ export function initialState() {
     // 실시간(기상청 실황) 상태. status: loading → ok(받음) · none(못 받음). on: 지금 실시간 값을 보여 주는 중(막대를 만지면 false = 미리 보기)
     live: { status: 'loading', on: false, time: '', reasons: [] },
     rain: 60, maxRain: DEFAULT_CRIT.max, stages: DEFAULT_CRIT.stages.map(s => ({ ...s, color: cssVar(s.color) })),
+    waterText: '',   // 막대 아래 한 줄: 지금 보이는 물이 무엇인지
     stage: { label: '준비', color: cssVar('--color-stage-1'), ai: false },
     lv: { ...LV[1] },
     routeKey: 'base', baseDisabled: false, baseLabel: '대피소',
@@ -293,15 +294,27 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
     return insts.length ? scene.groundPrimitives.add(new Cesium.GroundPrimitive({ geometryInstances: insts, show: false,
       appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN })) : null
   })
-  // 경보(대피) 단계: 강이 불어 강 구역(둔치·강~둑 사이 낮은 땅 = flood50fill)까지 찬 모습. 캠핑장 쪽 범람 범위는 아직 안 잠김
-  // 그림 표현이다: 경보 강수량 때 실제로 어디까지 차는지 계산한 자료는 없음 (수위 자료가 붙으면 바꿀 것)
-  const zoneRects = FILL[0]
-  const riverZone = zoneRects.length ? scene.groundPrimitives.add(new Cesium.GroundPrimitive({ show: false,
-    geometryInstances: zoneRects.map(([w, s, e, n]) => new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({
+  // 강 구역(공식 범람지도가 빼놓은 강 쪽 낮은 땅 = flood50fill)이 70 → 80 → 90 → 100 → 110mm 로 10mm 마다 차오른다 (2026-11-25)
+  // 안전·60mm 는 안 차고, 강 구역 밖(마을·캠핑장)은 114mm 이상의 공식 50년 범람 범위(floodDrape)에서만 잠긴다
+  // 순서는 실제 땅 높이(낮은 땅)와 강까지 거리로, 켜는 양은 보기 좋게 정한 값 = 참고 그림 (disaster-map/qgis/flood_steps.py 가 floodFillSteps 를 만듦)
+  //   강물 높이(REM)로 강 구역 밖까지 채워 봤더니 10m 지형이 둑을 못 잡아 55mm 에 마을이 잠겨서 뺐다
+  const riverZones = (D.floodFillSteps || (FILL[0].length ? [FILL[0]] : [])).map(rects => scene.groundPrimitives.add(new Cesium.GroundPrimitive({ show: false,
+    geometryInstances: rects.map(([w, s, e, n]) => new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({
       polygonHierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n])), vertexFormat: Cesium.MaterialAppearance.MaterialSupport.TEXTURED.vertexFormat }) })),
-    appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN })) : null
-  // 큰비 층(floodDrape)이 켜지면 겹쳐 진해지지 않게 강 구역 층은 끈다
-  const syncZone = () => { if (riverZone) riverZone.show = level >= 2 && !(floodDrape[0] && floodDrape[0].show) }
+    appearance: waterLook(), classificationType: Cesium.ClassificationType.TERRAIN })))
+  // 큰비 층(floodDrape)이 켜지면 겹쳐 진해지지 않게 끈다. 실시간에서 특보·수위로 대피가 되면 비가 적어도 90mm 모습은 보여 준다
+  // 막대 아래 회색 문장: 60mm 부터 같은 문장(안전 단계는 없음). 실시간은 특보·수위로도 단계가 오르므로 비의 양을 앞세우지 않고, 물이 보일 때만 낸다
+  // 114mm 이상은 공식 50년 하천범람지도, 그 전 물 그림은 양을 계산한 것이 아닌 참고 그림이다
+  const waterTextOf = n => state.live.on
+    ? (curFlood > 0 || n ? '여기까지 잠길 수 있어요' : '')
+    : state.rain >= 60 ? `3시간 동안 ${state.rain}mm가 오면 여기까지 잠길 수 있어요` : ''
+  const syncZone = () => {
+    const byRain = Math.max(0, Math.min(5, Math.floor((state.rain - 70) / 10) + 1))   // 70→1 · 80→2 · 90→3 · 100→4 · 110→5
+    const n = level >= 3 ? 5 : level === 2 ? Math.max(3, byRain) : level === 1 ? Math.min(2, byRain) : 0
+    const off = floodDrape[0] && floodDrape[0].show
+    riverZones.forEach((z, i) => { z.show = !off && i < n })
+    state.waterText = waterTextOf(n)
+  }
 
   /* ============ 건물 (건축물대장) — 물에 잠기는 건물은 파랗게 ============ */
   const blds = [], bInst = []
@@ -820,13 +833,13 @@ export async function createDisasterMap({ container, tagLayer, credits, state, b
   /* ============ 화면(Vue)이 부르는 동작 ============ */
   return {
     // 미리 보기: 막대 값(3시간 강수량)으로 단계를 정한다
-    setRain(mm) { state.rain = mm; state.live.on = false; applyStage(stageFromTable(mm)); rainFx(mm) },
+    setRain(mm) { state.rain = mm; state.live.on = false; applyStage(stageFromTable(mm)); syncZone(); rainFx(mm) },
     // 실시간: 단계는 서버가 3·12·24시간 기준으로 정한 level 을 그대로 쓰고, 슬라이더에는 3시간 비만 보여 준다
     setLive(level, mm) {
       const k = ST.findIndex(s => s.level === level)
       if (k < 0) return
       state.rain = Math.min(Math.round(mm), MAXR); state.live.on = true
-      applyStage(k); rainFx(state.rain)
+      applyStage(k); syncZone(); rainFx(state.rain)
     },
     selectRoute(key) { if (key === 'base' && state.baseDisabled) return; setRoute(key); meTarget = 0; goHome() },
     where() { state.sheetOpen = false; fly(routeKey === 'base' ? shelter : hEnd, camera.heading, -35, 520) },
