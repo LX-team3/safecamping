@@ -16,8 +16,8 @@ export const useMyCampingStore = defineStore('myCamping', () => {
 
   // 지난 날짜·체크아웃 순서·중복은 서버가 다시 검사한다 → 틀리면 서버 문구를 담은 Error 가 난다
   async function add(plan) {
-    // notifyPhone: 웹에서 저장하면 서버가 10초 뒤 내 폰 앱으로 브리핑 푸시를 보낸다
-    // 앱에서는 아래 scheduleBriefNotice 가 알림을 띄우므로 끈다 (두 번 울리지 않게)
+    // notifyPhone: 저장하면 서버가 10초 뒤 모임방 사람들 폰으로 브리핑 푸시를 보낸다. true(웹)면 내 폰에도 보낸다
+    // 앱에서는 아래 scheduleBriefNotice 가 내 알림을 띄우므로 나는 뺀다 (두 번 울리지 않게)
     const notifyPhone = !Capacitor.isNativePlatform()
     await api('/api/member/camp-plans', { method: 'post', body: { ...plan, notifyPhone } })
     await load() // 서버 순서(체크인 순)를 그대로 쓰려고 다시 불러온다
