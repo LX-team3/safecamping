@@ -5,7 +5,7 @@
 const TABS = [
   { key: 'explore', label: '탐색', to: '/app/explore', icon: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-4.5-4.5' },
 { key: 'nearby', label: '내 주변', to: '/app/nearby', icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3' },
-  { key: 'mycamp', label: '내 캠핑', to: '/app/my-camping', icon: 'M12 3L2 21h20zM12 10v5M12 18v.01' },
+  { key: 'mycamp', label: '내 캠핑', to: '/app/my-camping', icon: 'M3.5 21 14 3M20.5 21 10 3M15.5 21 12 15l-3.5 6M2 21h20' }, // 텐트 (Lucide tent, ISC — 시설 아이콘과 같은 세트). 예전 경고 삼각형은 알림으로 읽혀서 바꿈
   { key: 'saved', label: '저장', to: '/app/saved', icon: 'M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z' },
   { key: 'me', label: '내 정보', to: '/app/my-info', icon: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0' },
 ]

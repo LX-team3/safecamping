@@ -186,6 +186,9 @@ function measureAll() {
 const bigPhoto = ref('') // 후기 사진 크게 보기 (아무 데나 누르면 닫힘)
 
 // 출발 준비 줄에 보일 작은 글: 특보 > 특보 없음/받지 못함(가까울 때) > 특보가 보이는 날짜 + 안전점수(먼 일정)
+// 정보 카드 링크: 등록 캠핑장 → 캠핑장 상세, 차박 자리 → 차박 지도의 그 자리
+const campLink = (p) => (p.campId != null ? `/app/camps/${p.campId}` : { path: '/app/chabak', query: { lat: p.lat, lng: p.lng } })
+
 function prepLine(c) {
   if (!c) return { text: '', warn: false } // 아직 못 받음: 줄은 보이되 작은 글자는 비움
   if (c.warnings.length) {
@@ -282,18 +285,22 @@ async function remove(p) {
               </span>
             </div>
             <!-- 등록 캠핑장은 캠핑장 상세로, 차박 자리(campId 없음)는 차박 지도에서 그 자리로 -->
-            <RouterLink v-if="p.campId != null" :to="`/app/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
-            <RouterLink v-else :to="{ path: '/app/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
-              {{ p.campName }}
+            <!-- 캠핑장 정보: 흰 카드 (회색 일정 카드가 틀, 그 안에 정보 · 출발 준비 · 도구 버튼이 차례로) -->
+            <!-- 카드 전체가 링크: 등록 캠핑장은 캠핑장 상세로, 차박 자리(campId 없음)는 차박 지도에서 그 자리로. 오른쪽 › 로 누를 수 있음을 보여 준다 -->
+            <RouterLink :to="campLink(p)" class="info-card">
+              <span class="info-text">
+                <b class="plan-name">{{ p.campName }}</b>
+                <span class="plan-place">{{ p.place }}</span>
+                <span class="plan-range">{{ p.range }}</span>
+                <span v-if="p.memo" class="plan-memo">{{ p.memo }}</span>
+              </span>
+              <span class="info-arrow" aria-hidden="true">›</span>
             </RouterLink>
-            <p class="plan-place">{{ p.place }}</p>
-            <p class="plan-range">{{ p.range }}</p>
-            <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
             <!-- 캠핑 전날 브리핑: 닫혀 있을 때는 높이 0 (grid 행 0fr → 1fr 로 바뀌며 스르륵 열림) -->
             <div v-if="p.briefable" :id="`brief-${p.id}`" class="brief" :class="{ open: briefOpen[p.id] }" :inert="!briefOpen[p.id]">
               <div class="brief-inner">
                 <div class="brief-box">
-                  <p class="brief-title">{{ p.briefTitle }}</p>
+                  <p class="brief-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>{{ p.briefTitle }}</p>
                   <ul v-if="p.brief" class="brief-lines">
                     <li v-for="l in p.brief" :key="l.key">
                       <b :class="{ warn: l.warn }">{{ l.label }}</b>
@@ -306,6 +313,8 @@ async function remove(p) {
               </div>
             </div>
             <RouterLink v-if="p.prep" :to="`/app/my-camping/${p.id}/checklist`" class="prep">
+              <span class="prep-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9z" /><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></svg></span>
               <span v-if="p.prep.warn" class="warn-dot" aria-label="특보 발효 중" />
               <span class="prep-text">
                 <b>출발 준비</b>
@@ -389,17 +398,21 @@ async function remove(p) {
                   </button>
                 </span>
               </div>
-              <RouterLink v-if="p.campId != null" :to="`/app/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
-              <RouterLink v-else :to="{ path: '/app/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
-                {{ p.campName }}
+              <!-- 캠핑장 정보: 흰 카드 (회색 일정 카드가 틀, 그 안에 정보 · 출발 준비 · 도구 버튼이 차례로) -->
+              <!-- 카드 전체가 링크: 등록 캠핑장은 캠핑장 상세로, 차박 자리(campId 없음)는 차박 지도에서 그 자리로. 오른쪽 › 로 누를 수 있음을 보여 준다 -->
+              <RouterLink :to="campLink(p)" class="info-card">
+                <span class="info-text">
+                  <b class="plan-name">{{ p.campName }}</b>
+                  <span class="plan-place">{{ p.place }}</span>
+                  <span class="plan-range">{{ p.range }}</span>
+                  <span v-if="p.memo" class="plan-memo">{{ p.memo }}</span>
+                </span>
+                <span class="info-arrow" aria-hidden="true">›</span>
               </RouterLink>
-              <p class="plan-place">{{ p.place }}</p>
-              <p class="plan-range">{{ p.range }}</p>
-              <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
               <div v-if="p.briefable" :id="`brief-${p.id}`" class="brief" :class="{ open: briefOpen[p.id] }" :inert="!briefOpen[p.id]">
                 <div class="brief-inner">
                   <div class="brief-box">
-                    <p class="brief-title">{{ p.briefTitle }}</p>
+                    <p class="brief-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>{{ p.briefTitle }}</p>
                     <ul v-if="p.brief" class="brief-lines">
                       <li v-for="l in p.brief" :key="l.key">
                         <b :class="{ warn: l.warn }">{{ l.label }}</b>
@@ -413,6 +426,8 @@ async function remove(p) {
               </div>
               <!-- 가족 일정의 출발 준비도 같은 화면으로 (서버가 같은 가족방이면 보여 준다). 체크 표시는 보는 사람 브라우저에 따로 저장 -->
               <RouterLink :to="`/app/my-camping/${p.id}/checklist`" class="prep">
+                <span class="prep-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                  stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9z" /><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></svg></span>
                 <span class="prep-text"><b>출발 준비</b><small>특보 · 날씨 · 준비물 같이 보기</small></span>
                 <span class="arrow" aria-hidden="true">›</span>
               </RouterLink>
@@ -571,7 +586,7 @@ h1 {
   min-height: 44px; /* 손가락으로 누르기 쉬운 높이 */
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-text); /* 검정 테두리: 버튼으로 또렷하게 (예전 연회색 1px 은 흐릿) */
   background: var(--color-card);
   color: var(--color-text);
   display: flex;
@@ -752,17 +767,29 @@ h1 {
   overflow: hidden;
   min-height: 0;
 }
+/* 브리핑: 내일 알아야 할 것이라 제목을 주황(주의 색) 띠 + 종 아이콘으로 강조. 테두리도 주황.
+   초록(출발 준비)과 색이 달라 둘이 경쟁하지 않는다. 내용은 흰 바탕 그대로 */
 .brief-box {
   margin-top: 12px;
-  padding: 12px 14px;
   border-radius: 12px;
   background: var(--color-card);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid var(--color-caution);
+  overflow: hidden;
 }
 .brief-title {
-  margin: 0 0 8px;
+  margin: 0;
+  padding: 9px 14px;
+  background: var(--color-caution);
+  color: var(--color-card);
   font-size: 14px;
   font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.brief-box > .brief-lines,
+.brief-box > .brief-msg {
+  padding: 12px 14px;
 }
 .brief-lines {
   margin: 0;
@@ -800,6 +827,32 @@ h1 {
   color: var(--color-text-sub);
   cursor: pointer;
 }
+/* 흰 바탕 + 검정 테두리 (아래 메타버스 · 3D 지도 버튼과 같은 선) */
+.info-card {
+  margin-top: 10px;
+  padding: 14px 14px 12px;
+  border: 1.5px solid var(--color-text);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.info-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.info-arrow {
+  flex: none;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
 .plan-name {
   font-size: 19px;
   font-weight: 900;
@@ -816,14 +869,30 @@ h1 {
   font-size: 15px;
   font-weight: 700;
 }
+/* 출발 준비: 카드에서 가장 중요한 할 일이라 흰 바탕 + 올리브 테두리 + 왼쪽 아이콘으로 눈에 띄게
+   (예전 연회색 상자는 회색 카드 위에서 바탕과 구분이 안 돼 설명 글처럼 보였다) */
 .prep {
   margin-top: 12px;
   padding: 11px 12px;
+  border: 1.5px solid var(--color-primary);
   border-radius: 12px;
-  background: var(--color-bg-soft);
+  background: var(--color-card);
+  color: var(--color-text);
+  text-decoration: none;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.prep-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .prep-text {
   flex: 1;
@@ -832,7 +901,8 @@ h1 {
   flex-direction: column;
 }
 .prep-text b {
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 800;
 }
 .prep-text small {
   font-size: 12px;
@@ -846,8 +916,9 @@ h1 {
   background: var(--color-danger);
 }
 .prep .arrow {
-  font-size: 18px;
-  color: var(--color-arrow);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-primary);
 }
 /* 위 빈 카드(.empty-card)와 같은 회색 바탕 · 테두리 · 좌우 여백 → 한 묶음으로 보이게 */
 .family-btn {

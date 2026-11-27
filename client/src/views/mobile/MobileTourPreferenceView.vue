@@ -68,9 +68,13 @@ async function save() {
 
 <template>
   <div class="preference">
+    <!-- 왼쪽 뒤로 (예전 오른쪽 "나중에 할게요" 대신): 들어온 곳(캠핑장 관광지 탭 · 내 정보)으로 -->
     <header class="top">
+      <RouterLink class="back" :to="backTo" aria-label="뒤로" @click.capture.prevent="goUp(router, backTo)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      </RouterLink>
       <span>여행 취향 · 약 30초</span>
-      <RouterLink class="later" :to="backTo" @click.capture.prevent="goUp(router, backTo)">나중에 할게요</RouterLink>
     </header>
 
     <main class="body">
@@ -116,21 +120,21 @@ async function save() {
 .top {
   flex: none;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 2px;
   min-height: 56px;
-  padding: 8px 16px;
+  padding: 8px 16px 8px 4px;
   border-bottom: 1px solid var(--color-divider);
   font-size: 14px;
   color: var(--color-text-sub);
 }
-.later {
-  min-height: 44px;
+.back {
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
+  justify-content: center;
   color: var(--color-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 .body {
   flex: 1;
