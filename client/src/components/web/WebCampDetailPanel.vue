@@ -299,9 +299,13 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
 
         <!-- 탭 3: 관광지 -->
         <template v-else-if="tab === 'tour'">
-          <div class="sorts" role="tablist" aria-label="관광지 정렬">
-            <button type="button" role="tab" :aria-selected="tourSort === 'pref'" :class="{ on: tourSort === 'pref' }" @click="tourSort = 'pref'">내 취향순</button>
-            <button type="button" role="tab" :aria-selected="tourSort === 'near'" :class="{ on: tourSort === 'near' }" @click="tourSort = 'near'">가까운 순</button>
+          <!-- 정렬 + 오른쪽 "취향 바꾸기"(웹 여행 취향 화면, 저장하면 이 캠핑장으로 돌아온다) -->
+          <div class="sort-row">
+            <div class="sorts" role="tablist" aria-label="관광지 정렬">
+              <button type="button" role="tab" :aria-selected="tourSort === 'pref'" :class="{ on: tourSort === 'pref' }" @click="tourSort = 'pref'">내 취향순</button>
+              <button type="button" role="tab" :aria-selected="tourSort === 'near'" :class="{ on: tourSort === 'near' }" @click="tourSort = 'near'">가까운 순</button>
+            </div>
+            <RouterLink :to="`/web/tour-preference?camp=${campId}`" class="pref-link">취향 바꾸기 ›</RouterLink>
           </div>
           <p v-if="!tours.length" class="state small">주변 관광지 정보가 아직 없어요.</p>
           <div class="tours">
@@ -741,6 +745,19 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
 .fbtns .dir {
   background: var(--web-green);
   color: var(--web-white);
+}
+.sort-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pref-link {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--web-green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .sorts {
   align-self: flex-start;

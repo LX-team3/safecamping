@@ -73,9 +73,9 @@ async function logout() {
           <span class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</span>
         </div>
         <ol class="points">
-          <li><b>1</b><span><b>내 캠핑 유형</b><span>나는 어떤 캠퍼인지 알아봐요</span></span></li>
-          <li><b>2</b><span><b>맞춤 안전 수칙</b><span>내 유형에 꼭 필요한 것만</span></span></li>
-          <li><b>3</b><span><b>맞춤 캠핑장 순서</b><span>탐색 TOP5가 내 유형 기준으로 바뀌어요</span></span></li>
+          <li><b>1</b><span><b>내 캠핑 유형</b></span></li>
+          <li><b>2</b><span><b>맞춤 안전 수칙</b></span></li>
+          <li><b>3</b><span><b>맞춤 캠핑장 순서</b></span></li>
         </ol>
         <RouterLink to="/app/survey" class="start">1분 진단 시작하기</RouterLink>
       </div>
@@ -174,10 +174,6 @@ h1 {
 }
 .points li > span > b {
   font-size: 15px;
-}
-.points li > span > span {
-  font-size: 12px;
-  color: var(--color-text-light);
 }
 .start {
   height: 50px;

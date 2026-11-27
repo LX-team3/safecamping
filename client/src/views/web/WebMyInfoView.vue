@@ -1,6 +1,5 @@
 <script setup>
 // 웹 내 정보: 내 계정 · 내 캠핑 유형(1분 진단 저장 결과) · 바로가기 메뉴 · 로그아웃
-// 여행 취향은 웹 화면이 아직 없어 "준비 중"으로 둔다 (모바일에서 쓸 수 있다)
 import { computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import WebSubPage from '@/components/web/WebSubPage.vue'
@@ -26,6 +25,7 @@ const GROUPS = [
       { name: '찜한 캠핑장', sub: '비교하고 한눈에 보기', to: '/web/saved' },
       { name: '내 캠핑 유형', sub: '1분 진단 · 다시 하기', to: '/web/survey' },
       { name: '모임방', sub: '일행과 일정 · 모일 곳 공유', to: '/web/family' },
+      { name: '여행 취향', sub: '관광지 추천 순서 바꾸기', to: '/web/tour-preference' },
     ],
   },
   {
@@ -34,12 +34,6 @@ const GROUPS = [
       { name: '알림', sub: '기상특보 · 재난문자', to: '/web/alerts' },
       { name: '메타버스 안전 탐험', sub: '3D 캠핑장에서 안전 퀴즈', to: METAVERSE_PATH },
       { name: '3D 재난 대피 지도', sub: '재난 위험 지역 보기', to: DISASTER_PATH },
-    ],
-  },
-  {
-    title: '설정',
-    rows: [
-      { name: '여행 취향', sub: '준비 중 · 모바일에서 쓸 수 있어요' },
     ],
   },
 ]
@@ -79,10 +73,15 @@ async function logout() {
           <span class="weak">보완할 것: {{ saved.weak.join(' · ') }}</span>
           <RouterLink to="/web/survey" class="redo">다시 진단하기</RouterLink>
         </template>
+        <!-- 진단 전: 앱 내 정보(MobileMyInfoView) 카드와 같은 내용 · 모양 (진한 초록 카드 + 번호 목록 + 흰 버튼) -->
         <template v-else>
-          <span class="k">아직 내 유형이 없어요</span>
-          <b class="nick">1분이면 맞춤으로 바뀌어요</b>
-          <span class="weak">내 캠핑 유형 · 맞춤 안전 수칙 · 맞춤 캠핑장 순서</span>
+          <span class="k">8문항 · 약 1분</span>
+          <b class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</b>
+          <ol class="points">
+            <li><b>1</b>내 캠핑 유형</li>
+            <li><b>2</b>맞춤 안전 수칙</li>
+            <li><b>3</b>맞춤 캠핑장 순서</li>
+          </ol>
           <RouterLink to="/web/survey" class="redo">1분 진단 시작하기</RouterLink>
         </template>
       </section>
@@ -175,9 +174,11 @@ async function logout() {
   color: var(--web-terracotta);
   cursor: pointer;
 }
+/* 내 캠핑 유형 카드: 앱 내 정보 진단 카드와 같은 진한 초록 + 흰 글씨 + 흰 버튼 */
 .type {
-  background: var(--web-bg-beige);
-  border-color: var(--web-border);
+  background: var(--web-green);
+  border-color: var(--web-green);
+  color: var(--web-white);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -186,26 +187,49 @@ async function logout() {
 .k {
   font-size: 13px;
   font-weight: 700;
-  color: var(--web-text-sub);
+  letter-spacing: 0.04em;
+  color: var(--web-text-light);
 }
 .nick {
   font-family: var(--web-font-serif);
   font-size: 24px;
-  color: var(--web-green);
+  color: var(--web-white);
+}
+.title {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+}
+.points {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.points b {
+  display: inline-block;
+  width: 22px;
+  font-size: 14px;
+  color: var(--web-accent-light);
 }
 .weak {
   font-size: 14px;
-  color: var(--web-text-sub);
+  color: var(--web-text-light);
 }
 .redo {
-  margin-top: 10px;
-  height: 42px;
-  padding: 0 22px;
+  margin-top: 14px;
+  height: 46px;
+  padding: 0 26px;
   border-radius: 999px;
-  background: var(--web-green);
-  color: var(--web-white);
-  font-size: 14px;
-  font-weight: 700;
+  background: var(--web-white);
+  color: var(--web-green);
+  font-size: 15px;
+  font-weight: 800;
   display: inline-flex;
   align-items: center;
 }

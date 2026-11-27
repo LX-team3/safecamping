@@ -9,6 +9,7 @@
   --web-text: #1c1d1b;         /* 본문 */
   --web-text-sub: #5f615c;     /* 보조 글씨 */
   --web-text-light: #c9cac4;   /* 어두운 띠 안의 보조 글씨 */
+  --web-accent-light: #9db06a; /* 어두운 카드 안의 번호 강조 (앱 --color-accent-light 와 같은 값) */
   --web-arrow: #9a9c96;        /* 메뉴 줄 오른쪽 화살표 */
   --web-placeholder: #8a8c86;  /* 입력칸 안내 글씨 */
   --web-bg: #ffffff;           /* 기본 배경 */
