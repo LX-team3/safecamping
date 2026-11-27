@@ -53,7 +53,7 @@ async function logout() {
         <RouterLink to="/web/survey" class="row"><span>내 캠핑 유형</span><span class="sub">저장된 검사 결과 ›</span></RouterLink>
 
         <span class="badge">안전</span>
-        <RouterLink to="/web/family" class="row" @click="emit('close')"><span>모임방</span><span class="sub">함께 가는 사람과 안전 공유 ›</span></RouterLink>
+        <RouterLink to="/web/family" class="row" @click="emit('close')"><span>모임방</span><span class="sub">일행과 일정 · 모일 곳 공유 ›</span></RouterLink>
         <RouterLink :to="METAVERSE_PATH" class="row" @click="emit('close')"><span>메타버스 안전 탐험</span><i class="arrow"></i></RouterLink>
         <RouterLink :to="DISASTER_PATH" class="row" @click="emit('close')"><span>3D 재난 대피 지도</span><i class="arrow"></i></RouterLink>
         <RouterLink to="/web/my-booking" class="row" @click="emit('close')"><span>안전 점검 체크리스트</span><span class="sub">내 캠핑에서 열려요 ›</span></RouterLink>

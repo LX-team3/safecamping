@@ -475,7 +475,7 @@ input[type='date'] {
   height: 52px;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font: inherit;
   font-size: 16px;
@@ -524,7 +524,7 @@ input[type='date'] {
   font-weight: 700;
 }
 .primary {
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 .ghost {

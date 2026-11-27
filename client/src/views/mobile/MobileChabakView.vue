@@ -688,10 +688,10 @@ const parcelLine = computed(() =>
   padding: 0;
   justify-content: center;
 }
-/* 켜짐: 탐색의 "내 유형 맞춤" 켜짐과 같은 검은 칩 */
+/* 켜짐: 탐색의 "내 유형" 켜짐과 같은 올리브 칩 (지도 버튼 색) */
 .chip.on {
-  border-color: var(--color-text);
-  background: var(--color-text);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-card);
   font-weight: 700;
 }
@@ -782,7 +782,7 @@ const parcelLine = computed(() =>
   margin: 0;
   padding: 10px 14px;
   border-radius: 10px;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-size: 13px;
 }
@@ -932,7 +932,7 @@ h2 {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   display: flex;
   align-items: center;

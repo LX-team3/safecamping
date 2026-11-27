@@ -17,6 +17,7 @@ import { FACILITY_LABEL, shortSido } from '@/utils/place'
 import { useFavoriteStore } from '@/stores/favorite'
 import { useTourPreferenceStore } from '@/stores/tourPreference'
 import { useSurveyStore } from '@/stores/survey'
+import { useAuthStore } from '@/stores/auth'
 import { erBonusReasons } from '@/utils/webSurvey'
 import { useReservationReturnStore } from '@/stores/reservationReturn'
 
@@ -39,6 +40,9 @@ const preference = useTourPreferenceStore()
 const camp = ref(null)
 // 내 유형 점수 (응급실 가산점): 탐색과 같은 켜짐 상태 · 같은 규칙. 켜져 있고 해당 답이 있으면 점수 옆에 "+5" 를 따로
 const survey = useSurveyStore()
+// 내 진단 답을 여기서도 불러온다: 탐색을 거치지 않고(내 캠핑 · 새로고침 · 알림) 들어오면 답이 비어 유형 점수가 안 보였다
+const auth = useAuthStore()
+watch(() => auth.member?.id, () => survey.load(auth.isLoggedIn).catch(() => {}), { immediate: true })
 const bonusReasons = computed(() => erBonusReasons(survey.answers))
 const bonusApplies = computed(() => bonusReasons.value.length > 0 && !!camp.value?.erBonus)
 const bonus = computed(() => (survey.bonusOn && bonusApplies.value ? camp.value.erBonus : 0))
@@ -185,9 +189,11 @@ function openPlan() {
       <p v-if="!sheetOpen" class="route-note">{{ routeNote }}</p>
 
       <section class="sheet" :style="{ top: sheetOpen ? '56px' : `calc(100% - ${COLLAPSED}px)` }">
-        <button type="button" class="handle" :aria-expanded="sheetOpen" @click="sheetOpen = !sheetOpen">
+        <!-- 올린 상태에서는 손잡이만 (글씨 뺌). 내린 상태에서는 다시 올릴 수 있다는 걸 알려 주게 글씨를 남긴다 -->
+        <button type="button" class="handle" :aria-expanded="sheetOpen" :aria-label="sheetOpen ? '내려서 경로 지도 보기' : '올려서 상세 보기'"
+          @click="sheetOpen = !sheetOpen">
           <span class="grip" />
-          {{ sheetOpen ? '내리면 경로 지도' : '올려서 상세 보기' }}
+          <template v-if="!sheetOpen">올려서 상세 보기</template>
         </button>
 
         <!-- 올린 상태: 상세 -->
@@ -214,7 +220,11 @@ function openPlan() {
               <span v-if="summary">{{ summary }}</span>
               <!-- 켜고 끄기는 왼쪽 원을 누른다 -->
               <span v-if="bonusApplies" class="bonus-line">
-                <template v-if="bonus">내 유형 점수예요 · {{ bonusReasons.join(' · ') }} (안전점수 {{ camp.safetyScore }})</template>
+                <!-- 긴 문장 대신 해당하는 답을 칩으로 (웹 캠핑장 상세와 같음, 내가 고른 답 = 초록) -->
+                <template v-if="bonus">
+                  <span class="bonus-chips"><span v-for="r in bonusReasons" :key="r" class="bchip">{{ r }}</span></span>
+                  <small>응급실 거리를 더 따진 내 유형 점수 · 안전점수 {{ camp.safetyScore }}</small>
+                </template>
                 <template v-else>내 유형 점수 꺼짐 · 원을 누르면 켜져요</template>
               </span>
               <span v-if="camp.dummy" class="dummy">점수·시간은 더미 데이터</span>
@@ -234,7 +244,6 @@ function openPlan() {
           <!-- 안전점수 탭 -->
           <div v-if="tab === 'safety'">
             <template v-if="facilities.length">
-              <p class="hint">가까운 순 · 누르면 시설 상세를 보여줘요</p>
               <ol class="list">
                 <li v-for="(f, i) in facilities" :key="f.id">
                   <RouterLink class="row" :to="`/app/facilities/${f.id}?camp=${id}`">
@@ -263,10 +272,10 @@ function openPlan() {
               <b>시작 ›</b>
             </RouterLink>
             <template v-if="tours.length">
-              <p class="hint">
-                {{ prefer.length ? '내 취향에 맞는 곳부터 보여 드려요' : '지금은 인기순 · 취향을 알려주면 내 취향순으로 바뀌어요' }}
-                <!-- 배너는 취향이 없을 때만 보이므로, 저장한 뒤에는 여기서 바꾼다 -->
-                <RouterLink v-if="prefer.length" class="change" :to="`/app/tour-preference?camp=${id}`">바꾸기</RouterLink>
+              <!-- 취향이 없을 때는 위 배너가 안내하므로 글씨를 뺐다. 취향을 저장한 뒤에는 여기서 바꾼다 -->
+              <p v-if="prefer.length" class="hint">
+                내 취향에 맞는 곳부터 보여 드려요
+                <RouterLink class="change" :to="`/app/tour-preference?camp=${id}`">바꾸기</RouterLink>
               </p>
               <ol class="list">
                 <li v-for="(t, i) in tours" :key="t.id">
@@ -304,7 +313,6 @@ function openPlan() {
         </div>
 
         <footer class="foot">
-          <p>어디서 예약했든 날짜만 등록하면 캠핑 중 안전 알림을 보내드려요</p>
           <div class="buttons">
             <a v-if="camp.reservationUrl" class="reserve" :href="camp.reservationUrl" target="_blank" @click="visit.mark({ campId: props.id, campName: camp.name })"
               rel="noopener noreferrer">예약 사이트 ↗</a>
@@ -446,14 +454,15 @@ h1 {
   color: var(--color-caution);
   font-size: 11px;
 }
+/* 보조 버튼: 흰 바탕 + 테두리 (아래 "예약 사이트" 와 같은 등급). 초록은 점수 원 · 일정 등록에만 */
 .to-route {
   flex: none;
   height: 36px;
   padding: 0 12px;
-  border: none;
+  border: 1.5px solid var(--color-text);
   border-radius: 18px;
-  background: var(--color-text);
-  color: var(--color-card);
+  background: var(--color-card);
+  color: var(--color-text);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -510,7 +519,7 @@ h1 {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--color-text);
+  background: var(--color-text-mid); /* 순서 표시라 진회색 (초록 아님) */
   color: var(--color-card);
   display: flex;
   align-items: center;
@@ -561,7 +570,7 @@ h1 {
   margin-top: 12px;
   padding: 14px;
   border-radius: 12px;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-size: 14px;
 }
@@ -632,8 +641,8 @@ h1 {
   cursor: pointer;
 }
 .chip.on {
-  border-color: var(--color-text);
-  background: var(--color-text);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 .picked {
@@ -649,14 +658,8 @@ h1 {
 }
 .foot {
   flex: none;
-  padding: 10px 16px 16px;
+  padding: 12px 16px 16px;
   border-top: 1px solid var(--color-track);
-}
-.foot p {
-  margin: 0 0 8px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-text-sub);
 }
 .buttons {
   display: flex;
@@ -703,6 +706,28 @@ h1 {
 }
 .bonus-line b {
   font-weight: 800;
+}
+.bonus-line small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-sub);
+}
+.bonus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+/* 유형 칩: 정보라 조용한 회색 (흰 바탕 + 회색 테두리) */
+.bchip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text-mid);
+  font-size: 12px;
+  font-weight: 700;
 }
 .circle-wrap {
   flex: none;

@@ -22,6 +22,15 @@ onMounted(async () => {
   }
 })
 
+// 입력칸 닫기 (뒤로): 쓰던 내용과 오류 문구도 비운다
+function closeForm() {
+  adding.value = false
+  title.value = ''
+  startAt.value = ''
+  memo.value = ''
+  formError.value = ''
+}
+
 async function add() {
   if (!title.value) {
     formError.value = '일정 내용을 입력해 주세요.'
@@ -75,9 +84,17 @@ const groups = computed(() => {
 </script>
 
 <template>
-  <div class="tab-head">
-    <p class="sub">가족이 함께 볼 일정을 적어 두세요.</p>
-    <MobileAddButton label="일정 추가" @click="adding = !adding" />
+  <!-- 입력 중: 왼쪽 "뒤로" (입력칸을 닫고 목록·빈 카드로). + 를 다시 눌러 닫는 것보다 알아보기 쉬워서 -->
+  <div v-if="adding" class="tab-head">
+    <button type="button" class="form-back" @click="closeForm">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      뒤로
+    </button>
+  </div>
+  <!-- + 버튼 줄: 일정이 있을 때만 (비었을 때는 아래 빈 카드의 "일정 등록" 버튼이 대신). 안내 문장은 빈 카드와 겹쳐 뺐다 -->
+  <div v-else-if="family.schedules.length" class="tab-head end">
+    <MobileAddButton label="일정 추가" @click="adding = true" />
   </div>
 
   <form v-if="adding" class="stack-form" @submit.prevent="add">
@@ -89,7 +106,16 @@ const groups = computed(() => {
   </form>
 
   <p v-if="error" class="error" role="alert">{{ error }}</p>
-  <p v-if="!family.schedules.length && !adding" class="empty">아직 등록한 일정이 없어요.</p>
+  <!-- 비었을 때: 문장 하나 → 카드 (웹 저장 화면 빈 카드와 같은 모양) + 바로 추가하는 버튼 -->
+  <div v-if="!family.schedules.length && !adding" class="empty-card">
+    <span class="empty-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+    </span>
+    <b>등록한 일정이 없습니다</b>
+    <p>일정을 등록하세요</p>
+    <button type="button" class="empty-go" @click="adding = true">일정 등록</button>
+  </div>
 
   <section v-for="g in groups" :key="g.day" class="day">
     <h3>{{ g.day }}</h3>
@@ -120,5 +146,68 @@ const groups = computed(() => {
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+/* 빈 카드 (웹 저장 WebSavedView 의 .empty-card 와 같은 모양, 앱 색 토큰) */
+.empty-card {
+  margin-top: 8px;
+  padding: 28px 20px 22px;
+  border: 1px solid var(--color-divider);
+  border-radius: 14px;
+  background: var(--color-bg-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.empty-card b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.empty-card p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--color-text-sub);
+}
+.empty-go {
+  margin-top: 12px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-card);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tab-head.end {
+  justify-content: flex-end; /* 문장을 빼서 + 버튼만 오른쪽에 */
+}
+.form-back {
+  height: 44px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
 </style>

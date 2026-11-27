@@ -26,8 +26,12 @@ const COLOR = { er: 'hospital', fire: 'fire', police: 'police', store: 'store', 
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  /* 줄 상자는 오른쪽 끝(80px 앞)까지 넓게 깔려 있어서, 빈 곳이 아래 "지도·스카이뷰" 메뉴를 덮어 클릭을 막았다
+     → 상자 자체는 클릭을 통과시키고 칩 버튼만 클릭을 받는다 */
+  pointer-events: none;
 }
 .fac {
+  pointer-events: auto;
   height: 38px;
   padding: 0 14px;
   border-radius: 999px;

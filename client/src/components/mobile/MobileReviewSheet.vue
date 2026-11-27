@@ -296,7 +296,7 @@ textarea::placeholder {
   height: 20px;
   border: 0;
   border-radius: 50%;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-size: 12px;
   line-height: 1;
@@ -321,7 +321,7 @@ textarea::placeholder {
   height: 52px;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font: inherit;
   font-size: 16px;

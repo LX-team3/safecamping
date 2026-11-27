@@ -98,22 +98,33 @@ function remove(campId) {
           담은 {{ data.totalCount }}곳 중 앞의 {{ data.camps.length }}곳만 비교해요.
         </span>
 
-        <!-- 비교 중인 캠핑장 (빼기) -->
+        <!-- 비교 중인 캠핑장 (빼기). 사진은 서버가 주는 camp.image_url (없으면 회색 칸) -->
         <div class="camps">
           <div v-for="c in data.camps" :key="c.id" class="camp">
             <!-- 사진·이름을 누르면 캠핑장 상세 -->
             <RouterLink :to="`/app/camps/${c.id}`" class="camp-link">
-              <span class="photo" />
+              <span class="photo">
+                <img v-if="c.imageUrl" :src="c.imageUrl" alt="" loading="lazy" />
+              </span>
               <b>{{ c.name }} ›</b>
             </RouterLink>
             <button type="button" class="remove" :disabled="busy" @click="remove(c.id)">빼기</button>
           </div>
+          <!-- 빈 자리(3곳 미만): + 칸 → 탐색에서 하트로 담는다 (비교는 최대 3곳) -->
+          <RouterLink v-if="data.camps.length < 3" to="/app/explore" class="camp add">
+            <span class="photo add-box" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            </span>
+            <b>캠핑장 추가</b>
+          </RouterLink>
         </div>
 
-        <!-- 항목별 카드: 캠핑장마다 한 줄 (이름 · 막대 · 값 · 가장 좋은 곳 칩) -->
+        <!-- 항목별 카드: 캠핑장마다 이름(위, 줄임 없이) + 아래 막대 · 값 · 가장 좋은 곳 칩
+             (전에는 이름 · 막대가 한 줄이라 이름이 "하추자연…" 처럼 잘렸다). 막대 없는 항목은 이름 · 값 한 줄 -->
         <section v-for="r in data.rows" :key="r.label" class="item">
           <h2>{{ r.label }}</h2>
-          <div v-for="(v, i) in r.cells" :key="i" class="line" :class="{ best: v.best }">
+          <div v-for="(v, i) in r.cells" :key="i" class="line" :class="{ best: v.best, stack: hasBars(r) }">
             <span class="name">{{ data.camps[i].name }}</span>
             <span v-if="hasBars(r)" class="bar" aria-hidden="true">
               <span :class="{ score: r.kind === 'score' }" :style="{ width: barWidth(r, v) + '%' }" />
@@ -198,11 +209,30 @@ h1 {
   flex-direction: column;
   gap: 6px;
 }
-/* 캠핑장 사진 자리 */
+/* 캠핑장 사진 (없으면 회색 칸) */
 .photo {
   aspect-ratio: 4 / 3;
   border-radius: 10px;
   background: var(--color-photo);
+  overflow: hidden;
+}
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* + 칸: 사진 칸과 같은 크기, 점선 테두리 */
+.camp.add {
+  color: var(--color-text-sub);
+  text-decoration: none;
+}
+.add-box {
+  border: 1.5px dashed var(--color-border);
+  background: var(--color-bg-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .camp-link {
   display: flex;
@@ -251,11 +281,17 @@ h1 {
   color: var(--color-text-mid);
 }
 .line .name {
-  flex: none;
-  width: 72px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+/* 막대가 있는 항목: 이름이 한 줄을 다 차지하고 막대 · 값 · 칩은 그 아래 줄 */
+.line.stack {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding: 2px 0;
+}
+.line.stack .name {
+  flex-basis: 100%;
 }
 .bar {
   flex: 1;
@@ -276,20 +312,14 @@ h1 {
   min-width: 64px;
   text-align: right;
 }
-/* 가장 좋은 곳: 이름·값 진하게, 막대 진하게, 칩 */
+/* 가장 좋은 곳: 이름·값 진하게, 막대 초록, 칩 */
 .line.best {
   color: var(--color-text);
   font-weight: 700;
 }
+/* 막대 색 규칙 (모든 항목 같음): 1등 = 초록, 나머지 = 회색(.bar span 기본). 1등을 한눈에 찾게 */
 .line.best .bar span {
-  background: var(--color-text);
-}
-.line.best .bar span.score,
-.bar span.score {
   background: var(--color-green);
-}
-.line:not(.best) .bar span.score {
-  opacity: 0.45;
 }
 .value.no {
   color: var(--color-text-sub);
@@ -303,7 +333,7 @@ h1 {
   height: 22px;
   padding: 0 8px;
   border-radius: 11px;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-size: 11px;
   font-weight: 700;

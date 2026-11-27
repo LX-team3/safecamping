@@ -75,7 +75,6 @@ async function save() {
 
     <main class="body">
       <h1>캠핑 가서 뭘 하고 싶으세요?</h1>
-      <p class="sub">고른 취향으로 관광지 순서를 바꿔드려요. 캠핑장 안전점수에는 영향이 없어요.</p>
 
       <p v-if="loading" class="state">불러오는 중...</p>
       <p v-else-if="loadError" class="state">
@@ -96,8 +95,6 @@ async function save() {
           </div>
         </section>
 
-        <!-- 연령 데이터가 없어 활동을 뒤로 보내지는 못한다 → 하지 않는 동작을 약속하지 않고 확인을 안내한다 -->
-        <p class="note">아이와 함께라면 활동별 연령 제한을 꼭 확인하세요.</p>
       </template>
     </main>
 
@@ -147,12 +144,6 @@ h1 {
   font-weight: 900;
   line-height: 1.3;
   letter-spacing: -0.02em;
-}
-.sub {
-  margin: 6px 0 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--color-text-sub);
 }
 .state {
   margin: 24px 0 0;
@@ -212,15 +203,6 @@ h2 {
   background: var(--color-selected-bg);
   font-weight: 700;
 }
-.note {
-  margin: 24px 0 0;
-  padding: 14px;
-  border-radius: var(--radius-input);
-  background: var(--color-bg-soft);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--color-text-mid);
-}
 .foot {
   flex: none;
   padding: 12px 16px 20px;
@@ -236,7 +218,7 @@ h2 {
   height: 54px;
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-family: inherit;
   font-size: 16px;

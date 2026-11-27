@@ -2,11 +2,12 @@
 // "지도 설정" 시트 (탐색 · 내 주변 · 차박 지도 오른쪽 위 레이어 버튼)
 //  - 위: 지도 종류 지도 · 스카이뷰 (utils/mapType.js — 세 지도가 같이 씀). 미리보기 그림으로 구분
 //  - 아래: 안전 시설 켜고 끄기
-// 줄 목록은 서버(GET /api/nearby/layers)가 정본 — 대피소는 데이터가 없어 켜도 지도에 아무것도 안 나온다
+// 줄 목록은 서버(GET /api/nearby/layers)가 정본 — 데이터가 준비된 시설(ready)만 보인다. 대피소는 데이터가 없어 숨김
 import { nextTick, onMounted, ref } from 'vue'
 import MobileBottomSheet from '@/components/mobile/MobileBottomSheet.vue'
 import { MAP_TYPES, drawSkyPreview, mapType } from '@/utils/mapType'
 import { loadKakaoMap } from '@/utils/kakaoMap'
+import { facilityIcon } from '@/utils/facilityIcon'
 
 defineProps({
   layers: { type: Array, required: true }, // [{ code, icon, label, desc, ready }]
@@ -83,11 +84,12 @@ onMounted(async () => {
 
     <h3 class="sub">안전 시설</h3>
     <ul class="rows">
-      <li v-for="l in layers" :key="l.code" class="row">
-        <span class="icon" aria-hidden="true">{{ l.icon }}</span>
+      <!-- 데이터가 없는 시설(ready=false, 지금은 대피소)은 켜도 아무것도 안 나와서 줄을 숨긴다 (웹 칩과 같음) -->
+      <li v-for="l in layers.filter((x) => x.ready)" :key="l.code" class="row">
+        <!-- 아이콘: 지도에 뜨는 시설 배지와 같은 모양·색 (utils/facilityIcon.js, styles/base.css .fac-badge.plain). 설명 글은 뺐다 -->
+        <span class="fac-badge plain lbadge" :class="`t-${l.code}`" aria-hidden="true" v-html="facilityIcon(l.code)" />
         <div class="text">
           <b>{{ l.label }}</b>
-          <span>{{ l.desc }}</span>
         </div>
         <button type="button" role="switch" class="switch" :class="{ on: on[l.code] }" :aria-checked="!!on[l.code]"
           :aria-label="`${l.label} 지도에 보이기`" @click="emit('toggle', l.code)">
@@ -189,6 +191,10 @@ onMounted(async () => {
   font-size: 13px;
   font-weight: 700;
 }
+.lbadge {
+  --fac-size: 36px;
+  box-shadow: none; /* 지도 위가 아니라 그림자 없이 */
+}
 .icon .dot {
   width: 12px;
   height: 12px;
@@ -228,7 +234,7 @@ onMounted(async () => {
   transition: transform 0.15s;
 }
 .switch.on {
-  background: var(--color-text);
+  background: var(--color-primary);
 }
 .switch.on i {
   transform: translateX(20px);

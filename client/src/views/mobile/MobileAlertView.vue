@@ -318,8 +318,8 @@ h1 {
   cursor: pointer;
 }
 .filters button.on {
-  border-color: var(--color-text);
-  background: var(--color-text);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-card);
   font-weight: 700;
 }

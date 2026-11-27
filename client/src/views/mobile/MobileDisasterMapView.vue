@@ -22,6 +22,10 @@ const live = useDisasterLive(state, map)
 const pillAlert = live.alert
 const route = useRoute()
 const router = useRouter()
+// 웹 ⇄ 앱 전환 (시연용): 같은 재난 지도의 웹 화면으로. 좁은 화면에서는 /web 이 다시 앱으로 넘어오므로 PC 처럼 넓을 때만
+// replace: 왔다 갔다 해도 뒤로가기 기록이 쌓이지 않게
+const canSwitchWeb = window.matchMedia('(min-width: 768px)').matches
+
 // 뒤로: 들어온 화면으로. 알림으로 바로 들어왔거나 알림을 거듭 눌러 이 화면이 쌓였으면 내 캠핑으로
 function goBack() {
   const back = window.history.state?.back
@@ -77,7 +81,13 @@ onBeforeUnmount(() => {
         </svg>
       </button>
       <div class="place">
-        <span class="app">campine</span>
+        <span class="app">campine
+          <RouterLink v-if="canSwitchWeb" :to="{ path: '/web/disaster', query: route.query }" replace class="to-web"
+            aria-label="같은 화면을 웹(PC)으로 보기" title="웹 화면으로 보기">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>웹으로
+          </RouterLink>
+        </span>
         <h1>호우 및 침수 시 대피경로</h1>
         <span class="loc">인북천 물빛테마공원 캠핑장</span>
       </div>
@@ -143,6 +153,12 @@ onBeforeUnmount(() => {
 .topbar :deep(.alert:has(.pill[aria-expanded="true"])) { z-index: 8; }
 .place { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
 .place .app { font-size: 12px; font-weight: 700; color: var(--dm-water); letter-spacing: 0.04em; }
+.to-web {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 2px 8px;
+  border: 1px solid var(--dm-line); border-radius: 999px; background: var(--dm-card); color: var(--dm-text);
+  font-size: 11px; letter-spacing: 0; text-decoration: none; vertical-align: middle; pointer-events: auto;
+}
+.to-web:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
 .place h1 { margin: 0; font-size: 15px; word-break: keep-all; font-weight: 700; line-height: 1.3; }
 .place .loc { font-size: 12px; color: var(--dm-muted); }
 

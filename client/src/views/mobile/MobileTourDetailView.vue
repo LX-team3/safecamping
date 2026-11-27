@@ -133,7 +133,7 @@ function otherTours() {
   font-weight: 700;
 }
 .tag.rank {
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 h1 {
@@ -184,7 +184,7 @@ h2 {
 }
 .go {
   flex: 1;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 .link {

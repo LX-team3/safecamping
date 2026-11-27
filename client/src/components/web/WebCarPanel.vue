@@ -9,7 +9,7 @@
 //  - 안전점수: 전체 · 위험 제외(40↑) · 안전만(70↑) — 점에만 적용
 import { LAYER_CHIPS, SAFETY_FILTERS, VERDICT } from '@/utils/chabak'
 
-defineProps({
+const props = defineProps({
   camps: { type: Array, default: () => [] }, // [{ id, kind: open·camp, name, safetyScore, grade, tier, area, erDriveMin }]
   selectedId: { type: [Number, String], default: null },
   layerOn: { type: Object, default: () => ({}) }, // { open, camp, no, caution } 켜짐
@@ -18,6 +18,11 @@ defineProps({
 })
 const emit = defineEmits(['back', 'pick', 'toggle-layer', 'safety'])
 const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
+// 빈 카드의 "필터 넓히기": 갈 수 있는 곳(후보지 · 야영장)을 다 켜고 안전점수를 전체로 (피해야 할 곳은 그대로)
+function widen() {
+  LAYER_CHIPS.filter((c) => c.section === 'go' && !props.layerOn[c.type]).forEach((c) => emit('toggle-layer', c.type))
+  emit('safety', 'all')
+}
 </script>
 
 <template>
@@ -39,7 +44,7 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
             <i :style="{ background: `var(${VERDICT[c.verdict].colorVar})` }" />{{ c.label }}
           </button>
         </div>
-        <span class="flabel">피해야 할 곳 <small>지도에 칠해져요</small></span>
+        <span class="flabel">피해야 할 곳</span>
         <div class="fchips">
           <button v-for="c in LAYER_CHIPS.filter((x) => x.section === 'avoid')" :key="c.type" type="button" class="fchip"
             :class="{ on: layerOn[c.type] }" :aria-pressed="!!layerOn[c.type]" :title="c.note" @click="emit('toggle-layer', c.type)">
@@ -58,7 +63,16 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
         <b>차박지 {{ camps.length }}곳</b>
         <span>안전점수 높은 순</span>
       </div>
-      <p v-if="!camps.length" class="state">조건에 맞는 곳이 없어요. 필터를 넓혀 보세요.</p>
+      <!-- 비었을 때: 문장 하나 → 카드 (저장 · 탐색 빈 카드와 같은 모양) + 필터를 넓히는 버튼 -->
+      <div v-if="!camps.length" class="empty-card">
+        <span class="empty-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+        </span>
+        <b>조건에 맞는 곳이 없습니다</b>
+        <p>갈 수 있는 곳을 켜거나 안전점수 기준을 넓혀 주세요</p>
+        <button type="button" class="empty-go" @click="widen">필터 넓히기</button>
+      </div>
       <div class="rows">
         <button v-for="c in camps" :key="c.id" type="button" class="row" :class="{ on: c.id === selectedId }"
           :aria-pressed="c.id === selectedId" @click="emit('pick', c.id)">
@@ -126,10 +140,49 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
   font-size: 13px;
   color: var(--web-text-sub);
 }
-.state {
+/* 빈 카드 (저장 WebSavedView · 탐색 WebExploreView 의 .empty-card 와 같은 모양) */
+.empty-card {
+  padding: 28px 20px 22px;
+  border: 1px solid var(--web-line-panel-soft);
+  border-radius: 14px;
+  background: var(--web-bg-quiet);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--web-bg);
+  color: var(--web-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.empty-card b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.empty-card p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--web-text-sub);
+}
+.empty-go {
+  margin-top: 12px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--web-green);
+  color: var(--web-white);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .rows {
   display: flex;
@@ -225,10 +278,6 @@ const GRADE_LABEL = { safe: '안심', caution: '보통', danger: '유의' }
 .flabel {
   font-size: 13px;
   font-weight: 700;
-}
-.flabel small {
-  font-weight: 400;
-  color: var(--web-text-sub);
 }
 .fchips {
   display: flex;

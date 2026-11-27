@@ -28,18 +28,24 @@ const isSample = ref(false)
 const placeLabel = ref('')
 const radius = ref(10)
 
-function locate() {
+// fresh: 다시 받기 버튼은 기억해 둔 위치(1분)를 쓰지 않고 새로 받는다 → 안 그러면 눌러도 그대로라 안 눌린 것처럼 보인다
+function locate(fresh = false) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null)
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: fresh ? 0 : 60000 },
     )
   })
 }
-async function loadMe() {
-  const here = await locate()
+const locating = ref(false) // 위치를 받는 중: 버튼 아이콘을 돌리고 주소 자리에 "찾는 중"
+const refreshMsg = ref('') // 다시 받은 뒤 잠깐 보이는 한 줄 (같은 곳이어도 눌린 걸 알 수 있게)
+let refreshTimer = null
+async function loadMe(fresh = false) {
+  if (locating.value) return
+  locating.value = true
+  const here = await locate(fresh)
   isSample.value = !here
   me.value = here || SAMPLE
   // 주소 글씨와 기상특보 지역은 서버가 알려 주는 "가장 가까운 데이터 기준 지역"을 쓴다
@@ -50,6 +56,13 @@ async function loadMe() {
   } catch {
     placeLabel.value = ''
   }
+  locating.value = false
+}
+async function refreshMe() {
+  await loadMe(true)
+  refreshMsg.value = isSample.value ? '위치를 받지 못해 예시 위치를 보여 줘요' : '내 위치를 다시 받았어요'
+  clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => (refreshMsg.value = ''), 2500)
 }
 
 
@@ -168,10 +181,11 @@ watch(() => route.query.camp, (v) => {
             </span>
             <span class="me-text">
               <span class="k">{{ isSample ? '예시 위치 (위치 권한 없음)' : '현재 내 위치' }}</span>
-              <span class="v">{{ placeLabel || '위치를 찾는 중...' }}</span>
+              <span class="v">{{ locating || !placeLabel ? '위치를 찾는 중...' : placeLabel }}</span>
+              <span v-if="refreshMsg" class="k done" role="status">{{ refreshMsg }}</span>
             </span>
           </div>
-          <button type="button" class="refresh" aria-label="내 위치 다시 받기" @click="loadMe">
+          <button type="button" class="refresh" :class="{ spin: locating }" :disabled="locating" aria-label="내 위치 다시 받기" @click="refreshMe">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4v7h-7" /></svg>
           </button>
@@ -306,6 +320,21 @@ watch(() => route.query.camp, (v) => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+.refresh:hover {
+  background: var(--web-bg-quiet);
+}
+.refresh:disabled {
+  cursor: default;
+}
+.refresh.spin svg {
+  animation: refresh-spin 0.8s linear infinite;
+}
+@keyframes refresh-spin {
+  to { transform: rotate(360deg); }
+}
+.k.done {
+  color: var(--web-green);
 }
 .radii {
   display: flex;

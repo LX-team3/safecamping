@@ -17,4 +17,5 @@ public class SavedList {
     private Boolean isDefault;       // '관심 캠핑장' 기본 목록이면 true
     private Integer campCount;       // 조회할 때 saved_camp 를 세어 채운다 (테이블 컬럼 아님)
     private OffsetDateTime createdAt;
+    private String thumbUrls;        // 썸네일 사진 주소 최대 3개, 공백으로 이음 (조회할 때만 채움, 테이블 컬럼 아님)
 }

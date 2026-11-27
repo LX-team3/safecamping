@@ -65,7 +65,8 @@ function markerEl(target) {
   btn.type = 'button'
   btn.className = `route-marker${target.id === props.selectedId ? ' selected' : ''}${target.label ? '' : ' icon-only'}`
   btn.setAttribute('aria-label', [target.name, target.label].filter(Boolean).join(' '))
-  btn.appendChild(facilityBadgeEl({ type: target.type, grade: props.grade, no: target.no }))
+  // 시설은 웹 지도처럼 종류 색 배지(plain: 종류 색 테두리 + 옅은 바탕). 등급 색은 출발지 텐트에만 → 초록이 몰리지 않게
+  btn.appendChild(facilityBadgeEl({ type: target.type, no: target.no, plain: true }))
   if (target.label) btn.appendChild(document.createTextNode(target.label))
   btn.addEventListener('click', () => emit('select', target.id))
   return btn
@@ -205,7 +206,7 @@ const fake = computed(() => {
           :class="{ selected: t.id === selectedId, 'icon-only': !t.label }" :style="{ left: t.x + '%', top: t.y + '%' }"
           :aria-label="[t.name, t.label].filter(Boolean).join(' ')" @click="emit('select', t.id)">
           <!-- 카카오 지도 마커(facilityBadgeEl)와 같은 모양. 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
-          <span class="fac-badge" :class="gradeClass(grade)">
+          <span class="fac-badge plain" :class="`t-${t.type}`">
             <span v-if="facilityIcon(t.type)" class="fac-svg" v-html="facilityIcon(t.type)" />
             <template v-else>{{ t.no }}</template>
             <b v-if="facilityIcon(t.type) && t.no" class="fac-no">{{ t.no }}</b>

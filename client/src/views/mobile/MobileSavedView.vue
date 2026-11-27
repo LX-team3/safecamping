@@ -1,5 +1,5 @@
 <script setup>
-// 저장 화면 (설계: Saved.dc.html). 이번에는 "목록" 탭만 동작하고 차박 위치는 준비 중 (가족 공유 탭은 가족방과 역할이 겹쳐 뺌)
+// 저장 화면 (설계: Saved.dc.html). 탭은 "목록" 하나 (차박 위치 탭은 준비 중 글만 있어 뺐다 · 가족 공유 탭은 가족방과 역할이 겹쳐 뺌)
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSavedStore } from '@/stores/saved'
@@ -8,7 +8,7 @@ import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 const auth = useAuthStore()
 const saved = useSavedStore()
 
-const TABS = ['목록', '차박 위치']
+const TABS = ['목록']
 const tab = ref(0)
 const error = ref('')
 
@@ -41,12 +41,20 @@ async function create() {
   }
 }
 
-// 카드 썸네일 2×2 중 앞의 3칸: 담은 수만큼 회색으로 채운다. 4칸째는 3곳을 넘는 수(+2 등)
-function filled(list, i) {
-  return list.campCount > i
+// 카드 썸네일: 담은 캠핑장 사진을 카드처럼 겹쳐 쌓는다 (최대 3장, 2×2 칸은 빈칸이 생겨서 바꿈)
+//  - 맨 앞 = 처음 담은 곳, 뒤 장은 오른쪽 위로 8%씩 비켜 놓는다
+//  - 장 수가 적으면 크게 (1장 100% · 2장 92% · 3장 84%) → 빈 공간이 안 남게
+const STEP = 8
+function layerCount(list) {
+  return Math.min(list.campCount, 3)
 }
-function more(list) {
-  return list.campCount > 3 ? `+${list.campCount - 3}` : ''
+function layerStyle(list, i) {
+  const size = 100 - (layerCount(list) - 1) * STEP
+  return { width: `${size}%`, height: `${size}%`, left: `${i * STEP}%`, bottom: `${i * STEP}%`, zIndex: 3 - i }
+}
+// 장 i 의 사진 주소 (서버 thumbUrls: 담은 순서, 사진 있는 곳만 최대 3개). 없으면 회색 장
+function thumb(list, i) {
+  return list.thumbUrls?.[i] || ''
 }
 // 2곳 이상이면 비교할 수 있다는 것을 알려 준다
 function countText(list) {
@@ -78,8 +86,6 @@ function countText(list) {
         <RouterLink to="/app/login" class="primary">로그인</RouterLink>
       </div>
 
-      <p v-else-if="tab !== 0" class="empty">준비 중이에요.</p>
-
       <template v-else>
         <form v-if="creating" class="create" @submit.prevent="create">
           <input v-model.trim="newName" maxlength="30" placeholder="새 목록 이름 (예: 11월 가족 캠핑 후보)" />
@@ -92,8 +98,12 @@ function countText(list) {
         <div class="grid">
           <RouterLink v-for="list in saved.lists" :key="list.id" :to="`/app/saved/lists/${list.id}`" class="card">
             <span class="thumb">
-              <span v-for="i in 3" :key="i" :class="{ filled: filled(list, i - 1) }" />
-              <span class="more">{{ more(list) }}</span>
+              <!-- 담은 곳이 없으면 점선 빈 장 하나 -->
+              <span v-if="!layerCount(list)" class="layer empty" />
+              <span v-for="i in layerCount(list)" :key="i" class="layer" :class="{ back: i > 1 }"
+                :style="layerStyle(list, i - 1)">
+                <img v-if="thumb(list, i - 1)" :src="thumb(list, i - 1)" alt="" loading="lazy" />
+              </span>
             </span>
             <span class="text">
               <b>{{ list.name }}</b>
@@ -223,28 +233,34 @@ h1 {
   flex-direction: column;
   gap: 8px;
 }
+/* 겹쳐 쌓은 사진 (위치·크기는 layerStyle) */
 .thumb {
+  position: relative;
   aspect-ratio: 1;
+}
+.layer {
+  position: absolute;
+  border: 2px solid var(--color-card);
   border-radius: 14px;
-  background: var(--color-fill-soft);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
+  background: var(--color-photo); /* 사진 없는 캠핑장 = 회색 장 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
-.thumb > span {
-  background: var(--color-fill-soft);
+/* 뒤 장은 살짝 어둡게 → 맨 앞 장이 또렷 */
+.layer.back img {
+  filter: brightness(0.88);
 }
-.thumb > span.filled {
-  background: var(--color-photo);
+.layer.empty {
+  inset: 0;
+  border: 1.5px dashed var(--color-border);
+  background: var(--color-bg-soft);
+  box-shadow: none;
 }
-.thumb .more {
-  color: var(--color-text-mid);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
+.layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .text {
   display: flex;

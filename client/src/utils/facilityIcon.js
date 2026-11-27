@@ -42,7 +42,8 @@ export const facilityIcon = (type) => ICONS[type] || ''
 // 아이콘은 위 상수에서만 오므로 innerHTML 로 넣어도 안전하다 (사용자 입력이 아님)
 export function facilityBadgeEl({ type, grade, no, plain = false }) {
   const badge = document.createElement('span')
-  badge.className = `fac-badge ${plain ? 'plain' : gradeClass(grade)}`
+  // t-종류: 흰 바탕 배지(plain)의 테두리 · 아이콘 · 바탕을 종류별 색으로 칠할 때 쓴다 (styles/base.css, 웹은 WebCampMap.vue)
+  badge.className = `fac-badge ${plain ? 'plain' : gradeClass(grade)} t-${type}`
   badge.innerHTML = facilityIcon(type)
   if (!badge.innerHTML) badge.textContent = no ?? '' // 아이콘이 없으면 번호를 가운데에
   else if (no) {

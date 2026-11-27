@@ -146,7 +146,7 @@ const title = computed(() => ({ avoid: '지도에 구역 표시', safety: '안�
   transition: transform 0.15s;
 }
 .switch.on {
-  background: var(--color-text);
+  background: var(--color-primary);
 }
 .switch.on i {
   transform: translateX(20px);
@@ -180,7 +180,7 @@ const title = computed(() => ({ avoid: '지도에 구역 표시', safety: '안�
   border-radius: 50%;
 }
 .seg button.on {
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-weight: 700;
 }

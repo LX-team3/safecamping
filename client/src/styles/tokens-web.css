@@ -65,10 +65,10 @@
   /* 지도 위 시설 칩 종류별 색 */
   --web-fac-shelter: #4f7c8a;
   --web-fac-shelter-tint: #e4eef0;
-  --web-fac-hospital: #8a5a78;
-  --web-fac-hospital-tint: #f1e6ee;
-  --web-fac-pharmacy: #6f6a9e;
-  --web-fac-pharmacy-tint: #ecebf5;
+  --web-fac-hospital: #c23a5c; /* 장미빛 빨강 (자주 #8a5a78 에서 바꿈: 약국·경찰 보라 계열과 갈리게) */
+  --web-fac-hospital-tint: #f9e3e9;
+  --web-fac-pharmacy: #7a4fb0; /* 선명한 보라. 지도 바탕(초록 산 · 파란 강 · 노란 길)과 겹치는 색은 피한다 (청록 #2a8577 은 묻혀서 바꿈) */
+  --web-fac-pharmacy-tint: #eee6f8;
   --web-fac-fire: #bb6949;
   --web-fac-fire-tint: #f6e7df;
   --web-fac-police: #4a5a78;

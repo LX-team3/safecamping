@@ -3,7 +3,7 @@
 // 앱은 이것들이 지도 위·아래에 흩어져 있고(MobileAlertPill · MobileRainSlider · MobileEvacSheet), 웹은 한 칸에 모았다
 // 값은 전부 state(utils/disasterMap.js 가 채움)에서 오고, 버튼은 map 의 동작을 부른다
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
 const props = defineProps({
   state: { type: Object, required: true },
@@ -11,6 +11,7 @@ const props = defineProps({
   alert: { type: Object, required: true }, // 특보 칸 (utils/disasterLive.js, 미리 보기 중에는 예시 특보)
 })
 const emit = defineEmits(['rain', 'live'])
+const route = useRoute() // 앱 전환 때 주소 뒤의 값(?demo=…)을 그대로 넘긴다
 
 // ---- 비 슬라이더: 단계 구간별 색으로 칠한 막대 (앱 MobileRainSlider 와 같은 계산)
 const pct = (v) => (v / props.state.maxRain) * 100
@@ -25,7 +26,15 @@ const ticks = computed(() => props.state.stages.slice(1))
 <template>
   <aside class="panel" aria-label="재난 대피 안내">
     <header class="head">
-      <RouterLink to="/web" class="back">‹ campine 홈</RouterLink>
+      <div class="head-row">
+        <RouterLink to="/web" class="back">‹ campine 홈</RouterLink>
+        <!-- 웹 ⇄ 앱 전환 (시연용): 같은 재난 지도의 앱 화면으로. replace: 왔다 갔다 해도 뒤로가기 기록이 안 쌓이게 -->
+        <RouterLink :to="{ path: '/app/disaster', query: route.query }" replace class="to-app"
+          aria-label="같은 화면을 앱(모바일)으로 보기" title="앱 화면으로 보기">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18h2" /></svg>
+        </RouterLink>
+      </div>
       <h1>호우 및 침수 시 대피경로</h1>
       <span class="loc">인북천 물빛테마공원 캠핑장</span>
     </header>
@@ -141,6 +150,12 @@ const ticks = computed(() => props.state.stages.slice(1))
 }
 .head { display: flex; flex-direction: column; gap: 3px; }
 .back { align-self: flex-start; font-size: 13px; font-weight: 700; color: var(--dm-water); margin-bottom: 6px; }
+.head-row { display: flex; justify-content: space-between; align-items: flex-start; }
+.to-app {
+  display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--dm-line); border-radius: 50%;
+  background: var(--dm-card); color: var(--dm-text);
+}
+.to-app:focus-visible { outline: 2px solid var(--dm-water); outline-offset: 2px; }
 .head h1 { margin: 0; font-size: 20px; line-height: 1.35; font-weight: 700; }
 .loc { font-size: 12px; color: var(--dm-muted); }
 

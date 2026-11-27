@@ -210,7 +210,7 @@ h1 {
 }
 .option.on .mark {
   border: 0;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 .note {
@@ -231,7 +231,7 @@ h1 {
   height: 54px;
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-size: 16px;
   font-weight: 700;

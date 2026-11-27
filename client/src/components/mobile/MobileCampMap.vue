@@ -225,7 +225,7 @@ const fake = computed(() => {
         <span class="fake-note">임시 지도 · {{ message ? '카카오 지도 불러오기 실패' : '카카오 키 없음' }} (위치는 좌표 비율)</span>
         <div class="fake-area" :style="{ bottom: bottomInset + 60 + 'px' }">
           <!-- 시설 (카카오 지도의 facilityEl 과 같은 모양). 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
-          <span v-for="f in fake.facilities" :key="`f-${f.id}`" class="fac-badge plain camp-fac-pos"
+          <span v-for="f in fake.facilities" :key="`f-${f.id}`" class="fac-badge plain camp-fac-pos" :class="`t-${f.type}`"
             :title="f.name" :style="{ left: f.left + '%', top: f.top + '%' }">
             <span v-if="facilityIcon(f.type)" class="fac-svg" v-html="facilityIcon(f.type)" />
             <template v-else>{{ f.no }}</template>
