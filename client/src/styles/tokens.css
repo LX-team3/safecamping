@@ -53,8 +53,17 @@
   /* 경로 지도의 길 선 (형광 파랑). 바깥 빛은 같은 색을 옅게 겹쳐 그린다 — 사용자 요청으로 추가 (2026-11-08) */
   --color-route: #1e7bff;        /* 길 선 */
   --color-route-core: #bfe0ff;   /* 고른 길 선 안쪽의 밝은 심 */
-  --color-family-pin: var(--color-route); /* 가족방 위치 탭의 가족 마커·이름표 (길 선과 같은 파랑) */
-  --color-family-me: #16a34a;             /* 가족방의 "나" 표시: 위치 탭 마커 · 구성원 칩 (밝은 초록, 흰 글씨가 읽히는 정도까지만 밝게) */
+  --color-family-me: #16a34a;             /* 가족방의 "나" 표시 (웹 구성원 칩). 모바일은 아래 사람별 색을 쓴다 */
+  /* 가족 모임방 사람별 색: 구성원 이름 칩과 위치 탭 지도 마커를 같은 색으로 칠한다 (utils/familyColor.js)
+     방에 들어온 순서대로 1번부터 → 8명까지 겹치지 않음. 모두 흰 글씨가 읽히는 진하기. 사용자 요청으로 추가 (2026-11-27) */
+  --color-family-1: var(--color-route);     /* 파랑 */
+  --color-family-2: #e8590c;                /* 주황 */
+  --color-family-3: #7c3aed;                /* 보라 */
+  --color-family-4: #db2777;                /* 분홍 */
+  --color-family-5: #0d9488;                /* 청록 */
+  --color-family-6: var(--color-family-me); /* 초록 */
+  --color-family-7: #a16207;                /* 겨자 */
+  --color-family-8: #475569;                /* 회청 */
   /* 차박 판정 4단계 색 (불가·주의·제한 없음·야영 가능) — 사용자 승인 (2026-11-16, 나중에 바꿀 수 있음)
      카드 배지와 지도 위 필지 칠하기에 같이 쓴다 (지도는 utils/chabak.js 가 이 변수를 읽음) */
   --color-verdict-no: #a8402f;

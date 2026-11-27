@@ -16,13 +16,18 @@ public interface LocationMapper {
     // 이 방 구성원 중 위치가 있는 사람만 (위치 줄이 없는 사람은 JOIN 에서 빠진다)
     // 방을 나간 사람은 family_member 에 없으므로 위치가 남아 있어도 보이지 않는다
     // 순서는 구성원 목록과 같게 먼저 들어온 순서
+    // seq = 방에 들어온 순번(1부터). 화면이 구성원 이름 칩과 지도 마커를 같은 색으로 칠할 때 쓴다
+    //   위치 줄과 JOIN 하기 "전에" 방 구성원 전체로 번호를 매긴다 → 구성원 목록(FamilyMapper.findMembers)의 순서와 같아지고,
+    //   앞사람이 위치를 켜고 꺼도 내 번호(색)가 바뀌지 않는다
     @Select("""
-            SELECT m.id AS memberId, m.name, l.lon, l.lat, l.updated_at AS updatedAt
-              FROM family_member fm
-              JOIN member m ON m.id = fm.member_id
-              JOIN family_location l ON l.member_id = fm.member_id
-             WHERE fm.family_room_id = #{roomId}
-             ORDER BY fm.joined_at, fm.id
+            SELECT r.memberId, m.name, l.lon, l.lat, l.updated_at AS updatedAt, r.seq
+              FROM (SELECT fm.member_id AS memberId,
+                           ROW_NUMBER() OVER (ORDER BY fm.joined_at, fm.id) AS seq
+                      FROM family_member fm
+                     WHERE fm.family_room_id = #{roomId}) r
+              JOIN member m ON m.id = r.memberId
+              JOIN family_location l ON l.member_id = r.memberId
+             ORDER BY r.seq
             """)
     List<FamilyLocation> findAll(@Param("roomId") Long roomId);
 

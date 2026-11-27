@@ -16,4 +16,5 @@ public class FamilyLocation {
     private Double lon;              // 경도
     private Double lat;              // 위도
     private OffsetDateTime updatedAt;
+    private Integer seq;             // 방에 들어온 순번(1부터). 조회할 때 계산한다 (테이블 컬럼 아님)
 }
