@@ -9,7 +9,7 @@ export const useFamilyStore = defineStore('family', () => {
   const room = ref(null) // { id, name, inviteCode, members: [{ name, me }] } 또는 null (방 없음)
   const places = ref([]) // [{ id, name, description, lon, lat, createdByName }]
   const schedules = ref([]) // [{ id, title, startAt, memo, createdByName }] 시간 순
-  const locations = ref([]) // [{ id: 회원 id, name, lat, lng, me, updatedAt }] 위치 공유에 동의한 사람만
+  const locations = ref([]) // [{ id: 회원 id, name, lat, lng, me, updatedAt, seq: 방에 들어온 순번(색) }] 위치 공유에 동의한 사람만
 
   // 방이 바뀌면(만들기·들어가기·나가기) 이전 방의 목록이 남지 않게 비운다
   function clearLists() {
@@ -67,7 +67,7 @@ export const useFamilyStore = defineStore('family', () => {
   async function fetchLocations() {
     locations.value = await api('/api/family/locations')
   }
-  // 내 위치 저장. { lat, lng } 는 브라우저 GPS 값 — 지금은 화면에서 부르지 않는다 (DB 좌표만 씀, 2026-11-19)
+  // 내 위치 저장. { lat, lng } 는 지금 시연용 자리 (utils/familyColor.js demoSpot, 실제 GPS 아님) — 위치 탭의 [동의합니다] · [내 위치 찍기]
   async function saveMyLocation({ lat, lng }) {
     await api('/api/family/locations/me', { method: 'put', body: { lat, lng } })
   }
