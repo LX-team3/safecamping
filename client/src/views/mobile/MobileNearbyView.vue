@@ -1,7 +1,7 @@
 <script setup>
 // 내 주변 탭 (2부 모바일 · 캠핑 시작 이후)
 //  - 위: 지도 (내 위치 + 번호 붙은 안전 시설). 오른쪽 위 레이어 버튼 → "지도 설정" 시트
-//  - 아래 패널: 지금 이 위치 안전점수 · 119 신고 · 가족에게 내 위치 보내기 · 가까운 시설 목록
+//  - 아래 패널: 지금 이 위치 안전점수 · 119 신고 · 링크로 공유(내 위치) · 가까운 시설 목록
 //  - 시설 시간은 "차로 n분"만 보여 준다. 길찾기는 카카오맵으로 넘긴다 (앱 안 경로 화면 없음)
 // 데이터: GET /api/nearby?lat=&lng= (가장 가까운 캠핑장 기준 — 더미), /api/nearby/layers, /api/alerts?sido=
 import { computed, onMounted, ref } from 'vue'
@@ -136,7 +136,7 @@ function toggle(code) {
   on.value = { ...on.value, [code]: !on.value[code] }
 }
 
-// 가족에게 내 위치 보내기: 휴대폰 공유 창 → 없으면 링크 복사
+// 링크로 공유 (가족에게 내 위치 보내기): 휴대폰 공유 창 → 없으면 링크 복사
 // (가족방으로 바로 보내기는 2부 가족 위치 기능에서)
 async function shareLocation() {
   shareMsg.value = ''
@@ -199,8 +199,7 @@ async function shareLocation() {
         <template v-else>
           <!-- 가장 가까운 캠핑장이 멀면(서버 FAR_KM, 10km) 그 캠핑장 점수를 "지금 이 위치" 점수처럼 보이지 않게 숨긴다 -->
           <div v-if="basis.far" class="no-data">
-            <h1>이 지역은 아직 안전 데이터가 없어요</h1>
-            <p>지금은 강원 인제군 캠핑장만 안전점수를 계산해요. 가장 가까운 곳은 {{ basis.campName }}({{ basis.distanceKm }}km)이에요.</p>
+            <h1>이 지역은 데이터가 없습니다</h1>
           </div>
 
           <div v-else class="score">
@@ -216,7 +215,7 @@ async function shareLocation() {
 
           <div class="actions">
             <a class="call" href="tel:119">119 신고</a>
-            <button type="button" class="share" @click="shareLocation">가족에게 내 위치 보내기</button>
+            <button type="button" class="share" aria-label="내 위치를 링크로 공유" @click="shareLocation">링크로 공유</button>
           </div>
           <p v-if="shareMsg" class="share-msg" role="status">{{ shareMsg }}</p>
 
@@ -302,7 +301,7 @@ async function shareLocation() {
   height: 52px;
   border: none;
   border-radius: 50%;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   display: flex;
   align-items: center;
@@ -505,12 +504,6 @@ h1 {
   margin: 0 0 6px;
   font-size: 18px;
   font-weight: 800;
-}
-.no-data p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--color-text-sub);
 }
 .link {
   padding: 0;

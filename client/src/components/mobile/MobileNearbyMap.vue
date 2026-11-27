@@ -3,7 +3,7 @@
 // 마커 색 = 기준 캠핑장의 안전점수 등급 (안전·주의·위험) — utils/facilityIcon.js
 // 카카오 키가 있으면 카카오맵, 없으면 좌표 비율로 그린 임시 그림 (CampMap·RouteMap 과 같은 방식)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { facilityBadgeEl, facilityIcon, gradeClass } from '@/utils/facilityIcon'
+import { facilityBadgeEl, facilityIcon } from '@/utils/facilityIcon'
 import { fitPoints, keepMapSized, loadKakaoMap } from '@/utils/kakaoMap'
 import { applyMapType, mapType } from '@/utils/mapType'
 
@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
 })
 
 function facilityEl(f) {
-  const badge = facilityBadgeEl({ type: f.type, grade: props.grade, no: f.no })
+  const badge = facilityBadgeEl({ type: f.type, no: f.no, plain: true }) // 웹 지도처럼 종류 색 배지 (등급 색으로 다 칠하면 초록 일색)
   badge.title = f.name
   return badge
 }
@@ -105,7 +105,7 @@ const fake = computed(() => {
       <template v-if="mode === 'fake'">
         <div class="area" :style="{ bottom: bottomInset + 40 + 'px' }">
           <!-- 카카오 지도 마커(facilityBadgeEl)와 같은 모양. 아이콘은 우리 상수에서만 오므로 v-html 이 안전 -->
-          <span v-for="f in fake.facilities" :key="f.id" class="fac-badge fake-pos" :class="gradeClass(grade)"
+          <span v-for="f in fake.facilities" :key="f.id" class="fac-badge plain fake-pos" :class="`t-${f.type}`"
             :title="f.name" :style="{ left: f.x + '%', top: f.y + '%' }">
             <span v-if="facilityIcon(f.type)" class="fac-svg" v-html="facilityIcon(f.type)" />
             <template v-else>{{ f.no }}</template>

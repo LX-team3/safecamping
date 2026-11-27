@@ -41,13 +41,15 @@ const router = useRouter()
   justify-content: space-between;
   pointer-events: none; /* 버튼 사이 빈 곳은 아래 지도를 누를 수 있게 */
 }
+/* 지도 위에 뜬 버튼: 흰 바탕 + 검은 아이콘 + 그림자 (초록은 점수 · 주요 버튼에만 쓰려고 뺐다) */
 .round {
   width: 44px;
   height: 44px;
   border: none;
   border-radius: 50%;
-  background: var(--color-text);
-  color: var(--color-card);
+  background: var(--color-card);
+  color: var(--color-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;

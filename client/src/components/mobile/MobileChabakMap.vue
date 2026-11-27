@@ -366,8 +366,8 @@ defineExpose({ moveTo, showMe })
   cursor: pointer;
 }
 .demo.on {
-  border-color: var(--color-text);
-  background: var(--color-text);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 </style>

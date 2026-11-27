@@ -497,8 +497,8 @@ function onMarker(id) {
   background: var(--color-border);
 }
 .chip.mine.on {
-  border-color: var(--color-text);
-  background: var(--color-text);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-card);
 }
 .chip.mine.on i {

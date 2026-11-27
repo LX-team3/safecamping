@@ -150,7 +150,7 @@ async function save() {
   height: 50px;
   border: none;
   border-radius: 25px;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   display: flex;
   align-items: center;

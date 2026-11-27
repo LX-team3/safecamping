@@ -29,6 +29,7 @@ const auth = useAuthStore()
 const myCamping = useMyCampingStore()
 
 const error = ref('')
+const emptyOpen = ref(false) // 빈 카드 펼침 (처음엔 한 줄로 접어 둠)
 
 async function load() {
   error.value = ''
@@ -347,9 +348,19 @@ async function remove(p) {
             </template>
           </li>
         </ul>
-        <p v-else class="placeholder">
-          등록한 캠핑이 없어요.<br />캠핑장 상세나 차박 지도에서 '내 캠핑에 일정 등록'을 눌러 보세요.
-        </p>
+        <!-- 비었을 때: 접힌 한 줄 카드 → 누르면 안내 · 버튼이 펼쳐진다 (화면 위를 크게 차지하지 않게) -->
+        <div v-else class="empty-card" :class="{ open: emptyOpen }">
+          <button type="button" class="empty-toggle" :aria-expanded="emptyOpen" aria-controls="empty-more"
+            @click="emptyOpen = !emptyOpen">
+            <b>등록한 캠핑이 없습니다</b>
+            <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div v-if="emptyOpen" id="empty-more" class="empty-more">
+            <p>캠핑장 상세나 차박 지도에서<br />'내 캠핑에 일정 등록'을 눌러 주세요</p>
+            <RouterLink to="/app/explore" class="empty-go">캠핑장 찾기</RouterLink>
+          </div>
+        </div>
 
         <!-- 가족 캠핑: 가족방 사람이 등록한 캠핑 (보기만, 삭제·출발 준비 없음) -->
         <section v-if="familyCards.length || familyError" class="family-plans" aria-label="모임방 캠핑">
@@ -422,7 +433,7 @@ async function remove(p) {
           </svg>
           <span class="text">
             <b>모임방</b>
-            <small>함께 가는 사람과 캠핑 일정 · 모일 곳을 같이 봐요</small>
+            <small>일행과 일정 · 모일 곳 공유</small>
           </span>
           <span aria-hidden="true">›</span>
         </RouterLink>
@@ -576,7 +587,7 @@ h1 {
   height: 44px;
   border: 0;
   border-radius: 22px;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font: inherit;
   font-size: 14px;
@@ -696,7 +707,7 @@ h1 {
 .badge {
   padding: 3px 10px;
   border-radius: 12px;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-size: 12px;
   font-weight: 700;
@@ -713,7 +724,7 @@ h1 {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-bg);
   display: inline-flex;
   align-items: center;
@@ -838,27 +849,87 @@ h1 {
   font-size: 18px;
   color: var(--color-arrow);
 }
+/* 위 빈 카드(.empty-card)와 같은 회색 바탕 · 테두리 · 좌우 여백 → 한 묶음으로 보이게 */
 .family-btn {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
+  min-height: 52px;
+  padding: 12px 16px;
   border-radius: 14px;
-  border: 1px solid var(--color-border);
-  background: var(--color-card);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg-soft);
   color: var(--color-text);
+  text-decoration: none;
 }
 .family-btn .text {
   flex: 1;
+  min-width: 0; /* 설명 글이 길면 ... 으로 줄이게 */
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .family-btn b {
-  font-size: 16px;
+  font-size: 15px;
 }
 .family-btn small {
   font-size: 13px;
   color: var(--color-text-sub);
+  white-space: nowrap; /* 한 줄로 (짧게 줄인 문구) */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 빈 카드 (모임방 빈 카드와 같은 색 · 테두리). 접힘 = 제목 한 줄, 펼침 = 안내 · 버튼 */
+.empty-card {
+  border: 1px solid var(--color-divider);
+  border-radius: 14px;
+  background: var(--color-bg-soft);
+}
+.empty-toggle {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: inherit;
+  cursor: pointer;
+}
+.empty-toggle b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.chev {
+  color: var(--color-text-sub);
+  transition: transform 0.2s;
+}
+.empty-card.open .chev {
+  transform: rotate(180deg);
+}
+.empty-more {
+  padding: 0 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.empty-card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--color-text-sub);
+}
+.empty-go {
+  margin-top: 14px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-card);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
 }
 </style>

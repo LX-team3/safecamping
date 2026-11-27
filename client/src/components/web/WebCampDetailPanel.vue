@@ -261,7 +261,11 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
               <span v-if="summary">차로 {{ summary }}</span>
               <!-- 켜고 끄기는 왼쪽 원을 누른다 -->
               <span v-if="bonusApplies" class="bonus-line">
-                <template v-if="bonus">내 유형 점수예요 · {{ bonusReasons.join(' · ') }}에 해당해 응급실 거리를 더 따졌어요 (안전점수 {{ camp.safetyScore }})</template>
+                <!-- 긴 문장 대신 해당하는 답을 칩으로 (내가 고른 답 = 초록) -->
+                <template v-if="bonus">
+                  <span class="bonus-chips"><span v-for="r in bonusReasons" :key="r" class="bchip">{{ r }}</span></span>
+                  <small>응급실 거리를 더 따진 내 유형 점수 · 안전점수 {{ camp.safetyScore }}</small>
+                </template>
                 <template v-else>내 유형 점수 꺼짐 · 원을 누르면 켜져요</template>
               </span>
             </span>
@@ -978,6 +982,28 @@ const openFacility = (f) => router.push(`/web/facilities/${f.id}?camp=${props.ca
 }
 .bonus-line b {
   font-weight: 800;
+}
+.bonus-line small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--web-text-sub);
+}
+.bonus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.bchip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  /* 내가 진단에서 고른 답이라 진단 화면의 고른 답 버튼과 같은 초록 (빨강은 경고처럼 읽혀서 바꿈) */
+  border: 1.5px solid var(--web-green);
+  background: var(--web-best);
+  color: var(--web-green);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 .circle-wrap {
   flex: 0 0 72px;

@@ -273,7 +273,7 @@ const hasRisk = (c) => c.risk && !c.risk.startsWith('발효 중인') && !c.risk.
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg>새 캠핑장 찾기
             </RouterLink>
           </div>
-          <p v-if="!upcoming.length" class="state">등록한 캠핑이 없어요. 캠핑장 상세에서 '내 캠핑에 일정 등록'을 눌러 보세요.</p>
+          <p v-if="!upcoming.length" class="state">등록한 캠핑이 없습니다. 캠핑장 상세에서 '내 캠핑에 일정 등록'을 눌러 주세요.</p>
           <article v-for="(b, i) in upcoming" :key="b.id" class="card">
             <div class="status">
               <span class="dwrap">

@@ -111,7 +111,7 @@ public class SavedService {
                 yesNoRow("반려동물", camps, CompareCamp::getAllowsPet));
 
         return new CompareResponse(list.getId(), list.getName(), all.size(),
-                camps.stream().map(c -> new CompareResponse.Camp(c.getId(), c.getName())).toList(), rows);
+                camps.stream().map(c -> new CompareResponse.Camp(c.getId(), c.getName(), c.getImageUrl())).toList(), rows);
     }
 
     static final String UNKNOWN = "확인 필요";

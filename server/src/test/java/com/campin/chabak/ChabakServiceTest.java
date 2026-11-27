@@ -101,7 +101,7 @@ class ChabakServiceTest {
         // (30 × 0.5 + 25 × 1) ÷ (30 + 25) × 100 = 72.7 → 73점, 70 이상이라 safe
         assertEquals(73, s.score());
         assertEquals("safe", s.grade());
-        assertEquals("밤에도 비교적 안심할 수 있어요", s.headline()); // 캠핑장 상세와 같은 문구
+        assertEquals("비교적 안심할 수 있어요", s.headline()); // 캠핑장 상세와 같은 문구
         // 3,000m × 1.4 ÷ 시속 45km = 5.6분 → 올려서 6분
         assertEquals(6, s.erDriveMin());
         assertEquals(50, s.items().get(0).part());

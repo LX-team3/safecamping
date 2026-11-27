@@ -93,12 +93,18 @@ watch([() => trip.state.sido, () => trip.state.sigungu, bonusActive], load)
 
 const topIds = computed(() => new Set(recommend.value.camps.map((c) => c.id)))
 const tierOf = (c) => (topIds.value.has(c.id) ? 'rec' : TIER_BY_GRADE[c.grade] || null)
-// 지도·목록에 쓰는 캠핑장 (등급 묶음 정보를 붙임)
+// 지도·목록에 쓰는 캠핑장
+//  - tier: 핀 · 정보 카드 모양 (추천이면 추천 모양이 먼저)
+//  - gradeTier: 등급 묶음 (안심 · 보통 · 유의). 추천 TOP 5 도 자기 등급 묶음에 같이 센다
+//    → 70점 넘는 곳이 전부 추천에 들어가 "안심 0"으로 보이던 것을 막는다 (사용자 결정)
 const camps = computed(() =>
   allCamps.value
-    .map((c) => ({ ...withBonus(c), tier: tierOf(c) }))
+    .map((c) => ({ ...withBonus(c), tier: tierOf(c), gradeTier: TIER_BY_GRADE[c.grade] || null, rec: topIds.value.has(c.id) }))
     .filter((c) => c.tier),
 )
+// 이 캠핑장이 그 칩(추천 · 안심 · 보통 · 유의)에 드는지
+const inTier = (c, key) => (key === 'rec' ? c.rec : c.gradeTier === key)
+const inOnTier = (c) => TIERS.some((t) => tiers.value[t.key] && inTier(c, t.key))
 
 // ---- 검색 · 등급 칩 ----
 const query = ref('')
@@ -111,7 +117,7 @@ const matches = (c) => {
   return !q || [c.name, c.sigungu, c.eupmyeon].some((s) => s?.includes(q))
 }
 const tierChips = computed(() =>
-  TIERS.map((t) => ({ ...t, count: camps.value.filter((c) => c.tier === t.key).length, on: !!tiers.value[t.key] })),
+  TIERS.map((t) => ({ ...t, count: camps.value.filter((c) => inTier(c, t.key)).length, on: !!tiers.value[t.key] })),
 )
 const toggleTier = (key) => (tiers.value = { ...tiers.value, [key]: !tiers.value[key] })
 
@@ -124,14 +130,15 @@ const listTitle = computed(() =>
       ? '추천 캠핑장'
       : onKeys.value.map((k) => TIERS.find((t) => t.key === k).label).join(' · ') + ' 캠핑장',
 )
-const visibleCamps = computed(() => camps.value.filter((c) => tiers.value[c.tier] && matches(c)))
+const visibleCamps = computed(() => camps.value.filter((c) => inOnTier(c) && matches(c)))
 const listCount = computed(() => (!visibleCamps.value.length ? '' : onlyRec.value ? 'TOP 5' : `${visibleCamps.value.length}곳`))
 
 // 목록: 등급별로 묶는다. 추천은 전부, 나머지는 3곳까지 + 더보기
 const sections = computed(() =>
   onKeys.value.map((k, i) => {
     const t = TIERS.find((x) => x.key === k)
-    const all = visibleCamps.value.filter((c) => c.tier === k)
+    // 추천 캠핑장은 추천 묶음과 자기 등급 묶음 양쪽에 나온다. 등급 묶음에서는 등급 모양(안심 등)으로 보이게 tier 를 바꿔 넣는다
+    const all = visibleCamps.value.filter((c) => inTier(c, k)).map((c) => (k === 'rec' ? c : { ...c, tier: k }))
     const open = !!more.value[k]
     const cut = k === 'rec' ? all.length : 3
     return {
@@ -232,7 +239,10 @@ const mapCamps = computed(() => {
     return c ? [{ ...withBonus(c), tier: TIER_BY_GRADE[c.grade] || 'safe' }] : [] // 상세 핀도 내 유형 점수
   }
   if (view.value === 'car') return pickedAlt.value ? [...carCamps.value, { ...pickedAlt.value, tier: pickedAlt.value.tier || 'safe' }] : carCamps.value
-  return camps.value.filter((c) => (tiers.value[c.tier] && matches(c)) || c.id === selectedId.value)
+  // 핀은 한 곳에 하나: 추천을 꺼도 안심이 켜져 있으면 추천 캠핑장 핀이 남는다. 추천 칩이 꺼져 있으면 등급 모양 핀으로
+  return camps.value
+    .filter((c) => (inOnTier(c) && matches(c)) || c.id === selectedId.value)
+    .map((c) => (c.rec && !tiers.value.rec ? { ...c, tier: c.gradeTier || c.tier } : c))
 })
 const fitKey = computed(() => mapCamps.value.length + tierChips.value.filter((t) => t.on).length * 1000 + (view.value === 'browse' ? 0 : 7))
 
@@ -378,24 +388,46 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
         </div>
       </div>
 
-      <!-- 내 유형 점수: 가산점에 해당하는 진단 답이 있을 때만 -->
-      <div v-if="bonusReasons.length" class="bonusbar">
-        <button type="button" class="chip bonus-chip" :class="{ on: survey.bonusOn }" :aria-pressed="survey.bonusOn"
-          @click="survey.bonusOn = !survey.bonusOn">내 유형 점수 {{ survey.bonusOn ? '켜짐' : '꺼짐' }}</button>
-      </div>
-
-      <!-- 결과 헤더 -->
+      <!-- 결과 헤더 + 점수 기준 -->
+      <!-- 내 유형 점수는 추천만이 아니라 모든 캠핑장 점수 · 정렬 · TOP 5 를 바꾼다 → "지도에 보일 캠핑장" 칩 옆이 아니라
+           정렬 기준을 고르는 자리(목록 머리줄)에 둔다. 가산점에 해당하는 진단 답이 있을 때만 고를 수 있다 -->
       <div class="result-head">
         <div class="title">{{ listTitle }} <span class="count">{{ listCount }}</span></div>
-        <span class="sort">{{ bonusActive ? '안전점수 + 내 유형 점수순' : '안전점수순' }}</span>
+        <div v-if="bonusReasons.length" class="sortseg" role="radiogroup" aria-label="점수 기준"
+          :title="`내 유형 점수: ${bonusReasons.join(' · ')}에 해당해 응급실 거리를 더 따져요`">
+          <button type="button" role="radio" :aria-checked="!survey.bonusOn" :class="{ on: !survey.bonusOn }"
+            @click="survey.bonusOn = false">안전점수순</button>
+          <button type="button" role="radio" :aria-checked="survey.bonusOn" :class="{ on: survey.bonusOn }"
+            @click="survey.bonusOn = true">내 유형 점수 포함</button>
+        </div>
+        <span v-else class="sort">안전점수순</span>
       </div>
 
       <!-- 결과 목록 -->
       <div class="list">
         <p v-if="error" class="state">{{ error }} <button type="button" class="link" @click="load">다시 시도</button></p>
         <p v-else-if="loading && !camps.length" class="state">불러오는 중...</p>
-        <p v-else-if="!sections.length" class="state">지도에 보일 등급을 골라 주세요.</p>
-        <p v-else-if="!visibleCamps.length" class="state">조건에 맞는 캠핑장이 없어요.</p>
+        <!-- 등급 칩을 다 껐을 때: 문장 하나만 있으면 허전해서 카드로 (저장 화면 빈 카드와 같은 모양) + 추천으로 되돌리는 버튼 -->
+        <div v-else-if="!sections.length" class="empty-card">
+          <span class="empty-icon">
+            <svg width="22" height="26" viewBox="0 0 24 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 1C5.9 1 1.5 5.6 1.5 11.4c0 7.2 8.4 15.6 9.6 16.8a1.3 1.3 0 0 0 1.8 0c1.2-1.2 9.6-9.6 9.6-16.8C22.5 5.6 18.1 1 12 1z" /><circle cx="12" cy="11.2" r="3.8" />
+            </svg>
+          </span>
+          <b>선택한 등급이 없습니다</b>
+          <p>위에서 추천 · 안심 · 보통 · 유의 중 골라 주세요</p>
+          <button type="button" class="empty-go" @click="tiers = { rec: true }">추천 캠핑장 보기</button>
+        </div>
+        <!-- 켠 등급 · 검색어에 맞는 곳이 없을 때: 카드 + 검색어가 있으면 지우는 버튼 -->
+        <div v-else-if="!visibleCamps.length" class="empty-card">
+          <span class="empty-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          </span>
+          <b>조건에 맞는 캠핑장이 없습니다</b>
+          <p>{{ query.trim() ? '다른 검색어로 찾거나 등급을 더 켜 주세요' : '위에서 등급을 더 켜 주세요' }}</p>
+          <button v-if="query.trim()" type="button" class="empty-go" @click="query = ''">검색어 지우기</button>
+        </div>
 
         <div v-for="g in sections" :key="g.key" class="group">
           <div v-if="!onlyRec" class="group-head" :class="{ first: g.first }">
@@ -607,6 +639,7 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 .title {
   font-size: 15px;
@@ -615,17 +648,29 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
 .count {
   color: var(--web-grade-safe);
 }
-.bonusbar {
-  padding: 0 20px 10px;
+/* 점수 기준 고르기 (두 칸 스위치) */
+.sortseg {
+  flex: none;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--web-track);
 }
-.bonus-chip.on {
-  border-color: var(--web-green);
+.sortseg button {
+  border: 0;
+  background: none;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--web-text-sub);
+  cursor: pointer;
+}
+.sortseg button.on {
   background: var(--web-green);
   color: var(--web-white);
+  font-weight: 700;
 }
 .sort {
   font-size: 13px;
@@ -636,6 +681,51 @@ const directions = computed(() => (selected.value ? directionsUrl(selected.value
   min-height: 0;
   overflow-y: auto;
   padding: 0 12px 16px;
+}
+/* 빈 카드 (저장 화면 WebSavedView 의 .empty-card 와 같은 모양) */
+.empty-card {
+  margin: 8px 0 16px;
+  padding: 28px 20px 22px;
+  border: 1px solid var(--web-line-panel-soft);
+  border-radius: 14px;
+  background: var(--web-bg-quiet);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--web-bg);
+  color: var(--web-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.empty-card b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.empty-card p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--web-text-sub);
+}
+.empty-go {
+  margin-top: 12px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--web-green);
+  color: var(--web-white);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .state {
   margin: 24px 8px;

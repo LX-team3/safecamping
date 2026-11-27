@@ -16,9 +16,16 @@ import org.apache.ibatis.annotations.Update;
 public interface SavedMapper {
 
     // 기본 목록을 맨 앞에, 나머지는 만든 순서대로
+    // thumbUrls: 카드 썸네일에 쓸 사진 주소 최대 3개 (담은 순서, 사진 있는 캠핑장만). 주소에는 공백이 없어서 공백으로 이어 붙인다
     @Select("""
             SELECT l.id, l.member_id AS memberId, l.name, l.is_default AS isDefault,
-                   COUNT(c.id) AS campCount, l.created_at AS createdAt
+                   COUNT(c.id) AS campCount, l.created_at AS createdAt,
+                   (SELECT string_agg(t.image_url, ' ')
+                      FROM (SELECT cp.image_url
+                              FROM saved_camp s JOIN camp cp ON cp.id = s.camp_id
+                             WHERE s.saved_list_id = l.id AND cp.image_url IS NOT NULL AND cp.image_url <> ''
+                             ORDER BY s.created_at, s.id
+                             LIMIT 3) t) AS thumbUrls
               FROM saved_list l
               LEFT JOIN saved_camp c ON c.saved_list_id = l.id
              WHERE l.member_id = #{memberId}
@@ -78,7 +85,7 @@ public interface SavedMapper {
     // 소방서까지 시간은 camp_facility(캠핑장별 가까운 시설), 전기·반려동물은 원본 raw.camps 를 source_id 로 잇는다
     // 원본은 raw 스키마에 있다 (db/schema_03.sql 2단계). 접속 기본 스키마가 public 이라 raw. 를 꼭 붙인다
     @Select("""
-            SELECT sc.camp_id AS id, c.name, c.safety_score AS safetyScore, c.er_drive_min AS erMinutes,
+            SELECT sc.camp_id AS id, c.name, c.image_url AS imageUrl, c.safety_score AS safetyScore, c.er_drive_min AS erMinutes,
                    (SELECT min(cf.drive_min)
                       FROM camp_facility cf JOIN facility f ON f.id = cf.facility_id
                      WHERE cf.camp_id = c.id AND f.type = 'fire') AS fireMinutes,

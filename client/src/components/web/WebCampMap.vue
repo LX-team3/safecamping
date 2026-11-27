@@ -435,6 +435,21 @@ function pickType(key) {
 #web-rec-grad .g1 { stop-color: var(--web-rec-mid); }
 #web-rec-grad .g2 { stop-color: var(--web-rec-to); }
 
+/* 켠 시설 배지: 흰 바탕만 있으면 심심해서, 위쪽 시설 칩과 같은 종류별 색으로 (웹 지도에서만)
+   테두리 · 아이콘 = 진한 색, 바탕 = 옅은 색(칩을 켰을 때와 같음). 꽉 채우지 않는 건 색이 찬 캠핑장 핀과 헷갈리지 않게 */
+.campmap .fac-badge.plain {
+  border-width: 3px;
+  border-color: var(--fac-c, var(--color-border));
+  background: var(--fac-tint, var(--color-card));
+  color: var(--fac-c, var(--color-text-mid));
+}
+.campmap .fac-badge.t-er { --fac-c: var(--web-fac-hospital); --fac-tint: var(--web-fac-hospital-tint); }
+.campmap .fac-badge.t-fire { --fac-c: var(--web-fac-fire); --fac-tint: var(--web-fac-fire-tint); }
+.campmap .fac-badge.t-police { --fac-c: var(--web-fac-police); --fac-tint: var(--web-fac-police-tint); }
+.campmap .fac-badge.t-store { --fac-c: var(--web-fac-store); --fac-tint: var(--web-fac-store-tint); }
+.campmap .fac-badge.t-pharmacy { --fac-c: var(--web-fac-pharmacy); --fac-tint: var(--web-fac-pharmacy-tint); }
+.campmap .fac-badge.t-shelter { --fac-c: var(--web-fac-shelter); --fac-tint: var(--web-fac-shelter-tint); }
+
 .web-pin {
   display: flex;
   flex-direction: column;

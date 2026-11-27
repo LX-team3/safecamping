@@ -2,7 +2,7 @@
 // 웹 1분 진단 (설계 2-1 설문 · 2-2 결과표): 헤더·하단이 없는 한 화면. 질문 8개에 답하면 결과표가 같은 주소에서 바뀐다
 // 질문·유형·점수 계산은 utils/webSurvey.js (설계서 그대로). 추천 캠핑장은 실제 캠핑장 안전점수 순
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import WebIllust from '@/components/web/WebIllust.vue'
 import { api } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
@@ -11,6 +11,7 @@ import { ALLQ, KID_OPTS, PARTS, answeredCount, computeResult, emptyAnswers, isRe
 import '@/styles/tokens-web.css'
 
 const auth = useAuthStore()
+const router = useRouter()
 const survey = useSurveyStore() // 앱과 같은 진단 저장소 → 지도(웹·앱 탐색)의 "내 유형 점수"가 이 답을 읽는다
 const step = ref('survey') // survey | result
 const A = ref(emptyAnswers())
@@ -52,6 +53,14 @@ function restart() {
   r.value = null
   step.value = 'survey'
   window.scrollTo(0, 0)
+}
+
+// 왼쪽 위 뒤로 버튼: 헤더가 없는 화면이라 전체 화면(F11)에서는 브라우저 뒤로가기가 안 보인다
+//   결과표 → 설문으로 (고른 답 그대로), 설문 → 들어온 화면으로 (주소로 바로 들어왔으면 메인)
+function goBack() {
+  if (step.value === 'result') return restart()
+  if (window.history.state?.back) router.back()
+  else router.push('/web')
 }
 
 // 추천 캠핑장: "어디서 주무세요?" 답에 맞는 유형(campType)만 거르고, 안전점수 높은 순 5곳 + 그 캠핑장의 가까운 시설 시간 (상세 API)
@@ -125,6 +134,10 @@ const mustFirst = (list) => [...list.filter((c) => c.must), ...list.filter((c) =
 
 <template>
   <div class="survey">
+    <button type="button" class="backbtn" :aria-label="step === 'result' ? '설문으로 돌아가기' : '뒤로'" @click="goBack">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>뒤로
+    </button>
     <!-- ===== 설문 ===== -->
     <template v-if="step === 'survey'">
       <div class="top">
@@ -309,6 +322,29 @@ const mustFirst = (list) => [...list.filter((c) => c.must), ...list.filter((c) =
 }
 .top {
   background: var(--web-bg);
+}
+/* 뒤로 버튼: 스크롤해도 늘 보이게 왼쪽 위에 고정 */
+.backbtn {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 16px 9px 10px;
+  border: 1px solid var(--web-border);
+  border-radius: 999px;
+  background: var(--web-bg);
+  box-shadow: 0 2px 8px rgba(28, 29, 27, 0.08);
+  color: var(--web-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.backbtn:hover {
+  background: var(--web-bg-quiet);
 }
 .head {
   max-width: 1040px;

@@ -96,6 +96,38 @@
   --color-evac-edge: #06140c;      /* 대피 길 테두리 */
   --color-contour: #fff4d6;        /* 등고선 */
   --color-map-line: #ffffff;       /* 도로 · 대피 화살표 · 슬라이더 손잡이 */
+  /* 지도 시설 배지 종류별 색 (웹 tokens-web.css 의 --web-fac-* 와 같은 값 — 바꾸면 둘 다)
+     지도 바탕(초록 산 · 파란 강 · 노란 길)과 겹치는 색은 피한다 */
+  --color-fac-er: #c23a5c;         /* 응급실 장미빛 빨강 */
+  --color-fac-er-tint: #f9e3e9;
+  --color-fac-fire: #bb6949;       /* 소방 주황 */
+  --color-fac-fire-tint: #f6e7df;
+  --color-fac-police: #4a5a78;     /* 경찰 남색 */
+  --color-fac-police-tint: #e6e9f0;
+  --color-fac-store: #9c7a4e;      /* 편의점 갈색 */
+  --color-fac-store-tint: #f3ece1;
+  --color-fac-pharmacy: #7a4fb0;   /* 약국 보라 */
+  --color-fac-pharmacy-tint: #eee6f8;
+  /* 1분 진단 결과 (웹 tokens-web.css 와 같은 값 — 앱 진단을 웹 디자인에 맞춤 2026-11-27) */
+  --color-survey-water: #3e5a66;      /* 물·호우 유형 색 (--web-water) */
+  --color-survey-fire: #bb6949;       /* 일산화탄소 · 화재 유형 색 (--web-terracotta) */
+  --color-survey-warn-ink: #8a4a33;   /* 성격 말풍선 글씨 (--web-warn-ink) */
+  --color-survey-warn-bg: #fbeedd;    /* 성격 말풍선 바탕 (--web-warn-ink-bg) */
+  --color-survey-sky: #e7ebec;        /* 물 유형 성격 말풍선 바탕 (--web-sky-track) */
+  --color-survey-best: #e0e8de;       /* 고른 보기 바탕 (--web-best) */
+  --color-survey-track: #e3ded3;      /* 진행 막대 바탕 · 안 고른 탭 (--web-track) */
+  --color-survey-quiet: #f3f3ef;      /* 진단 본문 바탕 (--web-bg-quiet) */
+  --color-survey-card: #faf9f5;       /* 결과 안쪽 카드 (--web-bg-card) */
+  --color-survey-hash: #ecebe6;       /* 해시태그 (--web-hash-bg) */
+  --color-survey-rule-icon: #f3ece4;  /* 조심할 것 아이콘 바탕 (--web-rule-icon-bg) */
+  --color-survey-rule-tag: #ece6da;   /* 조심할 것 태그 (--web-rule-tag-bg) */
+  --color-survey-prep: #a0782e;       /* 119 상자 테두리 (--web-prep) */
+  --color-survey-report: #f3eae0;     /* 119 아이콘 바탕 (--web-report-bg) */
+  --color-survey-must-bg: #faf0d4;    /* 내 유형에 중요한 체크 항목 바탕 (--web-grade-danger-bg) */
+  --color-survey-must: #8a6a1e;       /* 내 유형에 중요한 체크 항목 글씨 (--web-grade-danger-fg) */
+  --color-survey-rec-from: #f2c24e;   /* 추천 점수 상자 그러데이션 (--web-rec-from · mid · to) */
+  --color-survey-rec-mid: #2a9468;
+  --color-survey-rec-to: #145238;
   --font-base: 'Noto Sans KR', system-ui, sans-serif;
   --frame-width: 390px;       /* 모바일 화면 폭 */
   --frame-height: 844px;      /* PC 에서 보여 줄 모바일 화면 높이 (설계 파일 크기) */

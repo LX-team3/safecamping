@@ -156,7 +156,16 @@ onMounted(async () => {
           <span class="limit" :class="{ warn: full }">{{ limitText }}</span>
         </div>
         <p v-if="error" class="state">{{ error }}</p>
-        <p v-else-if="!favCamps.length" class="state">아직 담은 캠핑장이 없어요. 탐색에서 하트를 눌러 담아 보세요.</p>
+        <!-- 비었을 때: 문장 하나만 있으면 허전해서 하트 아이콘 + 안내 + 탐색으로 가는 버튼을 카드로 묶는다 -->
+        <div v-else-if="!favCamps.length" class="empty-card">
+          <span class="empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></svg>
+          </span>
+          <b>저장한 캠핑장이 없습니다</b>
+          <p>캠핑장을 찾아 하트를 눌러 저장</p>
+          <RouterLink to="/web/explore" class="empty-go">캠핑장 찾기</RouterLink>
+        </div>
         <div class="items">
           <div v-for="c in favCamps" :key="c.id" class="item" :class="{ on: picked.includes(c.id) }">
             <button type="button" class="pick" :aria-pressed="picked.includes(c.id)" @click="togglePick(c.id)">
@@ -340,6 +349,47 @@ onMounted(async () => {
   margin: 24px 20px;
   font-size: 14px;
   color: var(--web-text-sub);
+}
+.empty-card {
+  margin: 8px 12px 16px;
+  padding: 28px 20px 22px;
+  border: 1px solid var(--web-line-panel-soft);
+  border-radius: 14px;
+  background: var(--web-bg-quiet);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--web-bg);
+  color: var(--web-terracotta);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.empty-card b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.empty-card p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--web-text-sub);
+}
+.empty-go {
+  margin-top: 12px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--web-green);
+  color: var(--web-white);
+  font-size: 14px;
+  font-weight: 700;
 }
 .items {
   padding: 0 12px 16px;

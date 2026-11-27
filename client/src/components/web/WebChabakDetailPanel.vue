@@ -238,7 +238,7 @@ async function savePlan() {
               <span class="fdist">{{ f.distanceKm }}km · 약 {{ driveMinOf(f.distanceKm) }}분</span>
             </li>
           </ul>
-          <p class="hint">거리 · 시간은 직선거리로 어림한 값이에요.</p>
+          <p class="hint">거리 · 시간은 직선거리로 어림한 값입니다.</p>
         </section>
 
         <!-- 근처 차박 후보 (주의 · 불가일 때 서버가 보내 줌) -->
@@ -267,7 +267,7 @@ async function savePlan() {
           </ul>
         </section>
 
-        <p class="disclaimer">공공데이터 기준 참고용 판정이며 법적 경계는 지적측량으로 확정돼요. '제한 없음'도 합법을 보증하지 않아요.</p>
+        <p class="disclaimer">공공데이터 기준 참고용 판정이며 법적 경계는 지적측량으로 확정됩니다. '제한 없음'도 합법을 보증하지 않습니다.</p>
       </template>
     </div>
 

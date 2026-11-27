@@ -303,7 +303,7 @@ h1 {
   background: var(--color-danger);
 }
 .go {
-  background: var(--color-text);
+  background: var(--color-primary);
 }
 .link {
   padding: 0;

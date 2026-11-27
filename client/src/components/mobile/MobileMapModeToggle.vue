@@ -39,7 +39,7 @@ const MODES = [
   color: var(--color-text-sub);
 }
 .mode.on {
-  background: var(--color-text);
+  background: var(--color-primary);
   color: var(--color-card);
   font-weight: 700;
 }

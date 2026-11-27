@@ -1,6 +1,6 @@
 <script setup>
 // 내 정보 화면 (설계: ForYouNew.dc.html 진단 전 / Me.dc.html 진단 후).
-// 진단 후 카드에는 유형 이름 대신 고른 답 요약만 보여 준다 (유형 판정 기준이 아직 없음).
+// 진단 후 카드에는 고른 답 요약을 보여 준다. 카드 바탕은 웹 메인 색과 같은 진한 숲 초록 (검정은 앱에서 혼자 튀어서 2026-11-27 바꿈)
 // 설계의 "내 유형 안전수칙"·캠핑 기록·안전 체크 카드는 데이터가 없어 아직 뺐다
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -31,11 +31,13 @@ const menu = computed(() =>
         { name: '여행 취향', to: '/app/tour-preference' },
         { name: '알림', to: '/app/my-info/alerts' },
         { name: '메타버스 안전 탐험', to: METAVERSE_PATH },
+        { name: '3D 재난 대피 지도', to: '/app/disaster' }, // 내 캠핑 화면에서도 들어감. 이름은 웹과 같게
       ]
     : [
         { name: '로그인 · 회원가입', to: '/app/login' },
         { name: '알림', to: '/app/my-info/alerts' },
         { name: '메타버스 안전 탐험', to: METAVERSE_PATH },
+        { name: '3D 재난 대피 지도', to: '/app/disaster' }, // 내 캠핑 화면에서도 들어감. 이름은 웹과 같게
       ],
 )
 
@@ -67,7 +69,7 @@ async function logout() {
       <!-- 진단 전 (ForYouNew.dc.html) -->
       <div v-else class="diagnosis">
         <div class="head">
-          <span class="step">2단계 · 8문항 · 약 1분</span>
+          <span class="step">8문항 · 약 1분</span>
           <span class="title">아직 내 유형이 없어요<br />1분이면 맞춤으로 바뀌어요</span>
         </div>
         <ol class="points">
@@ -122,13 +124,14 @@ h1 {
   font-weight: 900;
   letter-spacing: -0.03em;
 }
+/* 진단 카드: 진한 숲 초록 (웹 메인 색 --web-green 과 같은 값). 예전 검정은 앱에서 혼자 튀어서 바꿈 */
 .diagnosis {
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding: 20px 18px;
   border-radius: 18px;
-  background: var(--color-text);
+  background: var(--color-nudge-green);
   color: var(--color-card);
 }
 .head {
@@ -180,7 +183,7 @@ h1 {
   height: 50px;
   border-radius: 25px;
   background: var(--color-card);
-  color: var(--color-text);
+  color: var(--color-nudge-green);
   font-size: 15px;
   font-weight: 900;
   display: flex;
@@ -202,13 +205,15 @@ h1 {
   display: flex;
   gap: 8px;
 }
+/* 흰 바탕 + 초록 굵은 글씨 (진단 전 "1분 진단 시작하기"와 같은 모양). 예전 얇은 회색 테두리는 초록 위에서 잘 안 보였다 */
 .redo {
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 20px;
-  border: 1px solid var(--color-text-sub);
-  color: var(--color-card);
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 21px;
+  background: var(--color-card);
+  color: var(--color-nudge-green);
   font-size: 14px;
+  font-weight: 800;
   display: flex;
   align-items: center;
 }

@@ -97,7 +97,7 @@ public class CampService {
     // 차박 지도 안전점수 카드도 같은 문구를 쓴다 (chabak/ChabakService) → 한곳에서만 고치면 둘 다 바뀜
     public static String headlineOf(String grade) {
         return switch (grade) {
-            case "safe" -> "밤에도 비교적 안심할 수 있어요";
+            case "safe" -> "비교적 안심할 수 있어요";
             case "caution" -> "밤에는 주변 시설을 먼저 확인하세요";
             case "danger" -> "안전 정보를 꼭 확인하고 결정하세요";
             default -> "안전점수를 준비하고 있어요";
