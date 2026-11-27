@@ -7,6 +7,7 @@
 // 예약 전·중 카드: "예약 정보 확인" 으로 예약 확인 화면(MobileBookingCheckView)
 // 캠핑 전날(D-1) 카드 · 브리핑 알림으로 들어온 카드: 삭제 옆 초인종 버튼 → 카드 안에 브리핑 3줄이 스르륵 열리고 닫힘 (utils/campBrief.js)
 //   앱 브리핑 알림을 누르고 들어오면(?brief=일정id) 그 카드의 브리핑을 바로 펼친다 (utils/localNotify.js)
+//   모임방 사람이 등록한 일정의 알림이면 아래 "모임방 캠핑" 카드의 브리핑을 펼친다 (서버 push/BriefPushService)
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -41,8 +42,9 @@ async function load() {
   // 끝나지 않은 일정마다 출발 준비 요약(특보·안전점수)을 받는다. 못 받아도 카드는 그대로 (줄에 글자만 빠짐)
   myCamping.plans.filter((p) => p.checkOut >= todayIso()).forEach((p) => myCamping.loadChecklist(p.id).catch(() => {}))
   loadReviews()
-  openBriefFromQuery()
-  loadFamilyPlans()
+  openBriefFromQuery(cards.value)
+  await loadFamilyPlans()
+  openBriefFromQuery(familyCards.value) // 모임방 일정은 목록을 받은 뒤에야 찾을 수 있다
 }
 
 // ---- 가족 캠핑: 같은 가족방 사람이 등록한 캠핑 (GET /api/family/camp-plans, 보기만) ----
@@ -62,11 +64,15 @@ const familyCards = computed(() => {
   const today = todayIso()
   return familyPlans.value
     .filter((p) => p.checkOut >= today)
-    .map((p) => ({
-      ...p,
-      badge: p.checkIn <= today ? '캠핑 중' : `D-${nightsBetween(today, p.checkIn)}`,
-      range: `${labelWithDay(p.checkIn)} – ${labelWithDay(p.checkOut)} · ${nightsBetween(p.checkIn, p.checkOut)}박`,
-    }))
+    .map((p) => {
+      const badge = p.checkIn <= today ? '캠핑 중' : `D-${nightsBetween(today, p.checkIn)}`
+      return {
+        ...p,
+        badge,
+        range: `${labelWithDay(p.checkIn)} – ${labelWithDay(p.checkOut)} · ${nightsBetween(p.checkIn, p.checkOut)}박`,
+        ...briefOf(p, badge, fromNotice(p)), // 모임방 일정은 알림을 눌러 들어왔을 때만 브리핑을 보여 준다
+      }
+    })
 })
 onMounted(load)
 
@@ -87,9 +93,10 @@ async function toggleBrief(p) {
   }
 }
 // 알림을 눌러 들어온 경우: 그 일정 카드의 브리핑을 펼치고 카드가 보이게 내린다
-async function openBriefFromQuery() {
+// list: 찾을 카드 목록 (내 캠핑 cards 또는 모임방 familyCards)
+async function openBriefFromQuery(list) {
   const id = Number(route.query.brief)
-  const card = cards.value.find((c) => c.id === id)
+  const card = list.find((c) => c.id === id)
   if (!card?.briefable) return
   if (!briefOpen.value[id]) await toggleBrief(card)
   await nextTick()
@@ -100,7 +107,9 @@ async function openBriefFromQuery() {
 // 방금 PC 에서 등록한 일정은 이 화면의 목록에 아직 없다 → 목록을 다시 받는다 (load 가 끝에 브리핑도 펼친다)
 watch(() => [route.query.brief, route.query.t], ([v]) => {
   if (!v) return
-  if (myCamping.plans.some((p) => p.id === Number(v))) openBriefFromQuery()
+  const id = Number(v)
+  if (myCamping.plans.some((p) => p.id === id)) openBriefFromQuery(cards.value)
+  else if (familyPlans.value.some((p) => p.id === id)) openBriefFromQuery(familyCards.value)
   else load()
 })
 
@@ -188,6 +197,23 @@ function prepLine(c) {
   return { text: `특보는 ${d.getMonth() + 1}월 ${d.getDate()}일부터${score}`, warn: false }
 }
 
+// 내일 출발 = 오늘이 캠핑 전날
+const isEve = (p) => p.checkIn > todayIso() && nightsBetween(todayIso(), p.checkIn) === 1
+// 브리핑 알림을 눌러 들어온 일정은 전날이 아니어도 브리핑을 보여 준다 (시연용 알림이 아무 날짜에나 오므로). 지난 캠핑은 뺀다
+const fromNotice = (p) => p.checkOut >= todayIso() && String(p.id) === route.query.brief
+// 카드의 브리핑 칸 (내 캠핑 · 모임방 캠핑이 같이 쓴다)
+function briefOf(p, badge, briefable) {
+  const checklist = myCamping.checklists[p.id]
+  return {
+    briefable,
+    briefTitle: isEve(p) ? '내일 캠핑 브리핑' : `캠핑 브리핑 (${badge})`,
+    // 브리핑 3줄 (출발 준비 응답이 와야 만들 수 있다). 진단 · 체크 상태는 이 브라우저에 저장된 값
+    brief: briefable && checklist
+      ? buildBriefLines(p, checklist, loadSavedResult(auth.member?.id), readCheckedIds(auth.member?.id, p.id))
+      : null,
+  }
+}
+
 // 카드에 보일 글: 날짜 범위 · 몇 박, 그리고 D-day
 const cards = computed(() => {
   const today = todayIso()
@@ -197,23 +223,13 @@ const cards = computed(() => {
     else if (p.checkIn <= today) badge = '캠핑 중'
     else badge = `D-${nightsBetween(today, p.checkIn)}`
     const nights = nightsBetween(p.checkIn, p.checkOut)
-    const eve = p.checkIn > today && nightsBetween(today, p.checkIn) === 1 // 내일 출발 = 오늘이 캠핑 전날
-    // 브리핑 알림을 눌러 들어온 일정은 전날이 아니어도 브리핑을 보여 준다 (시연용 5초 알림이 아무 날짜에나 오므로)
-    const fromNotice = p.checkOut >= today && String(p.id) === route.query.brief // 지난 캠핑은 빼고
-    const briefable = eve || fromNotice
-    const checklist = myCamping.checklists[p.id]
     return {
       ...p,
       badge,
       past: p.checkOut < today,
       prep: p.checkOut < today ? null : prepLine(myCamping.checklists[p.id]), // 지난 캠핑은 줄 없음
       range: `${labelWithDay(p.checkIn)} – ${labelWithDay(p.checkOut)} · ${nights}박`,
-      briefable,
-      briefTitle: eve ? '내일 캠핑 브리핑' : `캠핑 브리핑 (${badge})`,
-      // 브리핑 3줄 (출발 준비 응답이 와야 만들 수 있다). 진단 · 체크 상태는 이 브라우저에 저장된 값
-      brief: briefable && checklist
-        ? buildBriefLines(p, checklist, loadSavedResult(auth.member?.id), readCheckedIds(auth.member?.id, p.id))
-        : null,
+      ...briefOf(p, badge, isEve(p) || fromNotice(p)),
     }
   })
 })
@@ -342,13 +358,25 @@ async function remove(p) {
             {{ familyError }} <button type="button" class="retry" @click="loadFamilyPlans">다시 시도</button>
           </p>
           <ul v-else class="plans">
-            <li v-for="p in familyCards" :key="p.id" class="plan">
+            <li v-for="p in familyCards" :id="`plan-${p.id}`" :key="p.id" class="plan">
               <div class="plan-head">
                 <span class="tags">
                   <span class="badge">{{ p.badge }}</span>
                   <span v-if="p.campId == null" class="kind">차박지</span>
                 </span>
-                <span class="owner">{{ p.ownerName }}님이 등록</span>
+                <span class="actions">
+                  <span class="owner">{{ p.ownerName }}님이 등록</span>
+                  <!-- 브리핑 알림을 눌러 들어온 일정에만: 내 카드와 같은 초인종 -->
+                  <button v-if="p.briefable" type="button" class="bell" :class="{ on: briefOpen[p.id] }"
+                    :aria-expanded="!!briefOpen[p.id]" :aria-controls="`brief-${p.id}`"
+                    :aria-label="`${p.campName} 캠핑 브리핑 ${briefOpen[p.id] ? '닫기' : '열기'}`" @click="toggleBrief(p)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                    </svg>
+                  </button>
+                </span>
               </div>
               <RouterLink v-if="p.campId != null" :to="`/app/camps/${p.campId}`" class="plan-name">{{ p.campName }}</RouterLink>
               <RouterLink v-else :to="{ path: '/app/chabak', query: { lat: p.lat, lng: p.lng } }" class="plan-name">
@@ -357,6 +385,21 @@ async function remove(p) {
               <p class="plan-place">{{ p.place }}</p>
               <p class="plan-range">{{ p.range }}</p>
               <p v-if="p.memo" class="plan-memo">{{ p.memo }}</p>
+              <div v-if="p.briefable" :id="`brief-${p.id}`" class="brief" :class="{ open: briefOpen[p.id] }" :inert="!briefOpen[p.id]">
+                <div class="brief-inner">
+                  <div class="brief-box">
+                    <p class="brief-title">{{ p.briefTitle }}</p>
+                    <ul v-if="p.brief" class="brief-lines">
+                      <li v-for="l in p.brief" :key="l.key">
+                        <b :class="{ warn: l.warn }">{{ l.label }}</b>
+                        <span>{{ l.text }}</span>
+                      </li>
+                    </ul>
+                    <p v-else-if="briefFailed[p.id]" class="brief-msg">브리핑을 불러오지 못했어요. 출발 준비에서 확인해 주세요.</p>
+                    <p v-else class="brief-msg">브리핑을 불러오는 중이에요…</p>
+                  </div>
+                </div>
+              </div>
               <!-- 가족 일정의 출발 준비도 같은 화면으로 (서버가 같은 가족방이면 보여 준다). 체크 표시는 보는 사람 브라우저에 따로 저장 -->
               <RouterLink :to="`/app/my-camping/${p.id}/checklist`" class="prep">
                 <span class="prep-text"><b>출발 준비</b><small>특보 · 날씨 · 준비물 같이 보기</small></span>

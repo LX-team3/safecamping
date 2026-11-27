@@ -37,13 +37,14 @@ public class CampPlanController {
 
     // 등록: POST /api/member/camp-plans  {"campId":1,"campName":"설하캠핑장","place":"강원 인제군 북면","checkIn":"2026-11-14","checkOut":"2026-11-16","memo":""}
     // 캠핑장이 아닌 자리(차박): campId 대신 "lat":38.057,"lng":128.166 (campName 은 지번 등 이름)
-    // 웹에서 저장하면 "notifyPhone":true 도 보낸다 → 10초 뒤 내 폰으로 브리핑 푸시 (저장에 성공했을 때만)
+    // 저장에 성공하면 10초 뒤 모임방 사람들 폰으로 브리핑 푸시. "notifyPhone":true(웹)면 내 폰에도, false(앱)면 나는 뺀다
+    // notifyPhone 을 안 보내면 아무에게도 보내지 않는다
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CampPlanResponse> add(Authentication authentication, @Valid @RequestBody CampPlanRequest body) {
         CampPlanResponse saved = service.add(authentication.getName(), body);
-        if (Boolean.TRUE.equals(body.notifyPhone())) {
-            briefPush.schedule(authentication.getName(), saved.id(), saved.campName());
+        if (body.notifyPhone() != null) {
+            briefPush.schedule(authentication.getName(), saved.id(), saved.campName(), body.notifyPhone());
         }
         return ApiResponse.ok(saved);
     }

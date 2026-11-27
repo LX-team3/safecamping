@@ -46,9 +46,10 @@ class CampPlanControllerTest {
             return saved("설하캠핑장");
         }
     };
-    private final BriefPushService fakePush = new BriefPushService(new PushTokenStore(), (token, title, body, data) -> true) {
-        @Override public void schedule(String loginId, Long planId, String campName) {
-            scheduled.add(loginId + ":" + planId + ":" + campName);
+    private final BriefPushService fakePush = new BriefPushService(new PushTokenStore(), (token, title, body, data) -> true,
+            loginId -> List.of()) {
+        @Override public void schedule(String loginId, Long planId, String campName, boolean toSelf) {
+            scheduled.add(loginId + ":" + planId + ":" + campName + ":" + (toSelf ? "나도" : "나빼고"));
         }
     };
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CampPlanController(fakeService, fakePush))
@@ -67,18 +68,23 @@ class CampPlanControllerTest {
     }
 
     @Test
-    void 웹에서_저장하면_로그인한_회원의_폰_알림을_예약한다() throws Exception {
+    void 웹에서_저장하면_나까지_알림을_예약한다() throws Exception {
         mvc.perform(post(URL).principal(A).contentType(MediaType.APPLICATION_JSON).content(body("true")))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.data.id").value(3));
-        assertEquals(List.of("a:3:설하캠핑장"), scheduled);
+        assertEquals(List.of("a:3:설하캠핑장:나도"), scheduled);
     }
 
     @Test
-    void 앱에서_저장하거나_값이_없으면_예약하지_않는다() throws Exception {
-        for (String notify : new String[] { "false", null }) {
-            mvc.perform(post(URL).principal(A).contentType(MediaType.APPLICATION_JSON).content(body(notify)))
-                    .andExpect(status().isCreated());
-        }
+    void 앱에서_저장하면_나를_빼고_예약한다() throws Exception {
+        mvc.perform(post(URL).principal(A).contentType(MediaType.APPLICATION_JSON).content(body("false")))
+                .andExpect(status().isCreated());
+        assertEquals(List.of("a:3:설하캠핑장:나빼고"), scheduled);
+    }
+
+    @Test
+    void 값이_없으면_예약하지_않는다() throws Exception {
+        mvc.perform(post(URL).principal(A).contentType(MediaType.APPLICATION_JSON).content(body(null)))
+                .andExpect(status().isCreated());
         assertTrue(scheduled.isEmpty());
     }
 
