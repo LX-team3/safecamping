@@ -15,7 +15,7 @@ import { useMyCampingStore } from '@/stores/myCamping'
 import { askConfirm } from '@/utils/confirm'
 import { api } from '@/utils/api'
 import { fromIso, labelWithDay, nightsBetween, todayIso } from '@/utils/date'
-import { buildBriefLines, readCheckedIds } from '@/utils/campBrief'
+import { briefSurveyOf, buildBriefLines, readCheckedIds } from '@/utils/campBrief'
 import { loadSavedResult } from '@/utils/webSurvey'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav.vue'
 import MobileReviewSheet from '@/components/mobile/MobileReviewSheet.vue'
@@ -80,9 +80,27 @@ onMounted(load)
 // ---- 캠핑 전날 브리핑 (초인종) ----
 const briefOpen = ref({}) // 일정 id → 펼쳤는지
 const briefFailed = ref({}) // 일정 id → 출발 준비 응답을 못 받았는지
+// 일정 id → AI 대비 행동 { loading, result } (서버 응답 BriefResult). 화면을 연 동안 한 번만 부른다
+// 왜 한 번만: 부를 때마다 서버가 Claude 를 불러 비용이 든다. 펼쳤다 접었다 해도 다시 부르지 않는다
+const aiBriefs = ref({})
+async function loadAiBrief(p) {
+  if (aiBriefs.value[p.id]) return
+  aiBriefs.value = { ...aiBriefs.value, [p.id]: { loading: true, result: null } }
+  let result = null
+  try {
+    result = await api(`/api/member/camp-plans/${p.id}/brief`, {
+      method: 'post',
+      body: { survey: briefSurveyOf(loadSavedResult(auth.member?.id)) },
+    })
+  } catch {
+    // 못 받아도 알리지 않는다: 아래 기본 3줄이 그대로 브리핑이 된다
+  }
+  aiBriefs.value = { ...aiBriefs.value, [p.id]: { loading: false, result } }
+}
 async function toggleBrief(p) {
   const opening = !briefOpen.value[p.id]
   briefOpen.value = { ...briefOpen.value, [p.id]: opening }
+  if (opening) loadAiBrief(p) // 기다리지 않는다: 기본 3줄을 먼저 보여 주고, AI 가 오면 진단 줄 자리가 바뀐다
   // 처음 화면을 열 때 받은 출발 준비가 없으면(실패) 펼칠 때 한 번 더 받아 본다
   if (opening && !myCamping.checklists[p.id]) {
     briefFailed.value = { ...briefFailed.value, [p.id]: false }
@@ -208,13 +226,16 @@ const fromNotice = (p) => p.checkOut >= todayIso() && String(p.id) === route.que
 // 카드의 브리핑 칸 (내 캠핑 · 모임방 캠핑이 같이 쓴다)
 function briefOf(p, badge, briefable) {
   const checklist = myCamping.checklists[p.id]
+  const ai = aiBriefs.value[p.id]
   return {
     briefable,
     briefTitle: isEve(p) ? '내일 캠핑 브리핑' : `캠핑 브리핑 (${badge})`,
-    // 브리핑 3줄 (출발 준비 응답이 와야 만들 수 있다). 진단 · 체크 상태는 이 브라우저에 저장된 값
+    // 브리핑 줄 (출발 준비 응답이 와야 만들 수 있다). 진단 · 체크 상태는 이 브라우저에 저장된 값, AI 대비 행동은 서버
     brief: briefable && checklist
-      ? buildBriefLines(p, checklist, loadSavedResult(auth.member?.id), readCheckedIds(auth.member?.id, p.id))
+      ? buildBriefLines(p, checklist, loadSavedResult(auth.member?.id), readCheckedIds(auth.member?.id, p.id), ai?.result)
       : null,
+    aiLoading: !!ai?.loading,
+    aiUsed: !!ai?.result?.ai,
   }
 }
 
@@ -304,11 +325,14 @@ async function remove(p) {
                   <ul v-if="p.brief" class="brief-lines">
                     <li v-for="l in p.brief" :key="l.key">
                       <b :class="{ warn: l.warn }">{{ l.label }}</b>
-                      <span>{{ l.text }}</span>
+                      <span>{{ l.text }}<small v-if="l.source" class="brief-src">근거 · {{ l.source }}</small></span>
                     </li>
                   </ul>
                   <p v-else-if="briefFailed[p.id]" class="brief-msg">브리핑을 불러오지 못했어요. 출발 준비에서 확인해 주세요.</p>
                   <p v-else class="brief-msg">브리핑을 불러오는 중이에요…</p>
+                  <!-- AI 대비 행동: 만드는 중 / 썼을 때 무엇으로 만들었는지 알린다 (믿을지 판단할 수 있게) -->
+                  <p v-if="p.brief && p.aiLoading" class="brief-note">안전자료에서 대비 행동을 찾는 중이에요…</p>
+                  <p v-else-if="p.brief && p.aiUsed" class="brief-note">대비 행동은 공공기관 안전자료를 바탕으로 AI가 골랐어요</p>
                 </div>
               </div>
             </div>
@@ -416,11 +440,13 @@ async function remove(p) {
                     <ul v-if="p.brief" class="brief-lines">
                       <li v-for="l in p.brief" :key="l.key">
                         <b :class="{ warn: l.warn }">{{ l.label }}</b>
-                        <span>{{ l.text }}</span>
+                        <span>{{ l.text }}<small v-if="l.source" class="brief-src">근거 · {{ l.source }}</small></span>
                       </li>
                     </ul>
                     <p v-else-if="briefFailed[p.id]" class="brief-msg">브리핑을 불러오지 못했어요. 출발 준비에서 확인해 주세요.</p>
                     <p v-else class="brief-msg">브리핑을 불러오는 중이에요…</p>
+                    <p v-if="p.brief && p.aiLoading" class="brief-note">안전자료에서 대비 행동을 찾는 중이에요…</p>
+                    <p v-else-if="p.brief && p.aiUsed" class="brief-note">대비 행동은 공공기관 안전자료를 바탕으로 AI가 골랐어요</p>
                   </div>
                 </div>
               </div>
@@ -816,6 +842,20 @@ h1 {
 .brief-msg {
   margin: 0;
   font-size: 13px;
+  color: var(--color-text-sub);
+}
+/* AI 대비 행동의 근거: 행동 글 아래 작은 회색 글 */
+.brief-src {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-sub);
+}
+/* AI 안내 한 줄: 줄 목록 아래, 구분선 위에 작게 */
+.brief-note {
+  margin: 0;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--color-line);
+  font-size: 11px;
   color: var(--color-text-sub);
 }
 .del {

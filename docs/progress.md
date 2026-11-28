@@ -1,5 +1,94 @@
 # 진행 상황
 
+## 2026-11-28 AI 브리핑 12단계: 앱 내 캠핑 카드 브리핑에 연결 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- `MobileMyCampingView`(내 캠핑 · 모임방 캠핑 카드의 초인종 브리핑): 펼치면 지금 3줄(특보·날씨 / 진단 / 준비물)을 **먼저** 보여 주고, 뒤에서 `POST /api/member/camp-plans/{id}/brief` 를 부름. `ai: true` 로 오면 **진단 줄 자리를 "대비" 줄들(AI, 최대 3줄)로 바꿈** + 줄 아래 작은 글 "근거 · 행정안전부 2016" + 상자 아래 "대비 행동은 공공기관 안전자료를 바탕으로 AI가 골랐어요". 기다리는 동안 "안전자료에서 대비 행동을 찾는 중이에요…"
+- 실패 · `ai: false` 면 알리지 않고 지금 3줄 그대로 (대체 브리핑). 특보 · 날씨 줄 · 준비물 줄은 AI 가 아니라 화면이 서버 값으로 만듦 (숫자는 기상청 값 그대로)
+- 화면을 연 동안 일정마다 **한 번만** 부름 (펼쳤다 접어도 다시 안 부름 — 부를 때마다 Claude 비용)
+- `utils/campBrief.js`: `briefSurveyOf(saved)` = 이 브라우저의 웹 진단 결과 → 요청 본문 `{ who, kid, site, weak }` (진단 없으면 null), `buildBriefLines(..., ai)` 에 AI 결과를 받는 칸 추가
+- 새 CSS 는 tokens.css 변수만 씀 (`--color-text-sub` · `--color-line`)
+- 확인: `npm run build` 통과 (500kB 경고는 원래 있던 메타버스 · 재난지도 파일)
+- **확인 못 함**: 실제 화면 — 서버를 켜고 로그인 → 내일 출발 일정(또는 `?brief=일정id`)에서 초인종을 눌러 AI 줄이 바뀌는지, 좁은 화면에서 근거 글 줄바꿈. 모임방 캠핑 카드는 보는 사람의 진단을 보냄(일정 메모는 등록한 사람 것)
+
+## 2026-11-28 AI 브리핑 11단계: API (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- `POST /api/member/camp-plans/{planId}/brief` (`brief/BriefController`): 본문 `BriefRequest { survey }`(없어도 됨) → `BriefService.make` → `BriefResult`. POST 인 이유: 브라우저에만 있는 진단을 본문으로 받고, 부를 때마다 Claude 비용이 들어서. `/api/member/**` 라 지금 보안 설정 그대로 로그인 필요 (SecurityConfig 안 고침)
+- 끝난 캠핑(체크리스트 `past`)은 400 "끝난 캠핑은 브리핑을 만들지 않습니다." (`BriefContextService` — 프롬프트의 "아직 없음(○월 ○일부터 확인)" 이 맞지 않고 출발 전 대비라 뜻이 없음)
+- 저장하지 않음 (`briefing` 테이블 안 씀 → DB 변경 없음). 부를 때마다 새로 만듦 (Haiku 4.5 실제 1회 입력 3170 · 출력 245 토큰)
+- `server/CLAUDE.md` API 목록에 한 줄 추가
+- 확인: `.\mvnw.cmd test` 268개 통과 (새 `BriefControllerTest` 4개: 진단 전달 · 응답 모양 · 본문 없음 · 끝난 캠핑 400)
+- 확인 못 함: 실제 서버를 켜고 로그인 → 내 일정으로 이 주소를 부르는 것 (서비스 DB · 로그인 필요. 12단계 화면 연결 때 함께)
+
+## 2026-11-28 AI 브리핑 10단계: 검사 · 대체 + 한 번에 잇기 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- 결정(사용자): 모델은 Haiku 로 감 (설정이 없으면 기본값 `claude-haiku-4-5`. 현재 세대 `claude-haiku-5-5` 는 이름을 적어야 씀)
+- `brief/BriefCheck`: 줄마다 검사, 어기면 **고치지 않고 버림**. 근거(sources 비었음 · 넘기지 않은 id · 3개 이상) / 숫자(답의 숫자가 상황 글 · 자료 제목 · 본문에 없음. "1,600" = "1600", 자료 id 의 숫자는 안 침) / 보증하는 말("안전해요" · "안전합니다" · "괜찮아요" · "괜찮습니다" · "안심하". "안전하게 ~해요"는 둠) / 형식(빈 글 · 60자 초과 · 같은 글 · 4번째 줄부터). 통과한 줄에 출처(id · 기관 · 연도 · 제목 · 자료 이름 · 쪽)를 붙임
+- `brief/BriefResult`: `{ ai, lines: [{ text, sources: [{ id, org, year, heading, source, page }] }], fallback }`. `ai: false` 면 lines 비움 → 화면이 지금의 문장 틀 브리핑(campBrief.js)을 그대로. fallback 이유: search-off · search-failed · no-docs · ai-failed · all-dropped
+- `brief/BriefService.make(loginId, planId, survey)`: 7 상황 → 임베딩 → 검색 → 프롬프트 → Claude → 검사. 어느 단계든 실패하면 예외 없이 대체 (일정 없음 · 남의 일정 404 는 그대로). 버린 줄은 로그로 (13단계 평가용)
+- 확인: `.\mvnw.cmd test` 264개 통과 (새 `BriefCheckTest` 9개). `--vector-ping --ai-brief` 로 전체 흐름 실제 1회: Haiku 4.5, 3.5초, 입력 3170 · 출력 245 토큰, **3줄 모두 통과** — 난로 · 환기 · 일산화탄소(JD-031 · NB-002), 텐트 위 눈(JD-031), 화로대 물 · 난연 텐트(JD-025). 이번엔 "~해요" 말투, 진단 분야 반영
+- 알아 둘 것: 숫자 검사는 아라비아 숫자만 봄 ("두 시간" 같은 한글 숫자는 못 잡음). 검사가 "버린" 경우는 아직 실제 답으로 본 적 없음 (테스트로만)
+
+## 2026-11-28 AI 브리핑 9단계: Claude 부르기 → JSON 답 읽기 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- `brief/BriefAiClient.ask(BriefPrompt)`: Spring AI `ChatModel` 에 system · user 메시지를 그대로 넘김 (`ChatClient` 는 글 안의 `{ }` 를 템플릿 자리로 읽을 수 있는데 system 규칙에 JSON 예시가 있어서). 답한 모델 · 시간 · 토큰을 로그로. 실패(키 · 401 · 시간 초과 · JSON 아님)면 empty → 대체 브리핑
+- `brief/BriefAnswer`: `{ lines: [{ text, sources }] }`. ```json 울타리 · 앞뒤 글이 붙어도 처음 `{` ~ 마지막 `}` 만 읽음. 빈 lines 는 "쓸 줄 없음"(실패 아님)
+- 임시 `VectorPingRunner` ⑥: `--vector-ping --ai-brief` 로 켤 때만 ⑤ 프롬프트로 Claude 를 한 번 부름
+- 확인: `.\mvnw.cmd test` 255개 통과 (새 `BriefAiClientTest` 4개). **실제 호출 성공**: 2.9초, 입력 3170 · 출력 200 토큰, 3줄 모두 sources `JD-031` (텐트 내 난로 · 젖은 옷 · 텐트 위 눈)
+- **문제: 답한 모델이 `claude-haiku-4-5-20251001`** → 모델 설정이 적용 안 됨. Spring AI 2.0.3 설정 이름은 `spring.ai.anthropic.chat.model` · `spring.ai.anthropic.chat.max-tokens` (jar 의 설정 목록에서 확인, `chat.options.*` 는 옛 이름). local 파일은 규칙상 열어 보지 않음 → 사람이 확인
+- 알아 둘 것(Haiku 4.5 답 기준): 말투가 "~해요"가 아니라 "~세요", 진단의 조심할 분야(일산화탄소 · 화재) 자료 NB-002 · JD-025 를 안 씀. 모델을 바꾼 뒤 다시 보고 13단계에서 평가
+
+## 2026-11-28 AI 브리핑 8단계: 프롬프트 만들기 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- 구조(사용자 확인): 특보 · 날씨 한 줄은 지금처럼 코드(`campBrief.js`)가 기상청 값으로 만들고, **AI 는 "대비 행동" 최대 3줄만** (줄마다 근거 조각 id). AI 가 숫자를 다시 쓸 일을 줄이려고
+- `brief/BriefPrompt`: system = 사용자 확인 규칙(근거 · 숫자 · 우선순위 · 안전 · 줄이 모자랄 때 · 형식 JSON `{"lines":[{"text","sources"}]}`), user = `<situation>`(장소 · 일정 · 동행 · 숙박 · 특보 · 예보 · 진단 · 안전점수/응급실 분) + `<documents>`(조각 5개: id · 기관 · 연도 · 제목 · 본문) + 요청 한 줄
+  - 값이 없을 때는 규칙과 같은 말: "받지 못함" · "아직 없음(○월 ○일부터 확인)" · "진단 안 함" · "해당 없음 또는 모름". 안전 정보가 없으면 그 줄을 뺌
+  - 숫자는 기상청 값 그대로 (-5.0 → "-5", 2.5 → "2.5", 반올림 안 함)
+  - 넣지 않는 것: 일정 메모 원문(사용자 글 → 지시 섞임 방지), 출발 준비 항목, 풍속(강풍 판단 기준 없음)
+- 확인: `.\mvnw.cmd test` 251개 통과 (새 `BriefPromptTest` 8개). `--vector-ping` ⑤ 로 실제 조각 5개를 넣은 user 프롬프트를 찍어 봄 (user 2150자 · system 1039자)
+- 알아 둘 것: 조각 본문에 "얼음 20cm 정도 두께가 되어야 안전합니다"(JD-031)처럼 자료 자체의 "안전" 표현 · 수치가 있음 → 규칙상 자료 수치는 그대로 쓸 수 있음. 10단계 검사 · 13단계 평가 때 볼 것. 지난 일정은 "아직 없음" 문구가 맞지 않아 11단계 API 에서 막을 것
+
+## 2026-11-28 AI 브리핑 7단계: 상황 모으기 → 검색 질문 · 검색 조건 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- 결정(사용자): 웹 1분 진단 결과는 서버 DB 에 칸이 없어(브라우저 localStorage 에만 있음) **화면이 브리핑 요청에 담아 보낸다** (지도 가산점 needsErBonus 와 같은 방식). 진단이 없으면 일정 정보만 씀. 다른 기기 · 서버 혼자 만드는 브리핑(푸시)에는 진단이 빠짐
+- `brief/BriefSurvey`: 화면이 보낼 진단 요약 `{ who[], kid, site, weak[] }` (webSurvey.js 의 코드값 그대로). 모르는 값은 400 대신 버림 (예전 형식으로 저장된 결과 대비)
+- `brief/BriefContext`: 체크리스트 응답(일정 · 특보 · 예보 · 안전점수 · 준비 항목) + 일정 메모 + 진단 → 상황 + 검색 질문(question) + `SafetyDocFilter`
+  - 동행: 일정 메모("성인 2명 · 어린이 1명 · 아이 동반 · …", bookingMemo.js)가 **진단보다 앞섬**(이번 여행 정보). 메모에 동행 정보가 없을 때만 진단. 아이는 12세 이하만(진단 teen 이면 아님, hasYoungChild 와 같음). 반려동물은 메모로만
+  - 숙박: 캠핑장이 아닌 자리 → car, 캠핑장이면 진단 차박 → car · 오토캠핑 → tent · 글램핑/모름 → null(거르지 않음)
+  - 검색 질문: 동행 · 숙박 · 계절 · 특보 이름 · 예보(최저 0° 이하 → "영하로 내려가는 추위", 비 · 눈 · 소나기) · 약한 분야. **수치는 넣지 않음**. 풍속은 기준이 없어 안 씀 (체크리스트와 같은 근거)
+- `brief/BriefContextService.collect(loginId, planId, survey)`: `ChecklistService.find` 를 그대로 써서 특보 · 예보 시기 · 캐시 · "못 받으면 비워 둠" 규칙을 체크리스트와 같게. 메모는 체크리스트 응답에 없어 `findVisible` 로 한 번 더 읽음 (내 일정 · 같은 가족방 일정만, 그 밖 404)
+- 확인: `.\mvnw.cmd test` 243개 통과 (새 `BriefContextTest` 14개). `--vector-ping` ④: 아이 동반 텐트 · 12월 · 영하 · 눈 · 약한 분야 일산화탄소 · 화재로 만든 질문 → JD-031 겨울 난로와 환기 0.373 · PT-002 겨울철 화기 0.384 · JD-012 · NB-002 텐트 안 화로 실험 · JD-025 화로대 (예시 질문 때 0.51~0.70 보다 가까움), 뺄 목록 JD-030 은 빠짐
+- 확인 못 함: 실제 일정 · 기상청 값으로 `collect` 를 부르는 것 (부르는 API 는 11단계)
+
+## 2026-11-28 AI 브리핑 6단계: 꼬리표로 거른 뒤 뜻이 가까운 안전자료 5개 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- 5단계 실제 호출 확인: 작업 PC 에서 OpenAI 임베딩 정상 (JD-001 본문 → JD-001 1등 0.164, 예시 질문 34토큰 · 148ms)
+- 꼬리표 값을 벡터 DB 에서 셈: companion all 114 · child 5 · pet 1 / sleep_type all 103 · tent 16 · car 1 / season all 92 · winter 13 · summer 12 · spring 3 (autumn 없음) / 메모 있는 조각 35
+- `brief/SafetyDocFilter`: 검색 조건 한곳. 동행(아이 · 반려동물 전용 조각은 함께 갈 때만), 숙박(tent · car, 모르면 거르지 않음), 계절(**반대 계절만 뺌**: 12~2월 → summer, 6~8월 → winter, 봄 · 가을은 거르지 않음 — 11월 말에도 겨울 조각이 남게. 사용자 결정), **뺄 목록 12개**(2016년 응급처치 "최신 지침과 대조 필요" 11개 + "가솔린 랜턴이 더 안전" 기사 인용 JD-004. 사용자 결정. 오타 · 옮겨 적기 메모 조각은 검수를 마쳐 그대로 씀)
+- `brief/SafetyDocRepository.search`: 위 조건 + `is_reviewed` + 거리 순 상위 5개 (`TOP_K`). 출처(source · org · doc_year · page)를 함께 돌려줌 → 9단계 근거 표시용
+- 임시 `VectorPingRunner` 에 ③ 검색 확인 4개 추가 (거르지 않은 5개와 나란히 찍음)
+- 확인: `.\mvnw.cmd test` 229개 통과. `--vector-ping` 으로 실제 확인 — 겨울 질문을 12월로 찾으면 여름 조각 JD-029 · 뺄 목록 JD-030 이 빠짐, 8월로 찾으면 겨울 조각 JD-031 · WT-002 가 빠짐, 아이 없이 찾으면 child 조각 KC-007 · SG-007 이 빠짐
+- 알아 둘 것: 거리가 얼마 이하여야 "관련 있음"인지 기준은 아직 없음 (지금 나온 값 0.51 ~ 0.70). 화상 질문에 화상 응급처치 조각(JD-058)은 뺄 목록이라 안 나옴 → 화상 처치는 다른 조각(SG-003 · PT-012 등)에 기대게 됨
+
+## 2026-11-28 AI 브리핑 5단계: 질문 글 → OpenAI 임베딩 → 비슷한 조각 찾기 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- `brief/EmbeddingClient`: OpenAI `text-embedding-3-small`(조각을 만든 모델과 같음)로 글 → 벡터 1536개. `RestClient` 로 직접 부름(Spring AI OpenAI 부품은 대화 모델이 둘이 되어 안 씀). 키는 환경변수 `OPENAI_API_KEY`, 없거나 실패하면 빈 결과 · 경고(로그에는 상태 코드만, 키 일부가 섞일 수 있는 응답 본문은 안 남김). 크기가 1536 이 아니면 버림
+- `brief/SafetyDocRepository.findSimilar`: 질문 벡터와 가까운 조각 (`embedding <=> ?::vector`, pgvector 자바 라이브러리 없이 글자 "[…]" 로 넘김). 꼬리표 거르기는 6단계
+- 임시 `VectorPingRunner` 에 확인 2개 추가: JD-001 본문을 다시 임베딩 → JD-001 이 1등인지, 예시 질문 → 관련 조각이 나오는지
+- 테스트 `brief/BriefSearchTest` 3개 (주소 · 키가 없을 때 꺼짐, 벡터 글자 모양)
+- 확인: `.\mvnw.cmd test` 225개 통과
+- 확인 못 함: 실제 OpenAI 호출 — 테스트 로그에 `OPENAI_API_KEY 환경변수가 없어…` 경고가 나옴 (설정 이름 확인 필요)
+
+## 2026-11-28 AI 브리핑 4단계: 서버가 벡터 DB(campine_vector)를 읽는 창구 (브랜치 `lyh-ragtest`, DB 구조 · 라이브러리 · 보안 설정 변경 없음)
+- 벡터 DB 위치: 배포 서버(NCP) PostgreSQL 18 의 `campine_vector` · 테이블 `safety_doc_chunk` (사용자가 `docs/deploy.md` 16단계대로 넣음. 서버에서 확인: pgvector 0.8.7, `embedding` vector · `topic` text[], 벡터 1536, 120개. 벡터 검색 결과는 아직)
+- `brief/SafetyDocRepository`: 벡터 DB 전용 접속을 이 클래스 안에서만 만든다 (DataSource 를 빈으로 등록하면 MyBatis 의 기본 DB 자동 설정이 꺼지므로). 읽기 전용, 접속 2개, 5초 제한, 처음 쓸 때 접속. 조각 수 · 조각과 가까운 조각 찾기
+- 접속 정보는 환경변수 `VECTOR_DB_URL` · `VECTOR_DB_USERNAME` · `VECTOR_DB_PASSWORD` (다른 키와 같은 방식, `application.properties` 는 안 고침). 주소가 없으면 벡터 기능만 끄고 서버는 켜짐
+- 작업 PC 는 서버 5432 가 막혀 있어 SSH 터널(`ssh -L 15432:127.0.0.1:5432 root@<서버>`)로 `localhost:15432/campine_vector` 에 접속
+- 임시 `brief/VectorPingRunner`: `--vector-ping` 인자로 켤 때만 개수 · JD-001 근처 3개를 로그로 (확인 후 삭제)
+- 결정: 재난 알림 문서(`disaster-map/rag`)는 벡터 DB 에 넣지 않고 단계(level)로 골라 AI 에게 바로 넘긴다 (README 설계와 같음, 다른 단계 문서가 섞이는 것을 막음)
+- 확인: `.\mvnw.cmd test` 222개 통과(처음에 235개로 적은 것은 `target/`에 남은 11-21 다른 브랜치 결과까지 센 잘못), 주소 없이 서버가 켜짐(경고 한 줄). **작업 PC 에서 SSH 터널로 `--vector-ping` 성공**: 조각 120 · 임베딩 120(413ms), JD-001 근처 = JD-001 0.000 · MW-002 0.508 · JD-002 0.570 (CSV 로 계산한 값과 같음)
+- 확인 못 함: 배포 서버 백엔드에서 접속(아직 안 올림, 환경변수 3줄 필요), 공용 DB 서버에 넣기(보류)
+
+## 2026-11-28 AI 브리핑 1 ~ 3단계: Spring AI로 Claude 연결 확인 (브랜치 `lyh-ragtest`, DB 변경 없음)
+- 라이브러리 추가: Spring AI 2.0.3 (`spring-ai-bom` + `spring-ai-starter-model-anthropic`, 안에 공식 Anthropic Java SDK 2.75.0). 2.0.x 인 이유: 공식 문서에 "2.0.x 는 Boot 4.0.x · 4.1.x 지원"
+- 키는 `application-local.properties`(git 제외)에만. `application.properties`에는 모델 · 최대 길이 · 키 자리(`${ANTHROPIC_API_KEY:}`)를 넣을 예정 (아직 안 넣음 → 지금은 기본값 Haiku 4.5)
+- 임시 `brief/AiPingRunner`: `--ai-ping` 인자로 켤 때만 Claude 한 번 호출 → 모델 · 시간 · 토큰 로그
+- 확인: 의존성 트리, `.\mvnw.cmd test` 222개 통과(서버 전체 켜기 포함), 시험 통화 성공(Haiku 4.5, 1.8초, 입력 68 · 출력 57 토큰)
+- 겪은 문제: 401 `invalid x-api-key` → 콘솔에서 새 키로 해결. 키를 `application.properties`에 직접 넣었던 것은 커밋 전에 되돌림
+- 확인 못 함: Opus 5.5로 호출, 키가 없을 때 서버가 켜지는지
+- 정리 문서: `docs/ai-brief-spring-ai.md`
+
 ## 2026-11-27 웹 1분 진단에 뒤로 버튼 (전체 화면 F11 시연용)
 - 앱 내 캠핑 브리핑 강조: 제목을 주황(--color-caution) 띠 + 흰 글씨 + 종 아이콘, 테두리 주황 (내용은 흰 바탕)
 - 앱 내 캠핑 "내일 캠핑 브리핑" 상자 테두리: 연회색 → 검정 1.5px

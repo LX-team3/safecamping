@@ -1,5 +1,6 @@
-// 캠핑 전날 브리핑 (내 캠핑 카드의 초인종 버튼을 누르면 펼쳐지는 3줄)
-// 아직 RAG(문서 검색 + AI 요약)를 붙이기 전이라, 이미 있는 데이터만 정해진 문장 틀에 넣어 만든다
+// 캠핑 전날 브리핑 (내 캠핑 카드의 초인종 버튼을 누르면 펼쳐지는 줄들)
+// 기본은 이미 있는 데이터를 정해진 문장 틀에 넣은 3줄. AI 대비 행동(RAG)을 받으면 2) 진단 줄 자리를 그 줄들로 바꾼다 (아래 buildBriefLines)
+// AI 를 못 받으면(실패 · 검사 통과 줄 없음) 이 3줄이 그대로 대체 브리핑이 된다
 //  1) 특보 · 날씨: 서버 출발 준비 응답(GET /api/member/camp-plans/{id}/checklist)의 warnings · forecast — 기상청 값 그대로
 //  2) 진단: 1분 진단 저장 결과(weak = 가장 약한 분야)와 그 분야의 안전 수칙 제목
 //  3) 체크리스트: 출발 준비 항목 중 아직 체크하지 않은 개수 + 먼저 챙길 항목 하나
@@ -59,7 +60,26 @@ function checklistLine(c, checkedIds) {
   return { key: 'check', label: '준비물', text: `${items.length}개 중 ${left.length}개 남음 · 먼저: ${left[0].text}` }
 }
 
+// ---- AI 대비 행동 (POST /api/member/camp-plans/{id}/brief, 서버 brief/) ----
+// 서버에 보낼 진단 요약. 웹 진단 결과는 서버 DB 에 칸이 없어 이 브라우저(loadSavedResult)에만 있다 → 요청에 담아 보낸다
+// 진단을 안 했으면 null (서버는 일정 · 날씨만으로 만든다)
+export function briefSurveyOf(savedSurvey) {
+  const A = savedSurvey?.answers
+  if (!A) return null
+  return { who: A.who || [], kid: A.kid || null, site: A.site || null, weak: savedSurvey.weak || [] }
+}
+
+// AI 줄 하나 → 브리핑 줄. 근거는 "행정안전부 2016" 처럼 기관 · 연도만 (제목은 길어서 화면이 좁다)
+function aiLine(l, i) {
+  const source = l.sources.map((s) => [s.org, s.year].filter(Boolean).join(' ')).join(', ')
+  return { key: `ai-${i}`, label: '대비', text: l.text, source }
+}
+
 // plan: 내 캠핑 일정, checklist: 출발 준비 응답, savedSurvey: loadSavedResult() 값(없으면 null)
-export function buildBriefLines(plan, checklist, savedSurvey, checkedIds) {
-  return [weatherLine(plan, checklist), surveyLine(savedSurvey), checklistLine(checklist, checkedIds)]
+// ai: 서버 브리핑 응답(없거나 ai=false 면 지금의 3줄 그대로)
+//   AI 가 있으면 진단 줄 자리에 대비 행동 줄들이 들어간다 (AI 가 진단의 조심할 분야를 반영해 행동을 고르므로)
+//   특보 · 날씨 줄과 준비물 줄은 AI 가 아니라 여기서 서버 값으로 만든다 → 숫자는 기상청 값 그대로
+export function buildBriefLines(plan, checklist, savedSurvey, checkedIds, ai = null) {
+  const middle = ai?.ai && ai.lines?.length ? ai.lines.map(aiLine) : [surveyLine(savedSurvey)]
+  return [weatherLine(plan, checklist), ...middle, checklistLine(checklist, checkedIds)]
 }
